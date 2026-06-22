@@ -25,12 +25,14 @@ from core.app_restart import restart_application
 from core.autosave import AutosaveManager, get_autosave_interval
 from core.ui_theme import load_stylesheet
 from core.constants_manager import APP_CREDIT, get_biblioteca_info
+from core.part_progress import compute_part_progress
 from core.parts_registry import PARTS, PART_LAYOUT, get_part_factory
 from core.session_state import load_session, save_session
 from database.backup import create_backup, ensure_backup_dir, list_backups, restore_backup
 from ui.excel_import.import_dialog import ImportExcelDialog
 from ui.about_dialog import AboutDialog
 from ui.help_dialog import HelpDialog
+from ui.home_page import HomePage
 from ui.incomplete_months_dialog import IncompleteMonthsDialog
 from ui.setup_wizard import SetupWizard
 from ui.widgets.toast import ToastHost
@@ -54,38 +56,92 @@ class MainWindow(QMainWindow):
         self._register_final_idx: int | None = None
         self._export_in_progress = False
         self._last_save_at: datetime | None = None
+        self._part_tooltips: dict[str, str] = {}
+        self._part_label_meta: dict[str, tuple[str, str]] = {}
         self._build_menu()
         self._build_ui()
         self._build_status_bar()
         self._autosave = AutosaveManager(self)
+        self.refresh_sidebar_badges(self._home_page.year())
 
         if load_first_part:
-            self.load_initial_part()
+            self.show_home()
 
-    def load_initial_part(self) -> None:
+    def show_home(self) -> None:
+        """Panou Acasă — vedere de ansamblu la pornire."""
+        self._home_page.refresh()
+        self._content_stack.setCurrentWidget(self._home_page)
+        self._part_list.blockSignals(True)
+        self._part_list.clearSelection()
+        self._part_list.blockSignals(False)
+        if hasattr(self, "_btn_home"):
+            self._btn_home.setChecked(True)
+        self.statusBar().showMessage("Acasă — progres registru pe anul selectat")
+
+    def continue_last_session(self) -> None:
+        """Deschide ultima parte / an / lună salvate în sesiune."""
         session = load_session()
         part_id = session.get("part_id", PARTS[0][1])
         if not any(pid == part_id for _roman, pid, _title, _short in PARTS):
             part_id = PARTS[0][1]
 
-        row = 0
-        for i, (_roman, pid, _title, _short) in enumerate(PARTS):
-            if pid == part_id:
-                row = i
+        for row in range(self._part_list.count()):
+            item = self._part_list.item(row)
+            if item and item.data(Qt.ItemDataRole.UserRole) == part_id:
+                self._part_list.blockSignals(True)
+                self._part_list.setCurrentRow(row)
+                self._part_list.blockSignals(False)
                 break
 
-        self._part_list.blockSignals(True)
         page = self._get_or_load_part(part_id)
-        if page is not None and hasattr(page, "apply_session_state"):
+        if page is None:
+            return
+        if hasattr(page, "apply_session_state"):
             year = session.get("year")
             month = session.get("month")
             if isinstance(year, int):
                 page.apply_session_state(year, month if isinstance(month, int) else None)
-        self._part_list.setCurrentRow(row)
-        self._part_list.blockSignals(False)
-        if page is not None:
-            self._content_stack.setCurrentWidget(page)
-            self.persist_session_from_page(page)
+        self._content_stack.setCurrentWidget(page)
+        if hasattr(self, "_btn_home"):
+            self._btn_home.setChecked(False)
+        self.persist_session_from_page(page)
+        self.statusBar().showMessage(self._part_tooltips.get(part_id, ""))
+
+    def load_initial_part(self) -> None:
+        """Compatibilitate — afișează panoul Acasă."""
+        self.show_home()
+
+    def refresh_sidebar_badges(self, year: int) -> None:
+        progress = compute_part_progress(year)
+        status_labels = {
+            "complete": "completă",
+            "attention": "necesită atenție",
+            "empty": "neîncepută",
+        }
+        for row in range(self._part_list.count()):
+            item = self._part_list.item(row)
+            if item is None:
+                continue
+            part_id = item.data(Qt.ItemDataRole.UserRole)
+            meta = self._part_label_meta.get(part_id)
+            if not meta:
+                continue
+            roman, short = meta
+            prog = progress.get(part_id)
+            badge = prog.badge if prog else "·"
+            item.setText(f"  {roman}   {short:<10} {badge}")
+            title = self._part_tooltips.get(part_id, "")
+            if prog:
+                item.setToolTip(f"{title}\nAn {year}: {status_labels.get(prog.status, '')}")
+            else:
+                item.setToolTip(title)
+
+    def maybe_show_onboarding(self) -> None:
+        from core.onboarding import is_onboarding_completed
+        from ui.onboarding_tour import OnboardingTourDialog
+
+        if not is_onboarding_completed():
+            OnboardingTourDialog(self).exec()
 
     def _build_menu(self) -> None:
         menu_setari = self.menuBar().addMenu("Setări")
@@ -103,6 +159,11 @@ class MainWindow(QMainWindow):
         menu_setari.addAction(act_excluded)
 
         menu_fisier = self.menuBar().addMenu("Fișier")
+        act_home = QAction("Acasă", self)
+        act_home.setShortcut("Ctrl+H")
+        act_home.triggered.connect(self.show_home)
+        menu_fisier.addAction(act_home)
+        menu_fisier.addSeparator()
         act_save = QAction("Salvează pagina curentă", self)
         act_save.setShortcut("Ctrl+S")
         act_save.triggered.connect(self._save_current)
@@ -417,6 +478,8 @@ class MainWindow(QMainWindow):
         self._part_list.blockSignals(False)
         register_final.refresh()
         self._content_stack.setCurrentWidget(register_final)
+        if hasattr(self, "_btn_home"):
+            self._btn_home.setChecked(False)
         self.statusBar().showMessage(
             "Registru final — selectați pagini, previzualizați sau exportați versiunea numerotată",
             6000,
@@ -436,6 +499,8 @@ class MainWindow(QMainWindow):
         if page is None:
             return
         self._content_stack.setCurrentWidget(page)
+        if hasattr(self, "_btn_home"):
+            self._btn_home.setChecked(False)
         if hasattr(page, "navigate_to"):
             page.navigate_to(month=month, category=category)
         self._autosave.on_page_changed()
@@ -446,7 +511,6 @@ class MainWindow(QMainWindow):
         root = QHBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        root.addWidget(self._build_sidebar())
 
         self._content_panel = QWidget()
         panel_layout = QVBoxLayout(self._content_panel)
@@ -463,7 +527,9 @@ class MainWindow(QMainWindow):
         self._content_stack.setObjectName("contentStack")
         panel_layout.addWidget(self._content_stack, stretch=1)
         self._toast = ToastHost(self._content_panel)
-        root.addWidget(self._content_panel, stretch=1)
+
+        self._home_page = HomePage(self)
+        self._home_idx = self._content_stack.addWidget(self._home_page)
 
         placeholder = QWidget()
         self._register_final_idx = self._content_stack.addWidget(placeholder)
@@ -473,6 +539,9 @@ class MainWindow(QMainWindow):
             self._part_pages[part_id] = placeholder
             idx = self._content_stack.addWidget(placeholder)
             self._part_placeholders[part_id] = idx
+
+        root.addWidget(self._build_sidebar())
+        root.addWidget(self._content_panel, stretch=1)
 
     def _build_sidebar(self) -> QFrame:
         frame = QFrame()
@@ -503,9 +572,18 @@ class MainWindow(QMainWindow):
         subtitle.setObjectName("sidebarSubtitle")
         layout.addWidget(subtitle)
 
+        self._btn_home = QPushButton("🏠  Acasă")
+        self._btn_home.setObjectName("btnHome")
+        self._btn_home.setCheckable(True)
+        self._btn_home.setChecked(True)
+        self._btn_home.clicked.connect(self.show_home)
+        layout.addWidget(self._btn_home)
+
         self._part_list = QListWidget()
         self._part_list.setObjectName("partList")
         for roman, part_id, title, short in PARTS:
+            self._part_tooltips[part_id] = title
+            self._part_label_meta[part_id] = (roman, short)
             item = QListWidgetItem(f"  {roman}   {short}")
             item.setToolTip(title)
             item.setData(Qt.ItemDataRole.UserRole, part_id)
@@ -546,6 +624,8 @@ class MainWindow(QMainWindow):
         page = self._get_or_load_part(part_id)
         if page is not None:
             self._content_stack.setCurrentWidget(page)
+            if hasattr(self, "_btn_home"):
+                self._btn_home.setChecked(False)
             self.statusBar().showMessage(item.toolTip())
             self.persist_session_from_page(page)
             self._autosave.on_page_changed()

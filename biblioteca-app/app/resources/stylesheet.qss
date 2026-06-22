@@ -649,3 +649,86 @@ QLabel#saveErrorBanner {
     color: #64748b;
     max-width: 420px;
 }
+
+/* ---- Home dashboard ---- */
+#homePage {
+    background-color: #eef2f7;
+}
+
+#homeHeaderCard, #homeCard {
+    background-color: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+#homeTitle {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+#homeLibrary {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e40af;
+}
+
+#homeSubtitle, #homeStat {
+    font-size: 13px;
+    color: #64748b;
+}
+
+#homeLegend {
+    font-size: 11px;
+    color: #94a3b8;
+    padding: 4px 2px;
+}
+
+#homeIssuesList {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    font-size: 13px;
+}
+
+#homeIssuesList::item {
+    padding: 8px 10px;
+}
+
+#homeIssuesList::item:hover {
+    background: #eff6ff;
+}
+
+QPushButton#btnHome {
+    text-align: left;
+    padding: 11px 10px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QPushButton#btnHome:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+QPushButton#btnHome:checked {
+    background-color: rgba(59, 130, 246, 0.25);
+    color: #ffffff;
+    border-left: 3px solid #60a5fa;
+}
+
+/* ---- Onboarding tour ---- */
+QLabel#tourStepTitle {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+QLabel#tourStepBody {
+    font-size: 14px;
+    color: #475569;
+    line-height: 1.5;
+}

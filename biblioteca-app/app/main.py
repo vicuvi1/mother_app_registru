@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QFont, QGuiApplication, QIcon
 from PyQt6.QtWidgets import QApplication
 
@@ -102,6 +102,7 @@ def main() -> int:
     app.processEvents()
 
     splash.finish(window)
+    QTimer.singleShot(400, window.maybe_show_onboarding)
     return app.exec()
 
 

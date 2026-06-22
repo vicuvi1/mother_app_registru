@@ -217,3 +217,80 @@ QListWidget::item:selected {
 #emptyStateSubtitle {
     color: #94a3b8;
 }
+
+/* ---- Home dashboard ---- */
+#homePage {
+    background-color: #0f172a;
+}
+
+#homeHeaderCard, #homeCard {
+    background-color: #1e293b;
+    border-radius: 12px;
+    border: 1px solid #334155;
+}
+
+#homeTitle {
+    font-size: 22px;
+    font-weight: 800;
+    color: #f8fafc;
+}
+
+#homeLibrary {
+    font-size: 16px;
+    font-weight: 600;
+    color: #93c5fd;
+}
+
+#homeSubtitle, #homeStat {
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+#homeLegend {
+    font-size: 11px;
+    color: #64748b;
+}
+
+#homeIssuesList {
+    border: 1px solid #334155;
+    border-radius: 8px;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-size: 13px;
+}
+
+#homeIssuesList::item:hover {
+    background: rgba(59, 130, 246, 0.15);
+}
+
+QPushButton#btnHome {
+    text-align: left;
+    padding: 11px 10px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QPushButton#btnHome:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+QPushButton#btnHome:checked {
+    background-color: rgba(59, 130, 246, 0.25);
+    color: #ffffff;
+    border-left: 3px solid #60a5fa;
+}
+
+QLabel#tourStepTitle {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+QLabel#tourStepBody {
+    font-size: 14px;
+    color: #cbd5e1;
+}
