@@ -1,8 +1,27 @@
-PyQt6>=6.6
-openpyxl>=3.1
-python-docx>=1.1
-reportlab>=4.0
-SQLAlchemy>=2.0
+# Registru Digital Bibliotecă — dependențe Python
+# Python 3.11+ (CI: 3.12) · v1.4.0
+#
+# Instalare:
+#   python -m venv venv
+#   venv\Scripts\pip install -r requirements.txt
+#
+# Rulare teste:
+#   set PYTHONPATH=app
+#   venv\Scripts\python.exe -m pytest tests\ -v
+
+# --- Runtime (aplicație desktop) ---
+
+PyQt6>=6.6,<7
+SQLAlchemy>=2.0,<3
+openpyxl>=3.1          # export / import Excel
+python-docx>=1.1       # export Word (.docx)
+reportlab>=4.0         # export PDF (fonturi bundled în app/resources/fonts/)
+
+# --- Dezvoltare și teste ---
+
 pytest>=8.0
-pytest-qt>=4.4
-pyinstaller>=6.0
+pytest-qt>=4.4         # smoke tests PyQt (MainWindow, tabel)
+
+# --- Build distribuție Windows ---
+
+pyinstaller>=6.0         # build.bat → dist/RegistruDigital/

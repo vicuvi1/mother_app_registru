@@ -1,0 +1,8 @@
+# Dependențe minime pentru RULAREA aplicației (fără teste / PyInstaller)
+# Folosit de install_dependencies.bat pe PC nou
+
+PyQt6>=6.6,<7
+SQLAlchemy>=2.0,<3
+openpyxl>=3.1
+python-docx>=1.1
+reportlab>=4.0

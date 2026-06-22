@@ -2,6 +2,7 @@
 
 Aplicație desktop **100% offline** pentru înlocuirea registrului fizic de evidență a activității bibliotecii publice din România. Datele sunt stocate local pe calculator; nu este necesară conexiune la internet.
 
+**Versiune curentă:** 1.4.0  
 **Repository GitHub:** [mother_app_registru](https://github.com/vicuvi1/mother_app_registru.git)
 
 **Ultima actualizare documentație:** 22 iunie 2026
@@ -15,7 +16,7 @@ Aplicație desktop **100% offline** pentru înlocuirea registrului fizic de evid
 3. [Meniu și funcții](#meniu-și-funcții)
 4. [Scurtături tastatură](#scurtături-tastatură)
 5. [Salvare și siguranța datelor](#salvare-și-siguranța-datelor)
-6. [Export și printare](#export-și-printare)
+6. [Export, import și printare](#export-import-și-printare)
 7. [Registru final și overview](#registru-final-și-overview)
 8. [Fișiere locale și foldere](#fișiere-locale-și-foldere)
 9. [Pornire și instalare](#pornire-și-instalare)
@@ -34,13 +35,14 @@ Registrul digital permite bibliotecarilor să:
 - **Navigheze pe ani și luni** cu tab-uri rapide, totaluri automate și total cumulativ „de la începutul anului”.
 - **Genereze automat** rânduri pentru zilele lucrătoare ale fiecărei luni (respectând zilele nelucrătoare / concediu).
 - **Exporte** pagini, anul întreg sau registrul complet în **Word (.docx)**, **PDF** sau **Excel (.xlsx)**.
-- **Printeze** previzualizare cu numerotare pagini.
-- **Salveze automat** modificările și să creeze **copii de rezervă** ale bazei de date.
+- **Importe** date din fișiere Excel exportate anterior (corecții în masă sau migrare).
+- **Printeze** previzualizare cu numerotare pagini și orientare configurabilă.
+- **Salveze automat** modificările (interval configurabil) și să creeze **copii de rezervă** ale bazei de date.
 - **Restaureze** registrul dintr-o copie anterioară (cu repornire automată).
-- **Verifice luni fără date** înainte de închiderea anului.
-- **Lucreze offline** — toate datele rămân pe PC-ul bibliotecii.
+- **Verifice integritatea** bazei de date la pornire și **luni fără date** înainte de închiderea anului.
+- **Lucreze offline** — toate datele rămân pe PC-ul bibliotecii sau pe un stick USB portabil.
 
-La prima pornire, un **asistent de configurare** solicită numele bibliotecii, localitatea, personalul responsabil și range-urile pentru generarea automată a valorilor.
+La prima pornire, un **asistent de configurare** solicită numele bibliotecii, localitatea, personalul responsabil, range-urile pentru generarea automată și preferințele aplicației (autosalvare, temă, printare, sincronizare backup).
 
 ---
 
@@ -68,6 +70,8 @@ La prima pornire, un **asistent de configurare** solicită numele bibliotecii, l
 - **Lunar (monthly)** — 12 rânduri fixe (câte o lună).
 - **CRUD** — listă liberă fără structură zilnică/lunară fixă.
 
+Toate părțile folosesc **QTableView** rapid, cu delegates pentru checkbox-uri, liste responsabil, text preset și câmpuri inline.
+
 ---
 
 ## Meniu și funcții
@@ -76,9 +80,11 @@ La prima pornire, un **asistent de configurare** solicită numele bibliotecii, l
 
 | Opțiune | Scurtătură | Descriere |
 |---------|------------|-----------|
-| Setup… | Ctrl+, | Redeschide asistentul: nume bibliotecă, localitate, personal, range-uri |
+| Setup… | Ctrl+, | Asistent: bibliotecă, personal, range-uri, autosalvare, temă, printare, folder cloud backup |
 | Pagina de titlu (copertă)… | — | Editează datele pentru coperta registrului la export |
 | Zile nelucrătoare (concediu)… | — | Marchează zilele excluse din calendarul lucrător (per an) |
+
+**În Setup → Aplicație:** autosalvare (30s / 1 min / 5 min / dezactivat), temă deschisă/întunecată, orientare printare, copiere automată a backup-urilor într-un folder sincronizat (OneDrive/Dropbox).
 
 ### Fișier
 
@@ -86,11 +92,13 @@ La prima pornire, un **asistent de configurare** solicită numele bibliotecii, l
 |---------|------------|-----------|
 | Salvează pagina curentă | Ctrl+S | Salvare manuală imediată |
 | Registru complet (overview)… | Ctrl+R | Dialog: selectați pagini/luni, previzualizare, export final |
-| Luni fără date… | — | Raport: lunile fără rânduri salvate în DB; dublu-click deschide partea |
+| Luni fără date… | — | Raport: lunile goale sau cu toate valorile zero; dublu-click deschide partea |
+| Asistent închidere an… | — | Pași ghidați: luni incomplete → copertă → export → backup |
 | Exportă pagina curentă… | Ctrl+E | Export lună / an / registru complet pentru partea curentă |
+| Importă din Excel… | — | Importă o lună dintr-un fișier Excel exportat din această aplicație |
 | Salvează copie registru (backup)… | — | Copie manuală `biblioteca_manual_YYYYMMDD_HHMMSS.db` |
 | Restaurează din copie… | — | Înlocuiește DB; creează copie pre-restaurare; **repornire automată** |
-| Deschide folderul copii de rezervă… | — | Deschide `app/data/backups/` în Explorer |
+| Deschide folderul copii de rezervă… | — | Deschide folderul `backups/` în Explorer |
 | Ieșire | Ctrl+Q | Închide aplicația (cu confirmare dacă există modificări nesalvate) |
 
 ### Ajutor
@@ -98,6 +106,7 @@ La prima pornire, un **asistent de configurare** solicită numele bibliotecii, l
 | Opțiune | Scurtătură | Descriere |
 |---------|------------|-----------|
 | Scurtături tastatură… | F1 | Lista completă de taste |
+| Despre… | — | Versiune aplicație și credit |
 
 ### Panou lateral
 
@@ -109,6 +118,7 @@ La prima pornire, un **asistent de configurare** solicită numele bibliotecii, l
 - Selector **An** și (unde e cazul) **Lună**.
 - **Regenerează zilele** — reconstruiește rândurile zilnice pentru luna curentă.
 - **Generează automat** — completează valori aleatoare în range-urile configurate.
+- **Copiază luna trecută** — duplică datele din luna anterioară (Ctrl+Shift+M).
 - **Range-uri** — setează min/max per coloană numerică.
 - **Liste text** — valori predefinite pentru celule tip listă (părți evenimente).
 - **Salvează**, **Printează**, **Exportă**.
@@ -128,10 +138,13 @@ La prima pornire, un **asistent de configurare** solicită numele bibliotecii, l
 | **Ctrl+S** | Salvează pagina curentă |
 | **Ctrl+E** | Exportă pagina curentă |
 | **Ctrl+R** | Registru complet (overview) |
-| **Ctrl+Z** | Anulează ultimele editări în celulă (**până la 10 pași**) |
-| **Ctrl+←** | Luna anterioară (părți zilnice/evenimente) |
-| **Ctrl+→** | Luna următoare |
+| **Ctrl+F** | Găsește în tabel (bară de căutare) |
+| **Ctrl+C / Ctrl+V** | Copiază / lipește bloc Excel (TSV) |
+| **Ctrl+Shift+M** | Copiază luna trecută |
+| **Ctrl+Z** | Anulează ultimele editări (**până la 10 pași**) |
+| **Ctrl+← / Ctrl+→** | Luna anterioară / următoare |
 | **Ctrl+D** | Duplică rândul selectat (părți evenimente) |
+| **Tab / Enter** | Navigare între celule editabile în tabel |
 | **Ctrl+,** | Setări bibliotecă |
 | **Ctrl+Q** | Ieșire |
 | **F1** | Ajutor — scurtături |
@@ -142,7 +155,7 @@ La prima pornire, un **asistent de configurare** solicită numele bibliotecii, l
 
 ### Salvare automată
 
-- La fiecare **60 de secunde** (dacă există modificări).
+- La interval configurabil în Setup: **30 s**, **1 min** (implicit), **5 min** sau **dezactivat**.
 - La **schimbarea părții** din meniul stâng.
 - La **schimbarea lunii** — salvare amânată în fundal (UI rămâne fluid).
 - La **închidere** — flush al modificărilor în așteptare.
@@ -153,7 +166,11 @@ Dacă există modificări nesalvate, la închidere apare dialogul: **Salvează /
 
 ### Sesiune reținută
 
-La repornire, aplicația restaurează ultima **parte**, **an** și **lună** deschise (`app/data/session.json`).
+La repornire, aplicația restaurează ultima **parte**, **an** și **lună** deschise (`data/session.json`).
+
+### Verificare integritate
+
+La pornire rulează `PRAGMA integrity_check`. Dacă baza de date este coruptă, aplicația oferă restaurare din ultima copie automată.
 
 ### Backup
 
@@ -162,29 +179,31 @@ La repornire, aplicația restaurează ultima **parte**, **an** și **lună** des
 | **Automat** | La fiecare pornire | Ultimele **5** copii (`biblioteca_auto_*.db`) |
 | **Manual** | Din meniu Fișier | Nelimitat (în folderul backups) |
 | **Pre-restaurare** | Înainte de restaurare | Copie `biblioteca_prerestore_*.db` |
+| **Cloud (opțional)** | După fiecare backup | Copie în folder OneDrive/Dropbox configurat în Setup |
 
-Backup-urile folosesc API-ul SQLite (`sqlite3.backup`) cu checkpoint WAL pentru consistență.
+Backup-urile folosesc API-ul SQLite (`sqlite3.backup`) cu checkpoint WAL pentru consistență. Fișiere simple `.db` — fără parolă sau criptare.
 
 ### Bază de date
 
 - **SQLite** cu mod **WAL** (Write-Ahead Logging) pentru performanță și integritate.
 - **Indexuri** pe `(an, luna)` pentru interogări rapide.
 - **Migrări** de schemă la actualizare (`schema_version`).
+- **Timestamps** timezone-aware (UTC) pe înregistrări.
 
 ### Jurnal (log)
 
-Evenimentele aplicației (pornire, salvare, export, erori) se scriu în `app/data/biblioteca.log` (rotație automată).
+Evenimentele aplicației (pornire, salvare, export, erori) se scriu în `data/biblioteca.log` (rotație automată).
 
 ---
 
-## Export și printare
+## Export, import și printare
 
 ### Formate
 
 | Format | Extensie | Motor |
 |--------|----------|-------|
 | Word | `.docx` | python-docx |
-| PDF | `.pdf` | ReportLab |
+| PDF | `.pdf` | ReportLab (fonturi cu diacritice românești incluse) |
 | Excel | `.xlsx` | openpyxl |
 
 ### Domenii export
@@ -193,8 +212,13 @@ Evenimentele aplicației (pornire, salvare, export, erori) se scriu în `app/dat
 - **Anul selectat** — toate lunile / categoriile părții curente.
 - **Registru complet** — toate părțile (cu dialog de progres și posibilitate de anulare).
 
+### Import Excel
+
+**Fișier → Importă din Excel…** — citește exporturile generate de această aplicație, mapează coloanele și înlocuiește datele lunii selectate. Util pentru corecții în masă după editare în Excel.
+
 ### Caracteristici export
 
+- Anteturi comune (`export_common.py`) pe toate formatele.
 - Anteturi de grup pe coloane (subgrupări).
 - Rânduri Total și Total de la început.
 - Pagină de titlu (copertă) opțională.
@@ -202,10 +226,11 @@ Evenimentele aplicației (pornire, salvare, export, erori) se scriu în `app/dat
 - Mesaje de eroare clare (fișier deschis în alt program, spațiu insuficient etc.).
 - Dialog de **progres** la exporturi mari.
 - Opțiune de deschidere fișier după export reușit.
+- **Preset-uri** — reține ultimul folder de export și orientarea printării.
 
 ### Printare
 
-Previzualizare print din pagina curentă sau din Registru final (orientare landscape, A4).
+Previzualizare print din pagina curentă sau din Registru final. Orientare **peisaj** sau **portret** configurabilă în Setup.
 
 ---
 
@@ -217,7 +242,7 @@ Dialog modal: arbore cu toate părțile și lunile; bifați ce includeți; expor
 
 ### Registru final (buton lateral)
 
-Pagină dedicată pentru **versiunea numerotată pe an**:
+Pagină dedicată pentru **versiunea numerotată pe an** (încărcare lazy la prima deschidere):
 
 - Arbore cu toate paginile registrului.
 - Selectare an.
@@ -225,34 +250,59 @@ Pagină dedicată pentru **versiunea numerotată pe an**:
 - Dublu-click pe pagină → navigare la editare în partea respectivă.
 - Previzualizare și export document final.
 
+### Asistent închidere an
+
+Wizard pas cu pas: verificare luni incomplete → pagină de titlu → export final → backup de siguranță.
+
 ---
 
 ## Fișiere locale și foldere
+
+### Dezvoltare (Python)
 
 ```
 biblioteca-app/
 ├── app/
 │   ├── main.py                 # Punct de intrare
-│   ├── data/
+│   ├── data/                   # Date locale în mod dev
 │   │   ├── biblioteca.db       # Baza de date SQLite (NU ȘTERGEȚI)
-│   │   ├── biblioteca.log      # Jurnal aplicație
-│   │   ├── biblioteca.db-wal   # WAL SQLite (generat automat)
-│   │   ├── biblioteca.db-shm   # Shared memory WAL
-│   │   ├── session.json        # Ultima parte/an/lună (generat automat)
+│   │   ├── biblioteca.log
+│   │   ├── session.json
 │   │   └── backups/            # Copii de rezervă .db
-│   ├── core/                   # Logică: autosave, sesiune, audit, părți
-│   ├── database/               # Modele SQLAlchemy, migrări, backup
-│   ├── ui/                     # Interfață PyQt6
+│   ├── core/                   # Logică: autosave, sesiune, audit, căi portabile
+│   ├── database/               # Modele SQLAlchemy, migrări, backup, integritate
+│   ├── ui/                     # Interfață PyQt6, import Excel, wizard-uri
 │   └── resources/
-│       └── stylesheet.qss      # Temă vizuală
-├── tests/                      # 29 teste pytest
+│       ├── stylesheet.qss        # Temă deschisă
+│       ├── stylesheet_dark.qss   # Temă întunecată
+│       └── fonts/                # Fonturi PDF (diacritice)
+├── tests/                      # 55 teste pytest (+ pytest-qt)
+├── installer/
+│   └── registru.iss            # Script Inno Setup
 ├── run.bat                     # Pornire aplicație (Windows)
-├── build.bat                   # Construire PyInstaller
+├── build.bat                   # Construire PyInstaller (portabil)
+├── build_installer.bat         # PyInstaller + Inno Setup
 ├── registru.spec               # Configurare PyInstaller
 └── requirements.txt
 ```
 
-**Important:** Copiați periodic folderul `app/data/backups/` pe USB sau alt mediu sigur.
+### Distribuție portabilă (.exe)
+
+După `build.bat`, folderul `dist/RegistruDigital/` conține `RegistruDigital.exe` și `_internal/`. La prima rulare se creează **`data/` lângă executabil** (nu în `_internal`):
+
+```
+dist/RegistruDigital/
+├── RegistruDigital.exe
+├── _internal/                  # Resurse aplicație (read-only)
+└── data/                       # Creat automat — DB, backup, log, sesiune
+    ├── biblioteca.db
+    ├── backups/
+    └── session.json
+```
+
+Copiați întregul folder `RegistruDigital/` pe USB pentru utilizare portabilă. Override opțional: variabila de mediu `BIBLIOTECA_DATA_DIR`.
+
+**Important:** Copiați periodic folderul `data/backups/` pe USB sau alt mediu sigur.
 
 ---
 
@@ -275,19 +325,41 @@ run.bat
 ### Prima pornire
 
 1. Ecran splash animat la inițializare.
-2. Asistent configurare (dacă e prima rulare).
-3. Se încarcă ultima sesiune sau Partea I, anul și luna curente.
+2. Verificare integritate bază de date.
+3. Asistent configurare (dacă e prima rulare).
+4. Se încarcă ultima sesiune sau Partea I, anul și luna curente.
+
+### Instalator Windows (opțional)
+
+Cu [Inno Setup](https://jrsoftware.org/isinfo.php) instalat și `iscc` în PATH:
+
+```bat
+cd biblioteca-app
+build_installer.bat
+```
+
+Rezultat: `installer/output/RegistruDigital_Setup_*.exe` — shortcut în Start Menu, dezinstalare, ștergere `data/` la uninstall.
 
 ---
 
 ## Construire executabil (.exe)
+
+### Portabil (PyInstaller)
 
 ```bat
 cd biblioteca-app
 build.bat
 ```
 
-Rezultat: `dist/RegistruDigital/RegistruDigital.exe` (folder portabil cu dependențe).
+Rezultat: `dist/RegistruDigital/RegistruDigital.exe` — folder portabil cu dependențe; datele utilizator în `data/` alături.
+
+### Cu instalator
+
+```bat
+build_installer.bat
+```
+
+Rulează PyInstaller, apoi Inno Setup dacă este disponibil.
 
 ---
 
@@ -295,10 +367,11 @@ Rezultat: `dist/RegistruDigital/RegistruDigital.exe` (folder portabil cu depende
 
 ```bat
 cd biblioteca-app
+set PYTHONPATH=app
 venv\Scripts\python.exe -m pytest tests\ -v
 ```
 
-**29 teste** acoperă: backup/restaurare, export PDF/utilitare, salvare roundtrip, agregări SQL, motor date, sesiune, audit luni incomplete, model tabel.
+**55 teste** acoperă: backup/restaurare, export PDF/utilitare, salvare roundtrip, agregări SQL, motor date, sesiune, audit luni incomplete, model tabel, căi portabile, import Excel, cloud backup, integritate DB, autosalvare, **smoke tests PyQt** (`pytest-qt`).
 
 **CI GitHub Actions:** la fiecare push pe `main`, rulează testele pe `windows-latest` cu Python 3.12.
 
@@ -311,10 +384,10 @@ venv\Scripts\python.exe -m pytest tests\ -v
 | Interfață | PyQt6 |
 | Bază de date | SQLite + SQLAlchemy 2 |
 | Export Word | python-docx |
-| Export PDF | ReportLab |
+| Export PDF | ReportLab + fonturi DejaVu bundled |
 | Export Excel | openpyxl |
-| Distribuție | PyInstaller |
-| Teste | pytest |
+| Distribuție | PyInstaller + Inno Setup (opțional) |
+| Teste | pytest + pytest-qt |
 
 ### Performanță
 
@@ -324,17 +397,32 @@ venv\Scripts\python.exe -m pytest tests\ -v
 - **Agregări SQL** pentru totalul cumulativ (în loc de încărcarea tuturor rândurilor).
 - **Salvare amânată** la schimbarea lunii.
 - **Splash screen** la pornire.
-- **QTableView + QAbstractTableModel** pentru părțile I, III, IV (fără widget-uri complexe în celule).
-- **QTableWidget** (legacy) pentru părți cu checkbox-uri, dropdown-uri, text preset.
+- **QTableView + QAbstractTableModel** pentru **toate** părțile, cu delegates pentru bool, scope, responsabil, text preset/inline.
 
 ### Structură cod `PartPageBase`
 
 Clasa de bază a paginilor este împărțită în mixin-uri (`app/ui/parts/mixins/`):
 
-- `ui_mixin` — construire UI, navigare
-- `cache_mixin` — cache, preload
-- `data_mixin` — persistență DB, generare
-- `export_mixin` — export, print, construire pagini
+| Mixin | Responsabilitate |
+|-------|------------------|
+| `ui_mixin` | UI, navigare, sesiune, scurtături luni |
+| `cache_mixin` | Cache în memorie, preload, salvare amânată |
+| `data_mixin` | Persistență DB, generare, copiere lună |
+| `export_mixin` | Export, print, construire pagini |
+
+`app/ui/part_base.py` este un re-export subțire — sursa de adevăr sunt mixin-urile. Scriptul `scripts/split_part_base.py` este **arhival** (Batch D); nu îl rulați din nou.
+
+### Module notabile (Batch E–H)
+
+| Modul | Rol |
+|-------|-----|
+| `core/paths.py` | Căi portabile USB, override `BIBLIOTECA_DATA_DIR` |
+| `core/cloud_backup.py` | Copiere backup în folder sincronizat |
+| `database/integrity.py` | Verificare integritate la pornire |
+| `ui/excel_import/` | Import din Excel |
+| `ui/year_end_wizard.py` | Asistent închidere an |
+| `ui/widgets/table_find_bar.py` | Căutare Ctrl+F în tabel |
+| `ui/export/export_common.py` | Antete și formatare comună export |
 
 ---
 
@@ -342,17 +430,26 @@ Clasa de bază a paginilor este împărțită în mixin-uri (`app/ui/parts/mixin
 
 Toate orele sunt **ora României (UTC+3)** din jurnalul Git.
 
-### 22 iunie 2026
+### 22 iunie 2026 — Batch E–H (v1.1.0 → v1.4.0)
+
+| Commit | Descriere |
+|--------|-----------|
+| `b68540b` | **Batch H — Calitate cod (Tier 4):** timestamps UTC; deduplicare antet PDF; fix undo pe celule preset; teste `pytest-qt`; eliminare criptare backup |
+| `826edf5` | **Batch G — Distribuție (Tier 3):** mod portabil USB (`data/` lângă exe); instalator Inno Setup; import Excel; sincronizare backup cloud |
+| `da191e7` | **Batch F — UX (Tier 2):** Ctrl+F în tabel; copy/paste Excel; copiere lună anterioară; wizard închidere an; preset-uri print/export; dark mode; diacritice PDF |
+| `67af96c` | **Batch E — Fiabilitate (Tier 1):** QTableView + delegates pe toate părțile; verificare integritate; autosalvare configurabilă; audit luni cu zerouri; dialog Despre; verificare PyInstaller |
+
+### 22 iunie 2026 — Batch A–D (fundament)
 
 | Ora | Commit | Descriere |
 |-----|--------|-----------|
-| **12:57** | `a00f579` | **Batch D — Arhitectură:** împărțire `PartPageBase` în 4 mixin-uri; `RegisterTableModel` + `RegisterTableView` (QTableView) pentru părțile I/III/IV; factory tabel automat |
+| **12:57** | `a00f579` | **Batch D — Arhitectură:** împărțire `PartPageBase` în 4 mixin-uri; `RegisterTableModel` + `RegisterTableView`; factory tabel |
 | **12:50** | `8fc12a1` | **Batch C — Siguranță date:** backup SQLite online; banner eroare salvare; undo 10 niveluri; raport „Luni fără date” |
-| **12:46** | `98eb9f7` | **Batch B — Fiabilitate:** repornire automată după restaurare; confirmare ieșire cu modificări nesalvate; reținere sesiune (parte/an/lună); Ctrl+←/→ navigare luni |
-| **12:42** | `34d5aef` | **Batch A — UX:** fix splash CSS; an/lună curentă implicit; progres export peste tot; antete export comune; folder backup; lazy Registru final; fix Ctrl+R overview |
-| **12:37** | `231e046` | **Fix critic:** import `QShortcut` din `QtGui` (PyQt6) — aplicația nu pornea |
-| **12:33** | `12dd5a3` | **Performanță + backup + UX:** indexuri DB, agregări SQL, lazy părți, splash, backup/restaurare UI, scurtături F1, export progres, PyInstaller, CI, 22 teste |
-| **12:11** | `b4b3a79` | **Fiabilitate export:** validare/erori export, jurnal rotativ, WAL SQLite, autosave la export, teste export |
+| **12:46** | `98eb9f7` | **Batch B — Fiabilitate:** repornire automată după restaurare; confirmare ieșire; reținere sesiune; Ctrl+←/→ navigare luni |
+| **12:42** | `34d5aef` | **Batch A — UX:** fix splash CSS; an/lună curentă implicit; progres export; antete export comune; folder backup; lazy Registru final |
+| **12:37** | `231e046` | **Fix critic:** import `QShortcut` din `QtGui` (PyQt6) |
+| **12:33** | `12dd5a3` | **Performanță + backup + UX:** indexuri DB, agregări SQL, lazy părți, splash, backup/restaurare UI, CI |
+| **12:11** | `b4b3a79` | **Fiabilitate export:** validare/erori export, jurnal rotativ, WAL SQLite |
 | **11:56** | `d4099cb` | **Versiune inițială:** aplicație completă PyQt6, 12 părți registru, SQLite, export Word/PDF/Excel |
 
 ---
@@ -361,11 +458,14 @@ Toate orele sunt **ora României (UTC+3)** din jurnalul Git.
 
 | Problemă | Soluție |
 |----------|---------|
-| Aplicația nu pornește | Rulați `run.bat`; verificați `biblioteca.log` |
+| Aplicația nu pornește | Rulați `run.bat`; verificați `data/biblioteca.log` |
+| Bază de date coruptă | La pornire, acceptați restaurarea din ultima copie automată |
 | „Fișier deschis în alt program” la export | Închideți Word/Excel/PDF deschis cu același nume |
-| Date pierdute | Restaurați din `app/data/backups/` — cea mai recentă `biblioteca_auto_*.db` |
-| Lună goală la export | Completați în parte sau folosiți „Luni fără date” pentru identificare |
+| Date pierdute | Restaurați din `data/backups/` — cea mai recentă `biblioteca_auto_*.db` |
+| Lună goală la export | Completați în parte sau folosiți „Luni fără date” |
 | Salvare eșuată (banner roșu) | Ctrl+S; verificați spațiu pe disc |
+| Diacritice lipsă în PDF | Reinstalați din build recent (fonturile sunt incluse în `.exe`) |
+| Mod portabil USB | Copiați tot folderul `RegistruDigital/`; `data/` trebuie să stea lângă `.exe` |
 
 ---
 
@@ -375,4 +475,4 @@ Proiect dezvoltat pentru evidența digitală a bibliotecilor publice. Consultaț
 
 ---
 
-*Document generat pentru versiunea din commit `a00f579` (22 iunie 2026, 12:57).*
+*Document actualizat pentru versiunea **1.4.0** (commit `b68540b`, 22 iunie 2026).*
