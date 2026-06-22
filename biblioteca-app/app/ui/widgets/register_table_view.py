@@ -287,6 +287,9 @@ class RegisterTableView(QTableView):
             for r in range(self._register_model.rowCount()):
                 self.setRowHeight(r, 34 if self.store.is_total_row(r) else 40)
 
+    def update_today_highlight(self, date_field: str, dd_mm: str | None) -> None:
+        self._register_model.set_highlight_date(date_field, dd_mm)
+
     def resize_columns_to_contents(self) -> None:
         self.resizeColumnsToContents()
         for i, col in enumerate(self._columns):

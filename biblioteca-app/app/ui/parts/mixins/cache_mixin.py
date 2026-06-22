@@ -39,10 +39,12 @@ class PartCacheMixin:
     def _cache_key(self, year: int | None = None, month: int | None = None, categorie: str | None = None) -> tuple:
         return (year or self._loaded_year, month or self._loaded_month, categorie)
     def _snapshot_table(self, table: EditableTable) -> dict:
+        ids = table.get_row_ids()
         return {
             "rows": table.get_data_rows(),
-            "ids": table.get_row_ids(),
+            "ids": ids,
             "flags": table.get_auto_flags(),
+            "db_empty": self.mode == "daily" and bool(ids) and all(i is None for i in ids),
         }
     def _cache_current_period(self) -> None:
         """Memorează starea tabelelor pentru perioada curentă (înainte de navigare)."""
@@ -173,6 +175,8 @@ class PartCacheMixin:
             row_ids.append(rec.id)
             auto_flags.append(getattr(rec, "is_auto_generated", False))
 
+        db_empty = len(rows_db) == 0
+
         if self.mode == "monthly" and not rows_data:
             rows_data, row_ids, auto_flags = self._ensure_monthly_rows(categorie)
         elif self.mode == "daily" and not rows_data:
@@ -183,7 +187,7 @@ class PartCacheMixin:
             finally:
                 self._loaded_year, self._loaded_month = saved_year, saved_month
 
-        return {"rows": rows_data, "ids": row_ids, "flags": auto_flags}
+        return {"rows": rows_data, "ids": row_ids, "flags": auto_flags, "db_empty": db_empty}
     def _load_table(self, table: EditableTable, categorie: str | None, fast: bool = False) -> None:
         key = self._cache_key(categorie=categorie)
         if key in self._data_cache:
@@ -196,6 +200,7 @@ class PartCacheMixin:
                 resize_rows=not fast,
             )
             self._update_totals(table, categorie, fast=fast)
+            self._refresh_table_chrome(table, cached)
             return
 
         cached = self._fetch_table_data(categorie)
@@ -208,6 +213,7 @@ class PartCacheMixin:
         )
         self._update_totals(table, categorie, fast=fast)
         self._data_cache[key] = cached
+        self._refresh_table_chrome(table, cached)
     def _schedule_preload_adjacent(self) -> None:
         if not self._has_month_bar:
             return

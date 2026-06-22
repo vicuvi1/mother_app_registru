@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QTabBar,
     QTabWidget,
     QVBoxLayout,
@@ -27,6 +28,7 @@ from database.db_manager import get_session
 from ui.export.export_dialog import ExportDialog
 from ui.export.export_errors import format_export_error, run_export_with_progress
 from ui.widgets.date_picker_zile_lucratoare import DatePickerZileLucratoare
+from ui.widgets.empty_state import TableEmptyState
 from ui.widgets.editable_table import ColumnDef, EditableTable
 from ui.widgets.range_config_dialog import RangeConfigDialog
 from ui.widgets.table_factory import create_register_table
@@ -239,7 +241,7 @@ class PartUiMixin:
         hint = QLabel(
             "Click pe celulă + tastați  ·  Tab / Enter = următoarea celulă  ·  "
             "Ctrl+F = găsește  ·  Ctrl+V = lipește din Excel  ·  "
-            "Dublu-click pe antet = redenumire  ·  Albastru = generat automat"
+            "Galben = ziua de azi  ·  Albastru = generat automat"
         )
         table_layout.addWidget(hint)
 
@@ -251,15 +253,29 @@ class PartUiMixin:
             self.tabs = QTabWidget()
             self.table_adulti = self._make_table()
             self.table_copii = self._make_table()
+            self._table_stack = QStackedWidget()
+            self._empty_state = TableEmptyState()
+            self._empty_state.regenerate_clicked.connect(self._regenerate_days)
+            self._empty_state.copy_month_clicked.connect(self._duplicate_from_previous_month)
+            self._empty_state.add_row_clicked.connect(self._add_empty_row)
+            self._table_stack.addWidget(self.tabs)
+            self._table_stack.addWidget(self._empty_state)
             self.tabs.addTab(self._scroll_for(self.table_adulti), "Adulți")
             self.tabs.addTab(self._scroll_for(self.table_copii), "Copii până la 16 ani")
             self.tabs.currentChanged.connect(self._on_tab_changed)
-            table_layout.addWidget(self.tabs)
+            table_layout.addWidget(self._table_stack)
             self.table = self.table_adulti
         else:
             self.tabs = None
             self.table = self._make_table()
-            table_layout.addWidget(self._scroll_for(self.table))
+            self._table_stack = QStackedWidget()
+            self._empty_state = TableEmptyState()
+            self._empty_state.regenerate_clicked.connect(self._regenerate_days)
+            self._empty_state.copy_month_clicked.connect(self._duplicate_from_previous_month)
+            self._empty_state.add_row_clicked.connect(self._add_empty_row)
+            self._table_stack.addWidget(self._scroll_for(self.table))
+            self._table_stack.addWidget(self._empty_state)
+            table_layout.addWidget(self._table_stack)
 
         outer.addWidget(table_card, stretch=1)
         self._building = False
@@ -392,6 +408,7 @@ class PartUiMixin:
     def _on_tab_changed(self) -> None:
         if self._building:
             return
+        self.table = self.table_adulti if self.tabs.currentIndex() == 0 else self.table_copii
         self._save_if_dirty()
         self._load_table(self._active_table(), self._active_category(), fast=True)
     def _on_cell_edited(self, row: int, key: str, value) -> None:
@@ -410,3 +427,54 @@ class PartUiMixin:
             )
     def _show_validation_hint(self, msg: str) -> None:
         self.main_window.statusBar().showMessage(msg, 3000)
+
+    def _refresh_table_chrome(self, table: EditableTable, cached: dict | None = None) -> None:
+        if not hasattr(self, "_table_stack"):
+            return
+        self._update_empty_state(table, cached or {})
+        self._update_today_highlight(table)
+
+    def _update_empty_state(self, table: EditableTable, cached: dict) -> None:
+        db_empty = bool(cached.get("db_empty"))
+        data_rows = len(table.get_data_rows()) if hasattr(table, "get_data_rows") else 0
+        show_empty = False
+        luna_name = LUNI_RO[self.month - 1] if self._has_month_bar else str(self.year)
+
+        if self.mode in ("events", "crud") and data_rows == 0:
+            show_empty = True
+            if self.mode == "events":
+                title = "Niciun eveniment înregistrat"
+                subtitle = f"Adăugați activități pentru {luna_name} {self.year}."
+            else:
+                title = "Lista este goală"
+                subtitle = "Adăugați primul rând pentru a începe evidența."
+            self._empty_state.configure(
+                title=title,
+                subtitle=subtitle,
+                show_regenerate=False,
+                show_copy_month=self._has_month_bar and self.mode == "events",
+                show_add_row=True,
+            )
+        elif self.mode == "daily" and db_empty:
+            show_empty = True
+            self._empty_state.configure(
+                title=f"Luna {luna_name} nu are încă date",
+                subtitle="Generați zilele lucrătoare sau copiați structura din luna anterioară.",
+                show_regenerate=True,
+                show_copy_month=self.month > 1,
+                show_add_row=False,
+            )
+
+        self._table_stack.setCurrentIndex(1 if show_empty else 0)
+
+    def _update_today_highlight(self, table: EditableTable) -> None:
+        from datetime import date
+
+        if not hasattr(table, "update_today_highlight"):
+            return
+        today = date.today()
+        if self.mode != "daily" or self.year != today.year or self.month != today.month:
+            table.update_today_highlight(self.date_field, None)
+            return
+        dd_mm = f"{today.day:02d}.{today.month:02d}"
+        table.update_today_highlight(self.date_field, dd_mm)

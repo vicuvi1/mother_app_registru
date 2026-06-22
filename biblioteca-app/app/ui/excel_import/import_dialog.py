@@ -128,9 +128,8 @@ class ImportExcelDialog(QDialog):
             QMessageBox.warning(self, "Import eșuat", str(exc))
             return
 
-        QMessageBox.information(
-            self,
-            "Import reușit",
-            f"Au fost importate {count} rânduri pentru {LUNI_RO[month - 1]} {year}.",
-        )
+        msg = f"Import reușit — {count} rânduri ({LUNI_RO[month - 1]} {year})"
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "show_toast"):
+            parent.show_toast(msg, duration_ms=4000)
         self.accept()

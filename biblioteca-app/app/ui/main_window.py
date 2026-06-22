@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence
+from PyQt6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence, QResizeEvent
 from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -33,6 +33,7 @@ from ui.about_dialog import AboutDialog
 from ui.help_dialog import HelpDialog
 from ui.incomplete_months_dialog import IncompleteMonthsDialog
 from ui.setup_wizard import SetupWizard
+from ui.widgets.toast import ToastHost
 from ui.year_end_wizard import YearEndWizard
 
 # Re-export pentru module care importă din main_window
@@ -172,11 +173,7 @@ class MainWindow(QMainWindow):
     def _backup_database(self) -> None:
         try:
             path = create_backup("manual")
-            QMessageBox.information(
-                self,
-                "Backup reușit",
-                f"Copia registrului a fost salvată:\n{path}",
-            )
+            self.show_toast(f"Copie de rezervă salvată\n{path.name}", duration_ms=4000)
         except OSError as exc:
             QMessageBox.warning(self, "Backup", f"Nu s-a putut crea copia:\n{exc}")
 
@@ -248,6 +245,11 @@ class MainWindow(QMainWindow):
         self.set_save_status(True)
         ts = self._last_save_at.strftime("%H:%M:%S")
         self._save_label.setToolTip(f"Ultima salvare: {ts}")
+        self.show_toast(f"Salvat ✓  {ts}")
+
+    def show_toast(self, message: str, *, kind: str = "success", duration_ms: int = 2800) -> None:
+        if hasattr(self, "_toast"):
+            self._toast.show_message(message, duration_ms=duration_ms, kind=kind)
 
     def show_save_error(self, message: str) -> None:
         self._save_error_banner.setText(message)
@@ -336,6 +338,11 @@ class MainWindow(QMainWindow):
         if page is not None:
             self.persist_session_from_page(page)
         super().closeEvent(event)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        if hasattr(self, "_toast"):
+            self._toast._reposition()
 
     def _open_cover(self) -> None:
         from ui.cover_page_dialog import CoverPageDialog
@@ -455,6 +462,7 @@ class MainWindow(QMainWindow):
         self._content_stack = QStackedWidget()
         self._content_stack.setObjectName("contentStack")
         panel_layout.addWidget(self._content_stack, stretch=1)
+        self._toast = ToastHost(self._content_panel)
         root.addWidget(self._content_panel, stretch=1)
 
         placeholder = QWidget()

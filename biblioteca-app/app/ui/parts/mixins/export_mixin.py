@@ -247,10 +247,14 @@ class PartExportMixin:
         finally:
             self.main_window.statusBar().clearMessage()
 
+        self.main_window.show_toast(
+            f"Export salvat — {len(pages)} pagini",
+            duration_ms=3500,
+        )
         reply = QMessageBox.question(
             self,
-            "Export reușit",
-            f"Fișierul a fost salvat ({len(pages)} pagini):\n{out_path}\n\nDoriți să îl deschideți?",
+            "Deschide fișierul?",
+            f"Fișierul a fost salvat:\n{out_path}\n\nDoriți să îl deschideți?",
         )
         if reply == QMessageBox.StandardButton.Yes:
             self._open_file(out_path)

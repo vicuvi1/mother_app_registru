@@ -11,6 +11,7 @@ from ui.widgets.table.data_store import TableDataStore
 AUTO_COLOR = QColor("#dbeafe")
 TOTAL_COLOR = QColor("#e2e8f0")
 INVALID_COLOR = QColor("#fecaca")
+TODAY_COLOR = QColor("#fef9c3")
 
 
 class RegisterTableModel(QAbstractTableModel):
@@ -23,6 +24,8 @@ class RegisterTableModel(QAbstractTableModel):
         super().__init__(parent)
         self.store = TableDataStore()
         self._invalid_cells: set[tuple[int, int]] = set()
+        self._highlight_field: str = ""
+        self._highlight_dd_mm: str | None = None
 
     def setup(
         self,
@@ -34,6 +37,28 @@ class RegisterTableModel(QAbstractTableModel):
         self.store.columns = list(columns)
         self.store.computed_rules = computed_rules or {}
         self.store.part_id = part_id
+
+    def set_highlight_date(self, field: str, dd_mm: str | None) -> None:
+        self._highlight_field = field or ""
+        self._highlight_dd_mm = dd_mm
+        if self.rowCount() > 0 and self.columnCount() > 0:
+            self.dataChanged.emit(
+                self.index(0, 0),
+                self.index(self.rowCount() - 1, self.columnCount() - 1),
+                [Qt.ItemDataRole.BackgroundRole],
+            )
+
+    def _is_today_row(self, row: int) -> bool:
+        if not self._highlight_dd_mm or not self._highlight_field or self.store.is_total_row(row):
+            return False
+        col_idx = next(
+            (i for i, c in enumerate(self.store.columns) if c.key == self._highlight_field),
+            None,
+        )
+        if col_idx is None:
+            return False
+        val = self.store.get_cell(row, col_idx)
+        return str(val or "").strip() == self._highlight_dd_mm
 
     def columnCount(self, parent=QModelIndex()) -> int:  # noqa: N802
         if parent.isValid():
@@ -107,6 +132,8 @@ class RegisterTableModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.BackgroundRole:
             if (row, col) in self._invalid_cells:
                 return QBrush(INVALID_COLOR)
+            if self._is_today_row(row):
+                return QBrush(TODAY_COLOR)
             if self.store.is_total_row(row):
                 return QBrush(TOTAL_COLOR)
             if (

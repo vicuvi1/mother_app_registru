@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QGuiApplication
+from PyQt6.QtGui import QFont, QGuiApplication, QIcon
 from PyQt6.QtWidgets import QApplication
 
 if str(Path(__file__).resolve().parent) not in sys.path:
@@ -24,6 +24,15 @@ from ui.splash_screen import SplashScreen  # noqa: E402
 
 def _load_stylesheet(app: QApplication) -> None:
     load_stylesheet(app, APP_ROOT)
+
+
+def _load_app_icon(app: QApplication) -> None:
+    for name in ("registru.ico", "registru.png"):
+        path = APP_ROOT / "resources" / name
+        if path.is_file():
+            icon = QIcon(str(path))
+            app.setWindowIcon(icon)
+            break
 
 
 def _center_on_screen(widget) -> None:
@@ -47,6 +56,7 @@ def main() -> int:
     font = QFont("Segoe UI", 10)
     app.setFont(font)
     _load_stylesheet(app)
+    _load_app_icon(app)
 
     splash = SplashScreen()
     _center_on_screen(splash)
@@ -83,6 +93,8 @@ def main() -> int:
     splash.set_message("Construire interfață")
     splash.set_progress(55, 100)
     window = MainWindow(load_first_part=False)
+    if not app.windowIcon().isNull():
+        window.setWindowIcon(app.windowIcon())
 
     splash.set_message("Încărcare registru")
     splash.set_progress(80, 100)
