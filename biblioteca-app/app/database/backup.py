@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 import shutil
+import sqlite3
 from datetime import datetime
 from pathlib import Path
+
+from sqlalchemy import text
 
 from database.db_manager import DATA_DIR, DB_PATH, get_engine
 
@@ -24,14 +27,39 @@ def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def _checkpoint_wal() -> None:
+    """Checkpoint WAL pentru copie consistentă."""
+    try:
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+            conn.commit()
+    except OSError:
+        logger.warning("Checkpoint WAL eșuat", exc_info=True)
+
+
+def _copy_database_safe(source: Path, dest: Path) -> None:
+    """Copie online SQLite prin backup API; fallback la copy2."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        _checkpoint_wal()
+        with sqlite3.connect(str(source)) as src_conn:
+            with sqlite3.connect(str(dest)) as dest_conn:
+                src_conn.backup(dest_conn)
+        return
+    except (sqlite3.Error, OSError):
+        logger.warning("Backup SQLite API eșuat pentru %s — fallback copy2", source, exc_info=True)
+    shutil.copy2(source, dest)
+
+
 def create_backup(label: str = "manual") -> Path:
-    """Copiază biblioteca.db în folderul backups/."""
+    """Salvează biblioteca.db în folderul backups/ (copie SQLite sigură)."""
     if not DB_PATH.exists():
         raise FileNotFoundError(f"Baza de date nu există: {DB_PATH}")
 
     ensure_backup_dir()
     dest = BACKUP_DIR / f"biblioteca_{label}_{_timestamp()}.db"
-    shutil.copy2(DB_PATH, dest)
+    _copy_database_safe(DB_PATH, dest)
     logger.info("Backup creat: %s", dest)
     return dest
 
@@ -84,9 +112,9 @@ def restore_backup(backup_path: Path) -> Path | None:
     if DB_PATH.exists():
         pre_restore = BACKUP_DIR / f"biblioteca_prerestore_{_timestamp()}.db"
         ensure_backup_dir()
-        shutil.copy2(DB_PATH, pre_restore)
+        _copy_database_safe(DB_PATH, pre_restore)
         logger.info("Copie pre-restaurare: %s", pre_restore)
 
-    shutil.copy2(backup_path, DB_PATH)
+    _copy_database_safe(backup_path, DB_PATH)
     logger.info("Bază de date restaurată din %s", backup_path)
     return pre_restore

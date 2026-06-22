@@ -17,7 +17,11 @@ class AutosaveManager(QObject):
             return
         page = self._current_part_page()
         if page is not None and hasattr(page, "save_all"):
-            page.save_all(show_status=True)
+            if not page.save_all(show_status=True):
+                if hasattr(self._main_window, "show_save_error"):
+                    self._main_window.show_save_error(
+                        "Autosalvarea a eșuat. Apăsați Ctrl+S pentru a reîncerca."
+                    )
 
     def on_page_changed(self) -> None:
         if getattr(self._main_window, "_export_in_progress", False):
@@ -26,9 +30,17 @@ class AutosaveManager(QObject):
         if page is not None and hasattr(page, "save_all"):
             if hasattr(page, "_debounce") and page._debounce.isActive():
                 page._debounce.stop()
-                page.save_all(show_status=True)
+                if not page.save_all(show_status=True):
+                    if hasattr(self._main_window, "show_save_error"):
+                        self._main_window.show_save_error(
+                            "Nu s-au putut salva modificările la schimbarea părții."
+                        )
             elif getattr(page, "_dirty", False):
-                page.save_all(show_status=True)
+                if not page.save_all(show_status=True):
+                    if hasattr(self._main_window, "show_save_error"):
+                        self._main_window.show_save_error(
+                            "Nu s-au putut salva modificările la schimbarea părții."
+                        )
 
     def _current_part_page(self):
         stack = self._main_window._content_stack

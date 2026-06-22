@@ -10,7 +10,7 @@ SHORTCUTS_TEXT = """
 <tr><td><b>Ctrl+S</b></td><td>Salvează pagina curentă</td></tr>
 <tr><td><b>Ctrl+E</b></td><td>Exportă pagina curentă</td></tr>
 <tr><td><b>Ctrl+R</b></td><td>Registru complet (overview)</td></tr>
-<tr><td><b>Ctrl+Z</b></td><td>Anulează ultima editare (celulă)</td></tr>
+<tr><td><b>Ctrl+Z</b></td><td>Anulează ultimele editări (până la 10 pași)</td></tr>
 <tr><td><b>Ctrl+,</b></td><td>Setări bibliotecă</td></tr>
 <tr><td><b>Ctrl+Q</b></td><td>Ieșire</td></tr>
 <tr><td><b>Ctrl+← / Ctrl+→</b></td><td>Luna anterioară / următoare</td></tr>

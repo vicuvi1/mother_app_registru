@@ -596,3 +596,11 @@ QCheckBox::indicator:checked {
     background: #2563eb;
     color: #ffffff;
 }
+
+QLabel#saveErrorBanner {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border-bottom: 1px solid #fecaca;
+    padding: 10px 16px;
+    font-weight: 600;
+}

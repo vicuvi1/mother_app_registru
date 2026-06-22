@@ -990,7 +990,14 @@ class PartPageBase(QWidget):
                 len(self.table.get_data_rows()) if hasattr(self, "table") else 0,
             )
             QMessageBox.warning(self, "Eroare salvare", f"Nu s-au putut salva datele:\n{exc}")
+            if hasattr(self.main_window, "show_save_error"):
+                self.main_window.show_save_error(
+                    f"Partea {self.roman} — salvare eșuată. Verificați spațiul pe disc și încercați din nou."
+                )
             return False
+
+        if hasattr(self.main_window, "clear_save_error"):
+            self.main_window.clear_save_error()
 
         if show_status:
             self.main_window.set_save_status(True)

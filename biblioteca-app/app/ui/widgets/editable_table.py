@@ -152,7 +152,8 @@ class EditableTable(QTableWidget):
         self._part_id = ""
         self._updating = False
         self._columns_sized = False
-        self._undo: tuple[int, int, str] | None = None
+        self._undo_stack: list[tuple[int, int, str]] = []
+        self._max_undo = 10
 
         self._grouped_header = GroupedHeaderView(self)
         self.setHorizontalHeader(self._grouped_header)
@@ -182,10 +183,9 @@ class EditableTable(QTableWidget):
         QShortcut(QKeySequence("Ctrl+Z"), self, self.undo_last)
 
     def undo_last(self) -> None:
-        if self._undo is None:
+        if not self._undo_stack:
             return
-        row, col, old_text = self._undo
-        self._undo = None
+        row, col, old_text = self._undo_stack.pop()
         item = self.item(row, col)
         if item is None:
             return
@@ -852,8 +852,15 @@ class EditableTable(QTableWidget):
 
         if col_def.col_type == "int":
             self._apply_computed_row(row)
-        self._undo = (row, col, old_text)
+        self._push_undo(row, col, old_text, item.text())
         self.cell_edited.emit(row, col_def.key, val)
+
+    def _push_undo(self, row: int, col: int, old_text: str, new_text: str) -> None:
+        if old_text == new_text:
+            return
+        self._undo_stack.append((row, col, old_text))
+        if len(self._undo_stack) > self._max_undo:
+            self._undo_stack.pop(0)
 
     def _bool_changed(self, row: int, key: str) -> None:
         if self._updating:

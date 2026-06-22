@@ -28,6 +28,7 @@ from core.parts_registry import PARTS, PART_LAYOUT, get_part_factory
 from core.session_state import load_session, save_session
 from database.backup import create_backup, ensure_backup_dir, list_backups, restore_backup
 from ui.help_dialog import HelpDialog
+from ui.incomplete_months_dialog import IncompleteMonthsDialog
 from ui.setup_wizard import SetupWizard
 
 # Re-export pentru module care importă din main_window
@@ -106,6 +107,10 @@ class MainWindow(QMainWindow):
         act_overview.setShortcut("Ctrl+R")
         act_overview.triggered.connect(self._open_overview)
         menu_fisier.addAction(act_overview)
+
+        act_incomplete = QAction("Luni fără date…", self)
+        act_incomplete.triggered.connect(self._open_incomplete_months)
+        menu_fisier.addAction(act_incomplete)
 
         act_export = QAction("Exportă pagina curentă…", self)
         act_export.setShortcut("Ctrl+E")
@@ -209,10 +214,19 @@ class MainWindow(QMainWindow):
         )
 
     def notify_saved(self) -> None:
+        self.clear_save_error()
         self._last_save_at = datetime.now()
         self.set_save_status(True)
         ts = self._last_save_at.strftime("%H:%M:%S")
         self._save_label.setToolTip(f"Ultima salvare: {ts}")
+
+    def show_save_error(self, message: str) -> None:
+        self._save_error_banner.setText(message)
+        self._save_error_banner.setVisible(True)
+        self.set_save_status(False)
+
+    def clear_save_error(self) -> None:
+        self._save_error_banner.setVisible(False)
 
     def persist_session_from_page(self, page) -> None:
         part_id = self._part_id_for_page(page)
@@ -312,6 +326,17 @@ class MainWindow(QMainWindow):
                 8000,
             )
 
+    def _open_incomplete_months(self) -> None:
+        from datetime import date
+
+        page = self._content_stack.currentWidget()
+        register_final = self._register_final_page
+        if register_final is not None and page is register_final:
+            year = register_final._year.value()
+        else:
+            year = getattr(page, "year", None) or date.today().year
+        IncompleteMonthsDialog(self, default_year=year).exec()
+
     def _open_overview(self) -> None:
         from datetime import date
 
@@ -380,9 +405,21 @@ class MainWindow(QMainWindow):
         root.setSpacing(0)
         root.addWidget(self._build_sidebar())
 
+        self._content_panel = QWidget()
+        panel_layout = QVBoxLayout(self._content_panel)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(0)
+
+        self._save_error_banner = QLabel()
+        self._save_error_banner.setObjectName("saveErrorBanner")
+        self._save_error_banner.setWordWrap(True)
+        self._save_error_banner.setVisible(False)
+        panel_layout.addWidget(self._save_error_banner)
+
         self._content_stack = QStackedWidget()
         self._content_stack.setObjectName("contentStack")
-        root.addWidget(self._content_stack, stretch=1)
+        panel_layout.addWidget(self._content_stack, stretch=1)
+        root.addWidget(self._content_panel, stretch=1)
 
         placeholder = QWidget()
         self._register_final_idx = self._content_stack.addWidget(placeholder)
