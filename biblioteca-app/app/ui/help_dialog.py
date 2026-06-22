@@ -3,8 +3,23 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QLabel, QVBoxLayout
 
+from core.autosave import get_autosave_interval
 
-SHORTCUTS_TEXT = """
+
+def _autosave_hint() -> str:
+    sec = get_autosave_interval()
+    if sec <= 0:
+        text = "Autosalvarea este dezactivată"
+    elif sec < 60:
+        text = f"Datele se salvează automat la {sec}s și la schimbarea părții"
+    elif sec % 60 == 0:
+        text = f"Datele se salvează automat la {sec // 60} min și la schimbarea părții"
+    else:
+        text = f"Datele se salvează automat la {sec}s și la schimbarea părții"
+    return f"<p style='color:#64748b'>{text}.</p>"
+
+
+SHORTCUTS_HEADER = """
 <h3>Scurtături tastatură</h3>
 <table cellspacing="6">
 <tr><td><b>Ctrl+S</b></td><td>Salvează pagina curentă</td></tr>
@@ -16,7 +31,6 @@ SHORTCUTS_TEXT = """
 <tr><td><b>Ctrl+← / Ctrl+→</b></td><td>Luna anterioară / următoare</td></tr>
 <tr><td><b>Ctrl+D</b></td><td>Duplică rând (părți evenimente)</td></tr>
 </table>
-<p style="color:#64748b">Datele se salvează automat la 60s și la schimbarea părții.</p>
 """
 
 
@@ -26,7 +40,7 @@ class HelpDialog(QDialog):
         self.setWindowTitle("Ajutor — scurtături")
         self.setMinimumWidth(420)
         layout = QVBoxLayout(self)
-        label = QLabel(SHORTCUTS_TEXT)
+        label = QLabel(SHORTCUTS_HEADER + _autosave_hint())
         label.setTextFormat(Qt.TextFormat.RichText)
         label.setWordWrap(True)
         layout.addWidget(label)

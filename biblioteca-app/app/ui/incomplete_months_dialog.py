@@ -32,8 +32,8 @@ class IncompleteMonthsDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
-                "Lista de mai jos arată lunile (și categoriile) pentru care nu există "
-                "încă rânduri salvate în baza de date.\n"
+                "Lista de mai jos arată lunile (și categoriile) fără date reale: "
+                "fie lipsesc rândurile, fie toate valorile numerice sunt 0 și câmpurile text sunt goale.\n"
                 "Dublu-click pe un element pentru a deschide partea respectivă."
             )
         )

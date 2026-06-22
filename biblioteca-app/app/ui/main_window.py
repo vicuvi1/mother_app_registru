@@ -22,11 +22,12 @@ from PyQt6.QtWidgets import (
 )
 
 from core.app_restart import restart_application
-from core.autosave import AutosaveManager
+from core.autosave import AutosaveManager, get_autosave_interval
 from core.constants_manager import APP_CREDIT, get_biblioteca_info
 from core.parts_registry import PARTS, PART_LAYOUT, get_part_factory
 from core.session_state import load_session, save_session
 from database.backup import create_backup, ensure_backup_dir, list_backups, restore_backup
+from ui.about_dialog import AboutDialog
 from ui.help_dialog import HelpDialog
 from ui.incomplete_months_dialog import IncompleteMonthsDialog
 from ui.setup_wizard import SetupWizard
@@ -142,6 +143,10 @@ class MainWindow(QMainWindow):
         act_help.triggered.connect(self._show_help)
         menu_ajutor.addAction(act_help)
 
+        act_about = QAction("Despre…", self)
+        act_about.triggered.connect(self._show_about)
+        menu_ajutor.addAction(act_about)
+
     def _save_current(self) -> None:
         page = self._content_stack.currentWidget()
         if hasattr(page, "save_all"):
@@ -149,6 +154,9 @@ class MainWindow(QMainWindow):
 
     def _show_help(self) -> None:
         HelpDialog(self).exec()
+
+    def _show_about(self) -> None:
+        AboutDialog(self).exec()
 
     def _backup_database(self) -> None:
         try:
@@ -529,6 +537,7 @@ class MainWindow(QMainWindow):
             if loc:
                 lib_text += f"\n{loc}"
             self._library_label.setText(lib_text)
+            self._autosave.set_interval(get_autosave_interval())
 
     def set_save_status(self, saved: bool) -> None:
         if saved:

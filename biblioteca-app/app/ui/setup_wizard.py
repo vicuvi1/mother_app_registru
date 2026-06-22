@@ -1,6 +1,7 @@
 """Ecran inițial: Personal, range-uri default, date bibliotecă."""
 
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -28,6 +29,7 @@ from core.constants_manager import (
     update_personal,
 )
 from database.db_manager import mark_setup_completed
+from core.autosave import get_autosave_interval, save_autosave_interval
 
 
 class SetupWizard(QDialog):
@@ -58,6 +60,7 @@ class SetupWizard(QDialog):
         tabs.addTab(self._build_personal_tab(), "👤 Personal")
         tabs.addTab(self._build_ranges_tab(), "📊 Range-uri")
         tabs.addTab(self._build_biblioteca_tab(), "🏛 Bibliotecă")
+        tabs.addTab(self._build_app_tab(), "⚙ Aplicație")
         layout.addWidget(tabs)
 
         buttons = QDialogButtonBox(
@@ -143,6 +146,34 @@ class SetupWizard(QDialog):
         )
         return w
 
+    def _build_app_tab(self) -> QWidget:
+        w = QWidget()
+        form = QFormLayout(w)
+        form.setSpacing(12)
+        form.addRow(QLabel("Comportament aplicație:"))
+
+        self.combo_autosave = QComboBox()
+        self._autosave_options = [
+            ("Dezactivat", 0),
+            ("La 30 secunde", 30),
+            ("La 1 minut (implicit)", 60),
+            ("La 5 minute", 300),
+        ]
+        for label, _sec in self._autosave_options:
+            self.combo_autosave.addItem(label)
+        current = get_autosave_interval()
+        for i, (_label, sec) in enumerate(self._autosave_options):
+            if sec == current:
+                self.combo_autosave.setCurrentIndex(i)
+                break
+        form.addRow("Autosalvare:", self.combo_autosave)
+        form.addRow(
+            QLabel(
+                "Salvează automat pagina curentă la intervalul ales și la schimbarea părții."
+            )
+        )
+        return w
+
     def _refresh_personal_table(self) -> None:
         names = get_personal_names()
         self.personal_table.setRowCount(len(names))
@@ -179,6 +210,9 @@ class SetupWizard(QDialog):
     def _save(self) -> None:
         apply_global_ranges(self.spin_persoane.value(), self.spin_activitati.value())
         set_biblioteca_info(self.edit_nume.text(), self.edit_localitate.text())
+        idx = self.combo_autosave.currentIndex()
+        if 0 <= idx < len(self._autosave_options):
+            save_autosave_interval(self._autosave_options[idx][1])
         if self.first_run:
             mark_setup_completed()
         self.accept()

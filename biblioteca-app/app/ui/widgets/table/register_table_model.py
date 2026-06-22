@@ -62,7 +62,21 @@ class RegisterTableModel(QAbstractTableModel):
         if self.store.is_total_row(row):
             return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
         col_def = self.store.columns[col]
-        if col_def.computed_from or not col_def.editable or col_def.uses_cell_widget():
+        if col_def.computed_from or not col_def.editable:
+            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            return (
+                Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsUserCheckable
+            )
+        if col_def.col_type == "responsabil":
+            return (
+                Qt.ItemFlag.ItemIsEnabled
+                | Qt.ItemFlag.ItemIsSelectable
+                | Qt.ItemFlag.ItemIsEditable
+            )
+        if col_def.col_type in ("preset_text", "inline_text"):
             return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
         return (
             Qt.ItemFlag.ItemIsEnabled
@@ -75,8 +89,18 @@ class RegisterTableModel(QAbstractTableModel):
             return None
         row, col = index.row(), index.column()
         col_def = self.store.columns[col]
+        if role == Qt.ItemDataRole.CheckStateRole:
+            if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+                return (
+                    Qt.CheckState.Checked
+                    if self.store.get_cell(row, col)
+                    else Qt.CheckState.Unchecked
+                )
+            return None
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             val = self.store.get_cell(row, col)
+            if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+                return bool(val)
             if col_def.col_type == "int" or col_def.computed_from or self.store.is_total_row(row):
                 return str(val)
             return str(val) if val is not None else ""
@@ -108,8 +132,41 @@ class RegisterTableModel(QAbstractTableModel):
         if self.store.is_total_row(row):
             return False
         col_def = self.store.columns[col]
-        if col_def.computed_from or not col_def.editable or col_def.uses_cell_widget():
+        if col_def.computed_from or not col_def.editable:
             return False
+
+        if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            old_val = bool(self.store.get_cell(row, col))
+            new_val = bool(value)
+            self.store.set_cell(row, col, new_val)
+            if row < len(self.store.auto_flags):
+                self.store.auto_flags[row] = False
+            self.dataChanged.emit(index, index)
+            self.edit_committed.emit(row, col, str(old_val), str(new_val))
+            return True
+
+        if col_def.col_type == "responsabil":
+            old_text = str(self.store.get_cell(row, col) or "")
+            new_text = str(value or "").strip()
+            self.store.set_cell(row, col, new_text)
+            if row < len(self.store.auto_flags):
+                self.store.auto_flags[row] = False
+            self.dataChanged.emit(index, index)
+            self.edit_committed.emit(row, col, old_text, new_text)
+            return True
+
+        if col_def.col_type in ("preset_text", "inline_text"):
+            return self.commit_widget_cell(row, col, str(value or ""))
+
+        if col_def.col_type == "date":
+            old_text = str(self.store.get_cell(row, col) or "")
+            new_text = str(value or "")
+            self.store.set_cell(row, col, new_text)
+            if row < len(self.store.auto_flags):
+                self.store.auto_flags[row] = False
+            self.dataChanged.emit(index, index)
+            self.edit_committed.emit(row, col, old_text, new_text)
+            return True
 
         if col_def.col_type == "int":
             text = str(value).strip()
@@ -155,6 +212,25 @@ class RegisterTableModel(QAbstractTableModel):
         self.store.set_payload(rows, row_ids, auto_flags)
         self.store.apply_computed_all()
         self.endResetModel()
+
+    def commit_widget_cell(self, row: int, col: int, value: str) -> bool:
+        """Actualizare din PresetTextCell sau alte widget-uri index."""
+        if self.store.is_total_row(row):
+            return False
+        col_def = self.store.columns[col]
+        old_text = str(self.store.get_cell(row, col) or "")
+        new_text = str(value or "")
+        if old_text == new_text:
+            return True
+        self.store.set_cell(row, col, new_text)
+        if row < len(self.store.auto_flags):
+            self.store.auto_flags[row] = False
+        self.dataChanged.emit(
+            self.index(row, col),
+            self.index(row, col),
+        )
+        self.edit_committed.emit(row, col, old_text, new_text)
+        return True
 
     def set_total_rows(self, totals: list[tuple[str, dict[str, int]]]) -> None:
         self.beginResetModel()

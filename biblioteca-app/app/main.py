@@ -13,6 +13,7 @@ if str(APP_ROOT) not in sys.path:
 
 from core.logging_config import setup_logging  # noqa: E402
 from database.db_manager import init_database, is_first_run  # noqa: E402
+from database.integrity import check_database_integrity, offer_restore_on_corruption  # noqa: E402
 from ui.main_window import MainWindow  # noqa: E402
 from ui.setup_wizard import SetupWizard  # noqa: E402
 from ui.splash_screen import SplashScreen  # noqa: E402
@@ -57,6 +58,17 @@ def main() -> int:
     splash.set_message("Pregătire bază de date")
     splash.set_progress(25, 100)
     init_database(seed=True)
+
+    splash.set_message("Verificare integritate")
+    splash.set_progress(35, 100)
+    ok, detail = check_database_integrity()
+    if not ok:
+        splash.hide()
+        if not offer_restore_on_corruption():
+            return 0
+        splash.show()
+        _center_on_screen(splash)
+        app.processEvents()
 
     if is_first_run():
         splash.hide()

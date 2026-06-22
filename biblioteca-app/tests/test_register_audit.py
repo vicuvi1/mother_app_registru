@@ -1,4 +1,4 @@
-"""Teste audit registru — luni incomplete."""
+"""Teste audit registru — luni incomplete și detectare zerouri."""
 
 import pytest
 from sqlalchemy import create_engine
@@ -46,3 +46,24 @@ def test_empty_year_all_daily_incomplete(audit_session):
     slots = find_incomplete_months(2025)
     part01 = [s for s in slots if s.part_id == "part_01"]
     assert len(part01) == 12
+
+
+def test_all_zero_rows_flagged_as_incomplete(audit_session):
+    Session = audit_session
+    with Session() as session:
+        session.add(
+            EvidentaUtilizatori(
+                an=2026,
+                luna=3,
+                data="2026-03-01",
+                adulti=0,
+                copii_pana_16=0,
+            )
+        )
+        session.commit()
+
+    slots = find_incomplete_months(2026)
+    part01_mar = [s for s in slots if s.part_id == "part_01" and s.month == 3]
+    assert len(part01_mar) == 1
+    assert part01_mar[0].reason == "zeros"
+    assert "toate valorile sunt 0" in part01_mar[0].label

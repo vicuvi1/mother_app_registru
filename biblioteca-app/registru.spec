@@ -19,6 +19,8 @@ a = Analysis(
         "openpyxl",
         "docx",
         "reportlab",
+        "ui.widgets.table.delegates.checkbox_delegate",
+        "ui.widgets.table.delegates.responsabil_delegate",
     ],
     hookspath=[],
     hooksconfig={},

@@ -5,15 +5,20 @@ from __future__ import annotations
 from typing import Any
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtGui import QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QHeaderView,
     QInputDialog,
+    QSizePolicy,
     QTableView,
 )
 
+from ui.widgets.preset_text_cell import PresetTextCell
 from ui.widgets.table.column_def import ColumnDef
+from ui.widgets.table.delegates.checkbox_delegate import CheckBoxDelegate
+from ui.widgets.table.delegates.responsabil_delegate import ResponsabilDelegate
 from ui.widgets.table.grouped_header import GroupedHeaderView
 from ui.widgets.table.register_table_model import RegisterTableModel
 
@@ -37,6 +42,9 @@ class RegisterTableView(QTableView):
         self._undo_stack: list[tuple[int, int, str]] = []
         self._max_undo = 10
         self._header_labels: list[str] = []
+        self._preset_cells: list[PresetTextCell] = []
+        self._checkbox_delegate = CheckBoxDelegate(self)
+        self._responsabil_delegate = ResponsabilDelegate(self)
 
         self._register_model = RegisterTableModel(self)
         self.setModel(self._register_model)
@@ -63,6 +71,7 @@ class RegisterTableView(QTableView):
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().sectionDoubleClicked.connect(self._edit_header_label)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         QShortcut(QKeySequence("Ctrl+Z"), self, self.undo_last)
 
@@ -83,6 +92,14 @@ class RegisterTableView(QTableView):
         self._computed_rules = computed_rules or {}
         self._part_id = part_id
         self._register_model.setup(columns, computed_rules, part_id=part_id)
+        self._install_delegates()
+
+    def _install_delegates(self) -> None:
+        for c, col in enumerate(self._columns):
+            if col.col_type in ("bool",) or col.col_type.startswith("scope_"):
+                self.setItemDelegateForColumn(c, self._checkbox_delegate)
+            elif col.col_type == "responsabil":
+                self.setItemDelegateForColumn(c, self._responsabil_delegate)
 
     def set_header_labels(self, labels: list[str]) -> None:
         self._header_labels = list(labels)
@@ -113,6 +130,7 @@ class RegisterTableView(QTableView):
         resize_rows: bool = True,
     ) -> None:
         self._register_model.load_rows(rows, row_ids, auto_flags)
+        self._sync_preset_widgets()
         if resize and not self._columns_sized:
             self.resize_columns_to_contents()
             self._columns_sized = True
@@ -208,30 +226,160 @@ class RegisterTableView(QTableView):
         self.load_rows(rows, ids, flags, resize=False, resize_rows=True)
         return insert_at
 
+    def _sync_preset_widgets(self) -> None:
+        self._preset_cells.clear()
+        for r in range(self._register_model.store.data_row_count()):
+            for c, col in enumerate(self._columns):
+                if col.col_type not in ("preset_text", "inline_text"):
+                    continue
+                idx = self._register_model.index(r, c)
+                cell = PresetTextCell(
+                    self._part_id,
+                    col.key,
+                    parent=self,
+                    picker_on_click=col.col_type == "preset_text",
+                )
+                cell.set_value(str(self._register_model.data(idx, Qt.ItemDataRole.DisplayRole) or ""))
+                cell.setSizePolicy(
+                    QSizePolicy.Policy.Expanding,
+                    QSizePolicy.Policy.Expanding,
+                )
+                cell.value_changed.connect(
+                    lambda _v, row=r, col_idx=c: self._on_preset_changed(row, col_idx)
+                )
+                self.setIndexWidget(idx, cell)
+                self._preset_cells.append(cell)
+
+    def _on_preset_changed(self, row: int, col: int) -> None:
+        cell = self.sender()
+        if not isinstance(cell, PresetTextCell):
+            return
+        self._register_model.commit_widget_cell(row, col, cell.value())
+
     def refresh_preset_dropdowns(self) -> None:
-        pass
+        for cell in self._preset_cells:
+            cell.refresh()
 
-    def close_all_inline_edits(self, except_cell=None) -> None:
-        pass
+    def close_all_inline_edits(self, except_cell: PresetTextCell | None = None) -> None:
+        for cell in self._preset_cells:
+            if cell is not except_cell and cell.is_editing():
+                cell._finish_inline_edit()
 
-    def close_all_preset_pickers(self, except_cell=None) -> None:
-        pass
+    def close_all_preset_pickers(self, except_cell: PresetTextCell | None = None) -> None:
+        for cell in self._preset_cells:
+            if cell is not except_cell:
+                cell.close_picker()
 
     def navigate_from_widget(self, widget, direction: str) -> None:
-        pass
+        for r in range(self._register_model.store.data_row_count()):
+            for c, col in enumerate(self._columns):
+                if col.col_type not in ("preset_text", "inline_text"):
+                    continue
+                idx = self._register_model.index(r, c)
+                if self.indexWidget(idx) is widget:
+                    self._navigate(r, c, direction)
+                    return
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        fw = QApplication.focusWidget()
+        if fw is not None:
+            parent = fw.parentWidget()
+            if isinstance(fw, PresetTextCell) or isinstance(parent, PresetTextCell):
+                super().keyPressEvent(event)
+                return
+        key = event.key()
+        mods = event.modifiers()
+        if key == Qt.Key.Key_Tab:
+            self.close_all_inline_edits()
+            row, col = self.currentIndex().row(), self.currentIndex().column()
+            direction = "back" if mods & Qt.KeyboardModifier.ShiftModifier else "forward"
+            self._navigate(row, col, direction)
+            event.accept()
+            return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.close_all_inline_edits()
+            row, col = self.currentIndex().row(), self.currentIndex().column()
+            self._navigate(row, col, "down")
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def _is_navigable(self, row: int, col: int) -> bool:
+        if col < 0 or col >= len(self._columns):
+            return False
+        if not self.is_data_row(row):
+            return False
+        col_def = self._columns[col]
+        return col_def.editable and not col_def.computed_from
+
+    def _navigable_cells(self) -> list[tuple[int, int]]:
+        cells: list[tuple[int, int]] = []
+        for r in range(self._register_model.rowCount()):
+            if not self.is_data_row(r):
+                continue
+            for c in range(len(self._columns)):
+                if self._is_navigable(r, c):
+                    cells.append((r, c))
+        return cells
+
+    def _navigate(self, row: int, col: int, direction: str) -> None:
+        cells = self._navigable_cells()
+        if not cells:
+            return
+        try:
+            idx = cells.index((row, col))
+        except ValueError:
+            idx = 0
+        if direction == "forward":
+            idx = min(idx + 1, len(cells) - 1)
+        elif direction == "back":
+            idx = max(idx - 1, 0)
+        else:
+            next_idx = None
+            for i in range(idx + 1, len(cells)):
+                if cells[i][1] == col:
+                    next_idx = i
+                    break
+            idx = next_idx if next_idx is not None else min(idx + 1, len(cells) - 1)
+        nr, nc = cells[idx]
+        self._activate_cell(nr, nc)
+
+    def _activate_cell(self, row: int, col: int) -> None:
+        index = self._register_model.index(row, col)
+        self.setCurrentIndex(index)
+        col_def = self._columns[col]
+        widget = self.indexWidget(index)
+        if isinstance(widget, PresetTextCell):
+            if col_def.col_type == "inline_text":
+                QTimer.singleShot(0, widget.start_inline_edit)
+            else:
+                QTimer.singleShot(0, widget.open_picker)
+        elif col_def.col_type == "responsabil":
+            self.edit(index)
+        elif col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            self.setFocus()
+        else:
+            QTimer.singleShot(0, lambda i=index: self.edit(i))
 
     def undo_last(self) -> None:
         if not self._undo_stack:
             return
         row, col, old_text = self._undo_stack.pop()
         index = self._register_model.index(row, col)
-        self._register_model.setData(index, old_text)
         col_def = self._columns[col]
+        if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            self._register_model.setData(
+                index, old_text.lower() in ("true", "1"), Qt.ItemDataRole.EditRole
+            )
+        else:
+            self._register_model.setData(index, old_text)
         if col_def.col_type == "int":
             try:
                 val = max(0, int(old_text)) if old_text.strip() else 0
             except ValueError:
                 val = 0
+        elif col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            val = old_text.lower() in ("true", "1")
         else:
             val = old_text
         self.cell_edited.emit(row, col_def.key, val)
@@ -244,6 +392,8 @@ class RegisterTableView(QTableView):
                 val = max(0, int(new_text)) if new_text.strip() else 0
             except ValueError:
                 val = 0
+        elif col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            val = new_text.lower() in ("true", "1")
         else:
             val = new_text
         self.cell_edited.emit(row, col_def.key, val)
