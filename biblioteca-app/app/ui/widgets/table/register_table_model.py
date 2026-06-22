@@ -115,6 +115,8 @@ class RegisterTableModel(QAbstractTableModel):
         row, col = index.row(), index.column()
         col_def = self.store.columns[col]
         if role == Qt.ItemDataRole.CheckStateRole:
+            if self.store.is_total_row(row):
+                return None
             if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
                 return (
                     Qt.CheckState.Checked
@@ -124,9 +126,19 @@ class RegisterTableModel(QAbstractTableModel):
             return None
         if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             val = self.store.get_cell(row, col)
+            if self.store.is_total_row(row):
+                if col == 0:
+                    return self.store.total_label(row)
+            if (
+                col_def.col_type == "int"
+                or col_def.computed_from
+                or col_def.counts_checked_in_total()
+            ):
+                return str(val)
+                return ""
             if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
                 return bool(val)
-            if col_def.col_type == "int" or col_def.computed_from or self.store.is_total_row(row):
+            if col_def.col_type == "int" or col_def.computed_from:
                 return str(val)
             return str(val) if val is not None else ""
         if role == Qt.ItemDataRole.BackgroundRole:

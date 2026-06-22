@@ -109,7 +109,7 @@ class PartExportMixin:
         result: dict[str, int] = {
             c.key: 0
             for c in self.columns
-            if c.col_type == "int" or (c.col_type == "bool" and c.count_in_total)
+            if c.col_type == "int" or c.counts_checked_in_total()
         }
         with get_session() as session:
             for m in range(1, month + 1):
@@ -120,7 +120,7 @@ class PartExportMixin:
                     for col in self.columns:
                         if col.col_type == "int":
                             result[col.key] += getattr(rec, col.key, 0) or 0
-                        elif col.col_type == "bool" and col.count_in_total:
+                        elif col.counts_checked_in_total():
                             if getattr(rec, col.key, False):
                                 result[col.key] += 1
         return result

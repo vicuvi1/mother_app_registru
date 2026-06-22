@@ -1,5 +1,7 @@
 # Dependențe minime pentru RULAREA aplicației (fără teste / PyInstaller)
-# Folosit de install_dependencies.bat pe PC nou
+# Folosit de install_dependencies.bat și run.bat pe PC nou · v1.7.0
+#
+# Pentru dezvoltare completă: pip install -r requirements.txt
 
 PyQt6>=6.6,<7
 SQLAlchemy>=2.0,<3

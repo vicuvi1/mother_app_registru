@@ -1,13 +1,20 @@
 # Registru Digital Bibliotecă — dependențe Python
-# Python 3.11+ (CI: 3.12) · v1.4.0
+# Python 3.11+ (CI: 3.12) · v1.7.0
 #
-# Instalare:
-#   python -m venv venv
-#   venv\Scripts\pip install -r requirements.txt
+# Instalare completă (dezvoltare + teste + build):
+#   install_dependencies.bat          # doar runtime, pentru bibliotecar/dev rapid
+#   venv\Scripts\pip install -r requirements.txt   # tot (inclusiv pytest, PyInstaller)
 #
-# Rulare teste:
+# Rulare aplicație:
+#   run.bat
+#
+# Teste:
 #   set PYTHONPATH=app
 #   venv\Scripts\python.exe -m pytest tests\ -v
+#
+# Build distribuție:
+#   build.bat              # portabil + ghid PDF
+#   build_installer.bat    # portabil + instalator Inno Setup
 
 # --- Runtime (aplicație desktop) ---
 
@@ -15,13 +22,13 @@ PyQt6>=6.6,<7
 SQLAlchemy>=2.0,<3
 openpyxl>=3.1          # export / import Excel
 python-docx>=1.1       # export Word (.docx)
-reportlab>=4.0         # export PDF (fonturi bundled în app/resources/fonts/)
+reportlab>=4.0         # export PDF + ghid bibliotecar (fonturi în app/resources/fonts/)
 
 # --- Dezvoltare și teste ---
 
 pytest>=8.0
-pytest-qt>=4.4         # smoke tests PyQt (MainWindow, tabel)
+pytest-qt>=4.4         # smoke tests PyQt (MainWindow, tabel, onboarding)
 
 # --- Build distribuție Windows ---
 
-pyinstaller>=6.0         # build.bat → dist/RegistruDigital/
+pyinstaller>=6.0         # build.bat / build_installer.bat → dist/RegistruDigital/

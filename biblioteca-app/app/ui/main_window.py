@@ -112,6 +112,8 @@ class MainWindow(QMainWindow):
         self.show_home()
 
     def refresh_sidebar_badges(self, year: int) -> None:
+        if not hasattr(self, "_part_list"):
+            return
         progress = compute_part_progress(year)
         status_labels = {
             "complete": "completă",

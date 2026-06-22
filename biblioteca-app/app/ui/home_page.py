@@ -33,7 +33,6 @@ class HomePage(QWidget):
         self.main_window = main_window
         self.setObjectName("homePage")
         self._build_ui()
-        self.refresh()
 
     def year(self) -> int:
         return self._year.value()
@@ -98,7 +97,7 @@ class HomePage(QWidget):
                     break
         self._session_hint.setText(f"Ultima sesiune: {hint}")
 
-        if hasattr(self.main_window, "refresh_sidebar_badges"):
+        if hasattr(self.main_window, "_part_list"):
             self.main_window.refresh_sidebar_badges(year)
 
     def _build_ui(self) -> None:

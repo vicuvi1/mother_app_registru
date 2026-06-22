@@ -51,7 +51,7 @@ def test_main_window_constructs(qtbot, test_db):
     assert win._part_list.count() == 12
 
 
-def test_main_window_loads_part_one(qtbot, test_db, monkeypatch):
+def test_main_window_shows_home_on_startup(qtbot, test_db, monkeypatch):
     monkeypatch.setattr(
         "ui.main_window.load_session",
         lambda: {"part_id": "part_01", "year": 2026, "month": 6},
@@ -60,6 +60,18 @@ def test_main_window_loads_part_one(qtbot, test_db, monkeypatch):
     qtbot.addWidget(win)
     page = win._content_stack.currentWidget()
     assert page is not None
+    assert type(page).__name__ == "HomePage"
+
+
+def test_continue_last_session_loads_part(qtbot, test_db, monkeypatch):
+    monkeypatch.setattr(
+        "ui.main_window.load_session",
+        lambda: {"part_id": "part_01", "year": 2026, "month": 6},
+    )
+    win = MainWindow(load_first_part=True)
+    qtbot.addWidget(win)
+    win.continue_last_session()
+    page = win._content_stack.currentWidget()
     assert getattr(page, "part_id", None) == "part_01"
 
 

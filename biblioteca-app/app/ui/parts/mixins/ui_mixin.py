@@ -428,14 +428,19 @@ class PartUiMixin:
     def _show_validation_hint(self, msg: str) -> None:
         self.main_window.statusBar().showMessage(msg, 3000)
 
-    def _refresh_table_chrome(self, table: EditableTable, cached: dict | None = None) -> None:
+    def _refresh_table_chrome(
+        self, table: EditableTable, cached: dict | None = None, *, update_stack: bool | None = None
+    ) -> None:
         if not hasattr(self, "_table_stack"):
             return
-        self._update_empty_state(table, cached or {})
+        if update_stack is None:
+            update_stack = table is self._active_table()
+        self._update_empty_state(table, cached or {}, update_stack=update_stack)
         self._update_today_highlight(table)
 
-    def _update_empty_state(self, table: EditableTable, cached: dict) -> None:
-        db_empty = bool(cached.get("db_empty"))
+    def _update_empty_state(
+        self, table: EditableTable, cached: dict, *, update_stack: bool = True
+    ) -> None:
         data_rows = len(table.get_data_rows()) if hasattr(table, "get_data_rows") else 0
         show_empty = False
         luna_name = LUNI_RO[self.month - 1] if self._has_month_bar else str(self.year)
@@ -455,17 +460,18 @@ class PartUiMixin:
                 show_copy_month=self._has_month_bar and self.mode == "events",
                 show_add_row=True,
             )
-        elif self.mode == "daily" and db_empty:
+        elif self.mode == "daily" and data_rows == 0:
             show_empty = True
             self._empty_state.configure(
-                title=f"Luna {luna_name} nu are încă date",
-                subtitle="Generați zilele lucrătoare sau copiați structura din luna anterioară.",
+                title=f"Luna {luna_name} nu are încă zile lucrătoare",
+                subtitle="Verificați zilele nelucrătoare sau apăsați Regenerează zilele.",
                 show_regenerate=True,
                 show_copy_month=self.month > 1,
                 show_add_row=False,
             )
 
-        self._table_stack.setCurrentIndex(1 if show_empty else 0)
+        if update_stack:
+            self._table_stack.setCurrentIndex(1 if show_empty else 0)
 
     def _update_today_highlight(self, table: EditableTable) -> None:
         from datetime import date

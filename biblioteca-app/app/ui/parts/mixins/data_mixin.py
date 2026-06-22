@@ -113,7 +113,7 @@ class PartDataMixin:
         result: dict[str, int] = {
             c.key: 0
             for c in self.columns
-            if c.col_type == "int" or (c.col_type == "bool" and c.count_in_total)
+            if c.col_type == "int" or c.counts_checked_in_total()
         }
         with get_session() as session:
             for m in range(1, self.month + 1):
@@ -129,7 +129,7 @@ class PartDataMixin:
                         if col.col_type == "int":
                             val = getattr(rec, col.key, 0) or 0
                             result[col.key] = result.get(col.key, 0) + val
-                        elif col.col_type == "bool" and col.count_in_total:
+                        elif col.counts_checked_in_total():
                             if getattr(rec, col.key, False):
                                 result[col.key] = result.get(col.key, 0) + 1
         self._cumulative_cache[key] = result
@@ -282,6 +282,10 @@ class PartDataMixin:
         table.append_row(row_data, None, False)
         self._dirty = True
         self._recompute_visible_totals()
+        categorie = self._active_category()
+        snap = self._snapshot_table(table)
+        self._data_cache[self._cache_key(categorie=categorie)] = snap
+        self._refresh_table_chrome(table, snap, update_stack=True)
         self._debounce.start()
     def _duplicate_selected_row(self) -> None:
         table = self._active_table()
@@ -344,7 +348,12 @@ class PartDataMixin:
             ids = [None] * len(new_rows)
             flags = [False] * len(new_rows)
             key = self._cache_key(self.year, self.month, cat)
-            self._data_cache[key] = {"rows": new_rows, "ids": ids, "flags": flags}
+            self._data_cache[key] = {
+                "rows": new_rows,
+                "ids": ids,
+                "flags": flags,
+                "db_empty": not any(ids),
+            }
 
         self._dirty = True
         self.main_window.set_save_status(False)

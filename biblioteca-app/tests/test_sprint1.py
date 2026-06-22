@@ -62,3 +62,33 @@ def test_snapshot_marks_unsaved_daily_month():
     assert snap["db_empty"] is True
     snap_saved = stub._snapshot_table(_FakeTable([1, 2]))
     assert snap_saved["db_empty"] is False
+
+
+def test_daily_with_rows_shows_table(qapp):
+    """Zilele lucrătoare generate nu trebuie ascunse de panoul gol."""
+    from PyQt6.QtWidgets import QStackedWidget, QWidget
+
+    from ui.parts.mixins.ui_mixin import PartUiMixin
+    from ui.widgets.empty_state import TableEmptyState
+
+    class Stub(PartUiMixin):
+        mode = "daily"
+        month = 6
+        year = 2026
+        _has_month_bar = True
+
+        def __init__(self):
+            pass
+
+    stub = Stub()
+    stub._table_stack = QStackedWidget()
+    stub._empty_state = TableEmptyState()
+    stub._table_stack.addWidget(QWidget())
+    stub._table_stack.addWidget(stub._empty_state)
+
+    class TableWithRows:
+        def get_data_rows(self):
+            return [{"data": "01.06"}, {"data": "02.06"}]
+
+    stub._update_empty_state(TableWithRows(), {"db_empty": True})
+    assert stub._table_stack.currentIndex() == 0

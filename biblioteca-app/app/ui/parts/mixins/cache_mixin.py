@@ -66,13 +66,13 @@ class PartCacheMixin:
         return {
             c.key: 0
             for c in self.columns
-            if c.col_type == "int" or (c.col_type == "bool" and c.count_in_total)
+            if c.col_type == "int" or c.counts_checked_in_total()
         }
     def _accumulate_record(self, result: dict[str, int], rec) -> None:
         for col in self.columns:
             if col.col_type == "int":
                 result[col.key] += getattr(rec, col.key, 0) or 0
-            elif col.col_type == "bool" and col.count_in_total:
+            elif col.counts_checked_in_total():
                 if getattr(rec, col.key, False):
                     result[col.key] += 1
     def _get_prior_months_totals(self, categorie: str | None, month: int | None = None) -> dict[str, int]:
@@ -94,7 +94,7 @@ class PartCacheMixin:
                     func.coalesce(func.sum(getattr(self.model_class, col.key)), 0).label(col.key)
                 )
                 labels.append(col.key)
-            elif col.col_type == "bool" and col.count_in_total:
+            elif col.counts_checked_in_total():
                 sum_exprs.append(
                     func.coalesce(
                         func.sum(
@@ -192,18 +192,10 @@ class PartCacheMixin:
         key = self._cache_key(categorie=categorie)
         if key in self._data_cache:
             cached = self._data_cache[key]
-            table.load_rows(
-                cached["rows"],
-                cached["ids"],
-                cached["flags"],
-                resize=not fast,
-                resize_rows=not fast,
-            )
-            self._update_totals(table, categorie, fast=fast)
-            self._refresh_table_chrome(table, cached)
-            return
+        else:
+            cached = self._fetch_table_data(categorie)
+            self._data_cache[key] = cached
 
-        cached = self._fetch_table_data(categorie)
         table.load_rows(
             cached["rows"],
             cached["ids"],
@@ -212,8 +204,8 @@ class PartCacheMixin:
             resize_rows=not fast,
         )
         self._update_totals(table, categorie, fast=fast)
-        self._data_cache[key] = cached
-        self._refresh_table_chrome(table, cached)
+        is_active = table is self._active_table()
+        self._refresh_table_chrome(table, cached, update_stack=is_active)
     def _schedule_preload_adjacent(self) -> None:
         if not self._has_month_bar:
             return

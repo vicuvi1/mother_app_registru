@@ -42,8 +42,10 @@ Registrul digital permite bibliotecarilor să:
 - **Restaureze** registrul dintr-o copie anterioară (cu repornire automată).
 - **Verifice integritatea** bazei de date la pornire și **luni fără date** înainte de închiderea anului.
 - **Lucreze offline** — toate datele rămân pe PC-ul bibliotecii sau pe un stick USB portabil.
+- **Vadă progresul** pe panoul **Acasă** — părți complete, luni incomplete, ultimul backup.
+- **Primească ghidare** la prima utilizare (tur rapid 5 pași) și stări goale prietenoase în lunile fără date.
 
-La prima pornire, un **asistent de configurare** solicită numele bibliotecii, localitatea, personalul responsabil, range-urile pentru generarea automată și preferințele aplicației (autosalvare, temă, printare, sincronizare backup).
+La prima pornire, un **asistent de configurare** solicită numele bibliotecii, localitatea, personalul responsabil, range-urile pentru generarea automată și preferințele aplicației (autosalvare, temă, printare, sincronizare backup). Urmează un **tur ghidat** opțional și panoul **Acasă**.
 
 ---
 
@@ -91,6 +93,7 @@ Toate părțile folosesc **QTableView** rapid, cu delegates pentru checkbox-uri,
 
 | Opțiune | Scurtătură | Descriere |
 |---------|------------|-----------|
+| Acasă | Ctrl+H | Panou de ansamblu: progres pe an, backup, luni incomplete |
 | Salvează pagina curentă | Ctrl+S | Salvare manuală imediată |
 | Registru complet (overview)… | Ctrl+R | Dialog: selectați pagini/luni, previzualizare, export final |
 | Luni fără date… | — | Raport: lunile goale sau cu toate valorile zero; dublu-click deschide partea |
@@ -106,12 +109,14 @@ Toate părțile folosesc **QTableView** rapid, cu delegates pentru checkbox-uri,
 
 | Opțiune | Scurtătură | Descriere |
 |---------|------------|-----------|
+| Ghid rapid pentru bibliotecar… | — | Deschide PDF-ul de o pagină (instalare, lucru zilnic, backup) |
 | Scurtături tastatură… | F1 | Lista completă de taste |
 | Despre… | — | Versiune aplicație și credit |
 
 ### Panou lateral
 
-- Listă cu toate părțile active (I–XIV).
+- Buton **🏠 Acasă** — dashboard la pornire (progres an, continuă sesiunea).
+- Listă cu toate părțile active (I–XIV), cu **badge-uri progres**: ✓ complet · ⚠ parțial · · neînceput.
 - Buton **Registru final** — editor pe an cu pagini numerotate, bifare pagini, export.
 
 ### Bara de instrumente (pe fiecare parte)
@@ -129,6 +134,15 @@ Toate părțile folosesc **QTableView** rapid, cu delegates pentru checkbox-uri,
 - Mesaj contextual pentru acțiunea curentă.
 - Indicator **Salvat ✓** cu ora ultimei salvări.
 - Banner roșu dacă o salvare a eșuat (cu instrucțiuni de reîncercare).
+- **Toast-uri** discrete (2–3 s) pentru salvare, backup, export reușit — fără popup-uri inutile.
+
+### Panou Acasă
+
+- Selector **an registru** și bară de progres (% părți complete).
+- **Continuă unde am rămas** — deschide ultima parte / lună din sesiune.
+- Status **backup** + butoane rapide salvare / deschidere folder.
+- Listă **de completat** — dublu-click pe o lună incompletă deschide partea respectivă.
+- Acces la **Asistent închidere an**.
 
 ---
 
@@ -136,6 +150,7 @@ Toate părțile folosesc **QTableView** rapid, cu delegates pentru checkbox-uri,
 
 | Tastă | Acțiune |
 |-------|---------|
+| **Ctrl+H** | Panou Acasă |
 | **Ctrl+S** | Salvează pagina curentă |
 | **Ctrl+E** | Exportă pagina curentă |
 | **Ctrl+R** | Registru complet (overview) |
@@ -167,7 +182,7 @@ Dacă există modificări nesalvate, la închidere apare dialogul: **Salvează /
 
 ### Sesiune reținută
 
-La repornire, aplicația restaurează ultima **parte**, **an** și **lună** deschise (`data/session.json`).
+La repornire, aplicația deschide panoul **Acasă** sau restaurează ultima **parte**, **an** și **lună** (`data/session.json`) prin **Continuă unde am rămas**.
 
 ### Verificare integritate
 
@@ -270,21 +285,28 @@ biblioteca-app/
 │   │   ├── biblioteca.log
 │   │   ├── session.json
 │   │   └── backups/            # Copii de rezervă .db
-│   ├── core/                   # Logică: autosave, sesiune, audit, căi portabile
+│   ├── core/                   # Logică: autosave, sesiune, audit, progres, ghid PDF
 │   ├── database/               # Modele SQLAlchemy, migrări, backup, integritate
-│   ├── ui/                     # Interfață PyQt6, import Excel, wizard-uri
+│   ├── ui/                     # Interfață PyQt6, Acasă, onboarding, import Excel
 │   └── resources/
 │       ├── stylesheet.qss        # Temă deschisă
 │       ├── stylesheet_dark.qss   # Temă întunecată
-│       └── fonts/                # Fonturi PDF (diacritice)
-├── tests/                      # 55 teste pytest (+ pytest-qt)
+│       ├── registru.ico          # Icon aplicație
+│       ├── fonts/                # Fonturi PDF (diacritice)
+│       └── guides/               # Ghid bibliotecar PDF
+├── tests/                      # 72 teste pytest (+ pytest-qt)
+├── scripts/
+│   ├── generate_user_guide.py  # Regenerează ghid_bibliotecar.pdf
+│   └── generate_icon.py
 ├── installer/
 │   └── registru.iss            # Script Inno Setup
+├── install_dependencies.bat    # Instalare venv + runtime (PC nou)
 ├── run.bat                     # Pornire aplicație (Windows)
-├── build.bat                   # Construire PyInstaller (portabil)
+├── build.bat                   # PyInstaller portabil + ghid PDF
 ├── build_installer.bat         # PyInstaller + Inno Setup
 ├── registru.spec               # Configurare PyInstaller
-└── requirements.txt
+├── requirements.txt            # Runtime + dev + build
+└── requirements-runtime.txt    # Doar rulare (fără pytest/PyInstaller)
 ```
 
 ### Distribuție portabilă (.exe)
@@ -295,6 +317,8 @@ După `build.bat`, folderul `dist/RegistruDigital/` conține `RegistruDigital.ex
 dist/RegistruDigital/
 ├── RegistruDigital.exe
 ├── _internal/                  # Resurse aplicație (read-only)
+├── docs/
+│   └── ghid_bibliotecar.pdf    # Ghid rapid 1 pagină
 └── data/                       # Creat automat — DB, backup, log, sesiune
     ├── biblioteca.db
     ├── backups/
@@ -326,19 +350,44 @@ Nu este nevoie de Python instalat pe PC-ul bibliotecii.
 
 ### Dezvoltare (surse Python)
 
+**Variantă rapidă** — dublu-click pe `run.bat` (creează `venv` automat la prima rulare).
+
+**Instalare manuală pe PC nou:**
+
 ```bat
 cd biblioteca-app
+install_dependencies.bat
 run.bat
 ```
 
-`run.bat` creează mediul virtual (`venv`), instalează dependențele și pornește aplicația.
+`install_dependencies.bat` instalează doar `requirements-runtime.txt` (PyQt6, SQLAlchemy, export). Pentru teste și build:
+
+```bat
+venv\Scripts\pip install -r requirements.txt
+```
+
+### Dependențe Python
+
+| Fișier | Utilizare |
+|--------|-----------|
+| `requirements-runtime.txt` | Rulare aplicație (`install_dependencies.bat`, `run.bat`) |
+| `requirements.txt` | Dezvoltare completă: runtime + **pytest**, **pytest-qt**, **PyInstaller** |
+
+| Pachet | Rol |
+|--------|-----|
+| PyQt6 | Interfață desktop |
+| SQLAlchemy | ORM SQLite |
+| openpyxl | Export / import Excel |
+| python-docx | Export Word |
+| reportlab | Export PDF + ghid bibliotecar |
 
 ### Prima pornire
 
 1. Ecran splash animat la inițializare.
 2. Verificare integritate bază de date.
 3. Asistent configurare (dacă e prima rulare).
-4. Se încarcă ultima sesiune sau Partea I, anul și luna curente.
+4. Tur ghidat opțional (5 pași).
+5. Panoul **Acasă** — progres pe anul curent; sau **Continuă unde am rămas**.
 
 ### Instalator Windows (dezvoltatori)
 
@@ -373,7 +422,7 @@ cd biblioteca-app
 build.bat
 ```
 
-Rezultat: `dist/RegistruDigital/RegistruDigital.exe` — folder portabil cu dependențe; datele utilizator în `data/` alături.
+Rezultat: `dist/RegistruDigital/RegistruDigital.exe` — folder portabil cu dependențe; datele utilizator în `data/` alături; ghid PDF în `docs/`.
 
 ### Cu instalator
 
@@ -393,7 +442,7 @@ set PYTHONPATH=app
 venv\Scripts\python.exe -m pytest tests\ -v
 ```
 
-**55 teste** acoperă: backup/restaurare, export PDF/utilitare, salvare roundtrip, agregări SQL, motor date, sesiune, audit luni incomplete, model tabel, căi portabile, import Excel, cloud backup, integritate DB, autosalvare, **smoke tests PyQt** (`pytest-qt`).
+**72 teste** acoperă: backup/restaurare, export PDF/utilitare, salvare roundtrip, agregări SQL, motor date, sesiune, audit luni incomplete, model tabel, căi portabile, import Excel, cloud backup, integritate DB, autosalvare, progres părți (Sprint II), ghid PDF și release (Sprint III), **smoke tests PyQt** (`pytest-qt`).
 
 **CI GitHub Actions:** la fiecare push pe `main`, rulează testele pe `windows-latest` cu Python 3.12. La tag `v*`, workflow **Release** publică `.exe` + ZIP pe GitHub Releases.
 
@@ -408,7 +457,7 @@ venv\Scripts\python.exe -m pytest tests\ -v
 | Export Word | python-docx |
 | Export PDF | ReportLab + fonturi DejaVu bundled |
 | Export Excel | openpyxl |
-| Distribuție | PyInstaller + Inno Setup (opțional) |
+| Distribuție | PyInstaller + Inno Setup; GitHub Releases (tag `v*`) |
 | Teste | pytest + pytest-qt |
 
 ### Performanță
@@ -434,17 +483,24 @@ Clasa de bază a paginilor este împărțită în mixin-uri (`app/ui/parts/mixin
 
 `app/ui/part_base.py` este un re-export subțire — sursa de adevăr sunt mixin-urile. Scriptul `scripts/split_part_base.py` este **arhival** (Batch D); nu îl rulați din nou.
 
-### Module notabile (Batch E–H)
+### Module notabile (Batch E–H + Sprint I–III)
 
 | Modul | Rol |
 |-------|-----|
 | `core/paths.py` | Căi portabile USB, override `BIBLIOTECA_DATA_DIR` |
 | `core/cloud_backup.py` | Copiere backup în folder sincronizat |
+| `core/part_progress.py` | Progres părți și badge-uri sidebar |
+| `core/user_guide.py` | Deschidere ghid PDF bibliotecar |
 | `database/integrity.py` | Verificare integritate la pornire |
+| `ui/home_page.py` | Panou Acasă — dashboard progres |
+| `ui/onboarding_tour.py` | Tur ghidat prima utilizare |
+| `ui/widgets/toast.py` | Notificări discrete succes |
+| `ui/widgets/empty_state.py` | Stări goale prietenoase în tabel |
 | `ui/excel_import/` | Import din Excel |
 | `ui/year_end_wizard.py` | Asistent închidere an |
 | `ui/widgets/table_find_bar.py` | Căutare Ctrl+F în tabel |
 | `ui/export/export_common.py` | Antete și formatare comună export |
+| `scripts/generate_user_guide.py` | Generează `ghid_bibliotecar.pdf` |
 
 ---
 
@@ -456,7 +512,7 @@ Toate orele sunt **ora României (UTC+3)** din jurnalul Git.
 
 | Commit | Descriere |
 |--------|-----------|
-| *(Sprint III)* | **v1.7.0 — Distribuție:** ghid PDF 1 pagină pentru bibliotecar; instalator ca produs principal; GitHub Release automat (ZIP + Setup); **Ajutor → Ghid rapid** |
+| `0e339a8` | **Sprint III — v1.7.0:** ghid PDF bibliotecar; instalator + GitHub Release automat; **Ajutor → Ghid rapid** |
 | `97f905d` | **Sprint II — v1.6.0:** panou Acasă; badge-uri progres sidebar; tur onboarding 5 pași |
 | `4ed3a64` | **Sprint I — v1.5.0:** toast-uri; evidențiere rând azi; stări goale; icon aplicație |
 
@@ -496,6 +552,8 @@ Toate orele sunt **ora României (UTC+3)** din jurnalul Git.
 | Salvare eșuată (banner roșu) | Ctrl+S; verificați spațiu pe disc |
 | Diacritice lipsă în PDF | Reinstalați din build recent (fonturile sunt incluse în `.exe`) |
 | Mod portabil USB | Copiați tot folderul `RegistruDigital/`; `data/` trebuie să stea lângă `.exe` |
+| Ghid PDF lipsă | Reinstalați din Release sau rulați `scripts\generate_user_guide.py` |
+| Prima instalare dev | Rulați `install_dependencies.bat`, apoi `run.bat` |
 
 ---
 
@@ -505,4 +563,4 @@ Proiect dezvoltat pentru evidența digitală a bibliotecilor publice. Consultaț
 
 ---
 
-*Document actualizat pentru versiunea **1.4.0** (commit `b68540b`, 22 iunie 2026).*
+*Document actualizat pentru versiunea **1.7.0** (commit `0e339a8`, 22 iunie 2026).*
