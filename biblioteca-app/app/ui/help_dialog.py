@@ -25,6 +25,9 @@ SHORTCUTS_HEADER = """
 <tr><td><b>Ctrl+S</b></td><td>Salvează pagina curentă</td></tr>
 <tr><td><b>Ctrl+E</b></td><td>Exportă pagina curentă</td></tr>
 <tr><td><b>Ctrl+R</b></td><td>Registru complet (overview)</td></tr>
+<tr><td><b>Ctrl+F</b></td><td>Găsește în tabel</td></tr>
+<tr><td><b>Ctrl+C / Ctrl+V</b></td><td>Copiază / lipește (Excel TSV)</td></tr>
+<tr><td><b>Ctrl+Shift+M</b></td><td>Copiază luna trecută</td></tr>
 <tr><td><b>Ctrl+Z</b></td><td>Anulează ultimele editări (până la 10 pași)</td></tr>
 <tr><td><b>Ctrl+,</b></td><td>Setări bibliotecă</td></tr>
 <tr><td><b>Ctrl+Q</b></td><td>Ieșire</td></tr>

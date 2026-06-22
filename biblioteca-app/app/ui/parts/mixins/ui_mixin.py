@@ -30,6 +30,7 @@ from ui.widgets.date_picker_zile_lucratoare import DatePickerZileLucratoare
 from ui.widgets.editable_table import ColumnDef, EditableTable
 from ui.widgets.range_config_dialog import RangeConfigDialog
 from ui.widgets.table_factory import create_register_table
+from ui.widgets.table_find_bar import TableFindBar
 from ui.widgets.table_scroll_wrapper import TableScrollWrapper
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,8 @@ class PartUiMixin:
         if self._has_month_bar:
             QShortcut(QKeySequence("Ctrl+Left"), self, lambda: self._go_month(-1))
             QShortcut(QKeySequence("Ctrl+Right"), self, lambda: self._go_month(1))
+            QShortcut(QKeySequence("Ctrl+Shift+M"), self, self._duplicate_from_previous_month)
+        QShortcut(QKeySequence("Ctrl+F"), self, self._open_table_find)
         QTimer.singleShot(0, self._load_current)
     def _working_days(self, year: int | None = None, month: int | None = None) -> list[str]:
         y, m = year or self.year, month or self.month
@@ -156,6 +159,13 @@ class PartUiMixin:
             btn_days.setObjectName("btnGhost")
             btn_days.clicked.connect(self._regenerate_days)
             toolbar.addWidget(btn_days)
+
+        if self._has_month_bar:
+            btn_copy_month = QPushButton("⎘ Copiază luna trecută")
+            btn_copy_month.setObjectName("btnGhost")
+            btn_copy_month.setToolTip("Copiază datele din luna anterioară (Ctrl+Shift+M)")
+            btn_copy_month.clicked.connect(self._duplicate_from_previous_month)
+            toolbar.addWidget(btn_copy_month)
 
         btn_gen = QPushButton("Generează automat")
         btn_gen.setObjectName("btnPrimary")
@@ -228,9 +238,14 @@ class PartUiMixin:
 
         hint = QLabel(
             "Click pe celulă + tastați  ·  Tab / Enter = următoarea celulă  ·  "
+            "Ctrl+F = găsește  ·  Ctrl+V = lipește din Excel  ·  "
             "Dublu-click pe antet = redenumire  ·  Albastru = generat automat"
         )
         table_layout.addWidget(hint)
+
+        self._find_bar = TableFindBar(table_card)
+        self._find_bar.hide()
+        table_layout.addWidget(self._find_bar)
 
         if self.has_copii_adulti:
             self.tabs = QTabWidget()
@@ -254,6 +269,9 @@ class PartUiMixin:
     def _make_table(self) -> EditableTable:
         table = create_register_table(self.columns)
         table.setup(self.columns, self.computed_rules, part_id=self.part_id)
+        table._allow_paste_extend = self.mode == "events"
+        if hasattr(table, "attach_find_bar"):
+            table.attach_find_bar(self._find_bar)
         labels = [get_all_etichete(self.part_id).get(c.key, c.key) for c in self.columns]
         table.set_header_labels(labels)
         table.cell_edited.connect(self._on_cell_edited)
@@ -262,6 +280,11 @@ class PartUiMixin:
         table.setMinimumHeight(320)
         table.setMinimumWidth(max(900, len(self.columns) * 90))
         return table
+    def _open_table_find(self) -> None:
+        table = self._active_table()
+        if hasattr(table, "open_find"):
+            table.open_find()
+
     def _heading_text(self) -> str:
         if self.mode == "crud":
             return f"Partea {self.roman}. {self.title}"

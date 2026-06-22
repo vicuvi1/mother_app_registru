@@ -311,6 +311,49 @@ class PartDataMixin:
         self._recompute_visible_totals()
         self._debounce.start()
         self.main_window.statusBar().showMessage("Rând duplicat — modificați ce trebuie și salvați.", 4000)
+
+    def _duplicate_from_previous_month(self) -> None:
+        if not self._has_month_bar or self.month <= 1:
+            QMessageBox.information(
+                self,
+                "Copiază luna trecută",
+                "Disponibil doar de la februarie înainte (luna 2–12).",
+            )
+            return
+        prev = self.month - 1
+        reply = QMessageBox.question(
+            self,
+            "Copiază luna trecută",
+            f"Copiați datele din {LUNI_RO[prev - 1]} în {LUNI_RO[self.month - 1]}?\n\n"
+            "Valorile curente din luna afișată vor fi înlocuite (nu se salvează automat).",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._cache_current_period()
+        categories = ["adulti", "copii"] if self.has_copii_adulti else [None]
+        for cat in categories:
+            source = self._fetch_table_data(cat, self.year, prev)
+            new_rows = [dict(r) for r in source["rows"]]
+            if self.mode == "daily":
+                days = self._working_days(self.year, self.month)
+                for i, row in enumerate(new_rows):
+                    if i < len(days):
+                        row[self.date_field] = days[i]
+            ids = [None] * len(new_rows)
+            flags = [False] * len(new_rows)
+            key = self._cache_key(self.year, self.month, cat)
+            self._data_cache[key] = {"rows": new_rows, "ids": ids, "flags": flags}
+
+        self._dirty = True
+        self.main_window.set_save_status(False)
+        self._load_current(fast=True)
+        self.main_window.statusBar().showMessage(
+            f"Date copiate din {LUNI_RO[prev - 1]} — apăsați Salvează pentru a confirma.",
+            6000,
+        )
+
     def save_all(self, show_status: bool = True, reload: bool = False) -> bool:
         self._debounce.stop()
         if self._save_pending:

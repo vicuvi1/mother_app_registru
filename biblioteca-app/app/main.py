@@ -12,6 +12,7 @@ if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
 from core.logging_config import setup_logging  # noqa: E402
+from core.ui_theme import load_stylesheet  # noqa: E402
 from database.db_manager import init_database, is_first_run  # noqa: E402
 from database.integrity import check_database_integrity, offer_restore_on_corruption  # noqa: E402
 from ui.main_window import MainWindow  # noqa: E402
@@ -20,9 +21,7 @@ from ui.splash_screen import SplashScreen  # noqa: E402
 
 
 def _load_stylesheet(app: QApplication) -> None:
-    qss_path = APP_ROOT / "resources" / "stylesheet.qss"
-    if qss_path.exists():
-        app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
+    load_stylesheet(app, APP_ROOT)
 
 
 def _center_on_screen(widget) -> None:

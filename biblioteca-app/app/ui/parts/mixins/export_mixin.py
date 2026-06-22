@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 from sqlalchemy import and_, case, delete, func, inspect as sa_inspect, select
 
 from core.constants_manager import get_excluded_days, LUNI_RO, get_all_etichete, set_eticheta_custom
+from core.export_presets import set_export_folder, suggest_export_path
 from core.date_engine import get_working_days
 from core.random_engine import generate_month_data, generate_year_monthly_data
 from database.db_manager import get_session
@@ -219,11 +220,15 @@ class PartExportMixin:
         }[fmt]
 
         out_path, _ = QFileDialog.getSaveFileName(
-            self, "Salvează exportul", self._suggested_filename(ext, scope, year), filt
+            self,
+            "Salvează exportul",
+            suggest_export_path(self._suggested_filename(ext, scope, year)),
+            filt,
         )
         if not out_path:
             return
 
+        set_export_folder(out_path)
         self.main_window.statusBar().showMessage("Se generează exportul…")
         try:
             pages = self._collect_pages(scope, year)
@@ -269,21 +274,8 @@ class PartExportMixin:
                 f"Nu s-a putut deschide fișierul:\n{path}\n\n{exc}",
             )
     def _print_table(self) -> None:
-        from PyQt6.QtGui import QTextDocument
-
-        from ui.export.export_html import build_pages_html
+        from ui.export.print_presets import show_print_preview
 
         self.save_all(show_status=False)
         pages = [self._build_page(self.year, self.month, self._active_category())]
-
-        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-        printer.setPageOrientation(QPageLayout.Orientation.Landscape)
-        printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
-
-        self._print_document = QTextDocument()
-        self._print_document.setHtml(build_pages_html(pages))
-
-        preview = QPrintPreviewDialog(printer, self)
-        preview.setWindowTitle("Previzualizare printare")
-        preview.paintRequested.connect(lambda p: self._print_document.print(p))
-        preview.exec()
+        show_print_preview(self, pages, title="Previzualizare printare")

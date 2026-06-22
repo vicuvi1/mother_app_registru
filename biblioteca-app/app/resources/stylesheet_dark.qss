@@ -1,0 +1,192 @@
+/* Temă întunecată — Registru Digital Bibliotecă */
+
+* {
+    font-family: "Segoe UI", "SF Pro Text", sans-serif;
+    font-size: 13px;
+    color: #e2e8f0;
+}
+
+QMainWindow {
+    background-color: #0f172a;
+}
+
+QMenuBar, QMenu {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+}
+
+QMenu::item:selected, QMenuBar::item:selected {
+    background-color: #334155;
+}
+
+#sidebar {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1e293b, stop:1 #0f172a);
+}
+
+#sidebarLogo, #sidebarTitle, #sidebarSubtitle, #sidebarLibrary {
+    color: #93c5fd;
+}
+
+#partList {
+    background: transparent;
+    border: none;
+    color: #cbd5e1;
+}
+
+#partList::item:selected {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+#partList::item:hover:!selected {
+    background-color: #334155;
+}
+
+#contentStack, #pageContainer {
+    background-color: #0f172a;
+}
+
+#pageHeaderCard, #toolBarCard, #tableCard {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+}
+
+#pageRegistru {
+    color: #94a3b8;
+}
+
+#pageHeading {
+    color: #f1f5f9;
+}
+
+#partRomanBadge {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+QPushButton {
+    background-color: #334155;
+    color: #f1f5f9;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 6px 14px;
+}
+
+QPushButton:hover {
+    background-color: #475569;
+}
+
+QPushButton#btnPrimary {
+    background-color: #2563eb;
+    border-color: #1d4ed8;
+    color: #ffffff;
+}
+
+QPushButton#btnSuccess {
+    background-color: #059669;
+    border-color: #047857;
+    color: #ffffff;
+}
+
+QPushButton#btnGhost {
+    background-color: transparent;
+    border-color: #475569;
+}
+
+QComboBox, QSpinBox, QLineEdit {
+    background-color: #0f172a;
+    color: #f1f5f9;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+#dataTable {
+    background-color: #1e293b;
+    alternate-background-color: #273549;
+    gridline-color: #475569;
+    color: #f1f5f9;
+    selection-background-color: #2563eb;
+}
+
+#dataTable QHeaderView::section {
+    background-color: #334155;
+    color: #f1f5f9;
+    border: 1px solid #475569;
+}
+
+#monthBar::tab {
+    background: #1e293b;
+    color: #94a3b8;
+    border: 1px solid #334155;
+    padding: 6px 12px;
+}
+
+#monthBar::tab:selected {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+#tableFindBar {
+    background-color: #334155;
+    border: 1px solid #475569;
+    border-radius: 6px;
+}
+
+QStatusBar {
+    background-color: #1e293b;
+    color: #94a3b8;
+}
+
+#setupDialog {
+    background-color: #1e293b;
+}
+
+#setupWelcome {
+    color: #f1f5f9;
+}
+
+#setupHint {
+    color: #94a3b8;
+}
+
+QTabWidget::pane {
+    border: 1px solid #334155;
+    background: #1e293b;
+}
+
+QTabBar::tab {
+    background: #334155;
+    color: #cbd5e1;
+    padding: 8px 16px;
+}
+
+QTabBar::tab:selected {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+QScrollBar:vertical, QScrollBar:horizontal {
+    background: #1e293b;
+}
+
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
+    background: #475569;
+    border-radius: 4px;
+}
+
+QCheckBox {
+    color: #e2e8f0;
+}
+
+QListWidget {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+}
+
+QListWidget::item:selected {
+    background-color: #2563eb;
+}

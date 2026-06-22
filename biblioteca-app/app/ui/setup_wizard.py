@@ -28,6 +28,8 @@ from core.constants_manager import (
     set_biblioteca_info,
     update_personal,
 )
+from core.export_presets import get_print_orientation, set_print_orientation
+from core.ui_theme import get_ui_theme, set_ui_theme
 from database.db_manager import mark_setup_completed
 from core.autosave import get_autosave_interval, save_autosave_interval
 
@@ -172,6 +174,29 @@ class SetupWizard(QDialog):
                 "Salvează automat pagina curentă la intervalul ales și la schimbarea părții."
             )
         )
+
+        self.combo_theme = QComboBox()
+        self._theme_options = [("Deschis (implicit)", "light"), ("Întunecat", "dark")]
+        for label, _val in self._theme_options:
+            self.combo_theme.addItem(label)
+        current_theme = get_ui_theme()
+        for i, (_label, val) in enumerate(self._theme_options):
+            if val == current_theme:
+                self.combo_theme.setCurrentIndex(i)
+                break
+        form.addRow("Temă interfață:", self.combo_theme)
+
+        self.combo_print = QComboBox()
+        self._print_options = [("Peisaj (implicit)", "landscape"), ("Portret", "portrait")]
+        for label, _val in self._print_options:
+            self.combo_print.addItem(label)
+        orient = get_print_orientation()
+        for i, (_label, val) in enumerate(self._print_options):
+            if val == orient:
+                self.combo_print.setCurrentIndex(i)
+                break
+        form.addRow("Orientare printare:", self.combo_print)
+        form.addRow(QLabel("Se aplică la previzualizarea de printare din toate părțile."))
         return w
 
     def _refresh_personal_table(self) -> None:
@@ -213,6 +238,12 @@ class SetupWizard(QDialog):
         idx = self.combo_autosave.currentIndex()
         if 0 <= idx < len(self._autosave_options):
             save_autosave_interval(self._autosave_options[idx][1])
+        tidx = self.combo_theme.currentIndex()
+        if 0 <= tidx < len(self._theme_options):
+            set_ui_theme(self._theme_options[tidx][1])
+        pidx = self.combo_print.currentIndex()
+        if 0 <= pidx < len(self._print_options):
+            set_print_orientation(self._print_options[pidx][1])
         if self.first_run:
             mark_setup_completed()
         self.accept()

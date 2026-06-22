@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QKeyEvent, QKeySequence, QShortcut
+from PyQt6.QtGui import QGuiApplication, QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ui.widgets.preset_text_cell import PresetTextCell
+from ui.widgets.table_find_bar import TableFindBar
 from ui.widgets.table.column_def import ColumnDef
 from ui.widgets.table.delegates.checkbox_delegate import CheckBoxDelegate
 from ui.widgets.table.delegates.responsabil_delegate import ResponsabilDelegate
@@ -43,6 +44,9 @@ class RegisterTableView(QTableView):
         self._max_undo = 10
         self._header_labels: list[str] = []
         self._preset_cells: list[PresetTextCell] = []
+        self._find_bar: TableFindBar | None = None
+        self._find_matches: list[tuple[int, int]] = []
+        self._find_pos = -1
         self._checkbox_delegate = CheckBoxDelegate(self)
         self._responsabil_delegate = ResponsabilDelegate(self)
 
@@ -74,6 +78,151 @@ class RegisterTableView(QTableView):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         QShortcut(QKeySequence("Ctrl+Z"), self, self.undo_last)
+        QShortcut(QKeySequence("Ctrl+F"), self, self.open_find)
+        QShortcut(QKeySequence("Ctrl+C"), self, self.copy_selection)
+        QShortcut(QKeySequence("Ctrl+V"), self, self.paste_from_clipboard)
+
+    def attach_find_bar(self, bar: TableFindBar) -> None:
+        self._find_bar = bar
+        bar.find_next.connect(self.find_next)
+        bar.find_previous.connect(self.find_previous)
+        bar.search_changed.connect(self._refresh_find_matches)
+        bar.closed.connect(self._clear_find_highlight)
+
+    def open_find(self) -> None:
+        if self._find_bar is None:
+            return
+        self._find_bar.show()
+        self._find_bar.focus_search()
+        self._refresh_find_matches()
+
+    def _refresh_find_matches(self, _needle: str = "", _case: bool = False) -> None:
+        if self._find_bar is None:
+            return
+        needle = self._find_bar.needle()
+        case = self._find_bar.case_sensitive()
+        self._find_matches = self._register_model.find_matches(needle, case_sensitive=case)
+        self._find_pos = -1
+        if needle and self._find_matches:
+            self.find_next()
+
+    def find_next(self) -> None:
+        if not self._find_matches:
+            return
+        self._find_pos = (self._find_pos + 1) % len(self._find_matches)
+        self._focus_find_match()
+
+    def find_previous(self) -> None:
+        if not self._find_matches:
+            return
+        self._find_pos = (self._find_pos - 1) % len(self._find_matches)
+        self._focus_find_match()
+
+    def _focus_find_match(self) -> None:
+        if self._find_pos < 0 or self._find_pos >= len(self._find_matches):
+            return
+        row, col = self._find_matches[self._find_pos]
+        index = self._register_model.index(row, col)
+        self.setCurrentIndex(index)
+        self.scrollTo(index)
+
+    def _clear_find_highlight(self) -> None:
+        self._find_matches.clear()
+        self._find_pos = -1
+
+    def copy_selection(self) -> None:
+        index = self.currentIndex()
+        if not index.isValid() or not self.is_data_row(index.row()):
+            return
+        val = self._register_model.data(index, Qt.ItemDataRole.DisplayRole)
+        QGuiApplication.clipboard().setText(str(val if val is not None else ""))
+
+    def paste_from_clipboard(self) -> None:
+        text = QGuiApplication.clipboard().text()
+        if not text.strip():
+            return
+        start = self.currentIndex()
+        if not start.isValid():
+            return
+        start_row = start.row() if self.is_data_row(start.row()) else 0
+        start_col = max(0, start.column())
+        lines = [ln for ln in text.replace("\r\n", "\n").replace("\r", "\n").split("\n") if ln is not None]
+        if not lines:
+            return
+
+        data_rows = self.get_data_rows()
+        ids = self.get_row_ids()
+        flags = self.get_auto_flags()
+        changed = False
+
+        for dr, line in enumerate(lines):
+            row = start_row + dr
+            if row >= self._register_model.store.data_row_count():
+                if getattr(self, "_allow_paste_extend", False):
+                    blank = {c.key: self._default_cell_value(c) for c in self._columns}
+                    data_rows.append(blank)
+                    ids.append(None)
+                    flags.append(False)
+                    row = len(data_rows) - 1
+                else:
+                    break
+            cells = line.split("\t")
+            for dc, raw in enumerate(cells):
+                col = start_col + dc
+                if col >= len(self._columns):
+                    break
+                col_def = self._columns[col]
+                if not col_def.editable or col_def.computed_from:
+                    continue
+                parsed = self._parse_paste_value(col_def, raw)
+                if parsed is None:
+                    continue
+                data_rows[row][col_def.key] = parsed
+                changed = True
+
+        if not changed:
+            return
+        self.load_rows(data_rows, ids, flags, resize=False, resize_rows=True)
+        for dr, line in enumerate(lines):
+            row = start_row + dr
+            if row >= self._register_model.store.data_row_count():
+                break
+            for dc, raw in enumerate(line.split("\t")):
+                col = start_col + dc
+                if col >= len(self._columns):
+                    break
+                col_def = self._columns[col]
+                if not col_def.editable or col_def.computed_from:
+                    continue
+                parsed = self._parse_paste_value(col_def, raw)
+                if parsed is not None:
+                    self.cell_edited.emit(row, col_def.key, parsed)
+
+    def _default_cell_value(self, col_def: ColumnDef):
+        if col_def.col_type == "int":
+            return 0
+        if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            return False
+        return ""
+
+    def _parse_paste_value(self, col_def: ColumnDef, raw: str):
+        text = raw.strip()
+        if col_def.col_type == "int":
+            try:
+                return max(0, int(text)) if text else 0
+            except ValueError:
+                self.validation_error.emit("Lipire: doar numere întregi ≥ 0")
+                return None
+        if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
+            low = text.casefold()
+            if low in ("1", "da", "true", "x", "✓"):
+                return True
+            if low in ("0", "nu", "false", ""):
+                return False
+            return None
+        if col_def.col_type in ("date", "text", "responsabil", "preset_text", "inline_text"):
+            return text
+        return text
 
     @property
     def store(self):

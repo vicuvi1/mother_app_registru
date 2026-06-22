@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 
 from core.app_restart import restart_application
 from core.autosave import AutosaveManager, get_autosave_interval
+from core.ui_theme import load_stylesheet
 from core.constants_manager import APP_CREDIT, get_biblioteca_info
 from core.parts_registry import PARTS, PART_LAYOUT, get_part_factory
 from core.session_state import load_session, save_session
@@ -31,6 +32,7 @@ from ui.about_dialog import AboutDialog
 from ui.help_dialog import HelpDialog
 from ui.incomplete_months_dialog import IncompleteMonthsDialog
 from ui.setup_wizard import SetupWizard
+from ui.year_end_wizard import YearEndWizard
 
 # Re-export pentru module care importă din main_window
 __all__ = ["MainWindow", "PARTS", "PART_LAYOUT"]
@@ -112,6 +114,10 @@ class MainWindow(QMainWindow):
         act_incomplete = QAction("Luni fără date…", self)
         act_incomplete.triggered.connect(self._open_incomplete_months)
         menu_fisier.addAction(act_incomplete)
+
+        act_year_end = QAction("Asistent închidere an…", self)
+        act_year_end.triggered.connect(self._open_year_end_wizard)
+        menu_fisier.addAction(act_year_end)
 
         act_export = QAction("Exportă pagina curentă…", self)
         act_export.setShortcut("Ctrl+E")
@@ -345,6 +351,13 @@ class MainWindow(QMainWindow):
             year = getattr(page, "year", None) or date.today().year
         IncompleteMonthsDialog(self, default_year=year).exec()
 
+    def _open_year_end_wizard(self) -> None:
+        from datetime import date
+
+        page = self._content_stack.currentWidget()
+        year = getattr(page, "year", None) or date.today().year
+        YearEndWizard(self, default_year=year).exec()
+
     def _open_overview(self) -> None:
         from datetime import date
 
@@ -538,6 +551,14 @@ class MainWindow(QMainWindow):
                 lib_text += f"\n{loc}"
             self._library_label.setText(lib_text)
             self._autosave.set_interval(get_autosave_interval())
+            from pathlib import Path
+
+            from PyQt6.QtWidgets import QApplication
+
+            app_root = Path(__file__).resolve().parent.parent
+            app = QApplication.instance()
+            if app is not None:
+                load_stylesheet(app, app_root)
 
     def set_save_status(self, saved: bool) -> None:
         if saved:

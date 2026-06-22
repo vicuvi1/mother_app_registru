@@ -232,6 +232,21 @@ class RegisterTableModel(QAbstractTableModel):
         self.edit_committed.emit(row, col, old_text, new_text)
         return True
 
+    def find_matches(self, needle: str, *, case_sensitive: bool = False) -> list[tuple[int, int]]:
+        if not needle:
+            return []
+        hits: list[tuple[int, int]] = []
+        for row in range(self.store.data_row_count()):
+            for col, col_def in enumerate(self.store.columns):
+                val = self.store.get_cell(row, col)
+                hay = str(val if val is not None else "")
+                if case_sensitive:
+                    if needle in hay:
+                        hits.append((row, col))
+                elif needle.casefold() in hay.casefold():
+                    hits.append((row, col))
+        return hits
+
     def set_total_rows(self, totals: list[tuple[str, dict[str, int]]]) -> None:
         self.beginResetModel()
         self.store.total_rows = list(totals)

@@ -173,17 +173,9 @@ class RegisterOverviewDialog(QDialog):
         if not table_pages and len(pages) == 0:
             QMessageBox.information(self, "Overview", "Nu ați selectat nicio pagină.")
             return
-        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-        from PyQt6.QtGui import QPageLayout, QPageSize
+        from ui.export.print_presets import show_print_preview
 
-        printer.setPageOrientation(QPageLayout.Orientation.Landscape)
-        printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
-        self._doc = QTextDocument()
-        self._doc.setHtml(build_pages_html(pages))
-        dlg = QPrintPreviewDialog(printer, self)
-        dlg.setWindowTitle("Previzualizare registru complet")
-        dlg.paintRequested.connect(lambda p: self._doc.print(p))
-        dlg.exec()
+        show_print_preview(self, pages, title="Previzualizare registru complet")
 
     def _export(self) -> None:
         pages = self._selected_pages()
@@ -197,11 +189,17 @@ class RegisterOverviewDialog(QDialog):
             "word": "Document Word (*.docx)",
             "excel": "Fișier Excel (*.xlsx)",
         }[fmt]
+        from core.export_presets import set_export_folder, suggest_export_path
+
         out_path, _ = QFileDialog.getSaveFileName(
-            self, "Salvează registrul final", f"Registru_complet_{self._year.value()}.{ext}", filt
+            self,
+            "Salvează registrul final",
+            suggest_export_path(f"Registru_complet_{self._year.value()}.{ext}"),
+            filt,
         )
         if not out_path:
             return
+        set_export_folder(out_path)
         try:
             run_export_with_progress(
                 self,

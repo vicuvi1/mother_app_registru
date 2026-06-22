@@ -13,6 +13,8 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(APP / "resources" / "stylesheet.qss"), "resources"),
+        (str(APP / "resources" / "stylesheet_dark.qss"), "resources"),
+        (str(APP / "resources" / "fonts"), "resources/fonts"),
     ],
     hiddenimports=[
         "sqlalchemy.dialects.sqlite",

@@ -23,11 +23,14 @@ from ui.export.export_utils import (
     format_total_value,
     validate_pages,
 )
+from ui.export.pdf_fonts import register_pdf_fonts
+
+_FONT, _FONT_BOLD = register_pdf_fonts()
 
 
 def _on_page(canvas, doc):
     canvas.saveState()
-    canvas.setFont("Helvetica", 8)
+    canvas.setFont(_FONT, 8)
     w, _h = landscape(A4)
     canvas.drawRightString(w - 10 * mm, 6 * mm, f"Pagina {doc.page}")
     canvas.restoreState()
@@ -43,6 +46,10 @@ def export_to_pdf(out_path: Path, pages: list[dict]) -> Path:
         leftMargin=8 * mm, rightMargin=8 * mm, topMargin=8 * mm, bottomMargin=12 * mm,
     )
     styles = getSampleStyleSheet()
+    if _FONT != "Helvetica":
+        styles["Normal"].fontName = _FONT
+        styles["Title"].fontName = _FONT_BOLD
+        styles["Heading3"].fontName = _FONT_BOLD
     story = []
 
     for pi, page in enumerate(pages):
@@ -64,7 +71,7 @@ def _cover_flowables(page: dict, styles) -> list:
     def ps(name, size, space):
         return ParagraphStyle(name, parent=styles["Normal"], alignment=TA_CENTER,
                               fontSize=size, leading=size + 4, spaceAfter=space,
-                              fontName="Helvetica-Bold")
+                              fontName=_FONT_BOLD)
 
     flow = [Spacer(1, 90 * mm * 0.5)]
     if page.get("institutie_1"):
@@ -134,7 +141,7 @@ def _page_flowables(page: dict, styles) -> list:
         header_rows = 1
 
     style_cmds.append(("BACKGROUND", (0, 0), (-1, header_rows - 1), colors.HexColor("#DBE3EE")))
-    style_cmds.append(("FONTNAME", (0, 0), (-1, header_rows - 1), "Helvetica-Bold"))
+    style_cmds.append(("FONTNAME", (0, 0), (-1, header_rows - 1), _FONT_BOLD))
 
     for row in rows:
         line = []
@@ -144,7 +151,7 @@ def _page_flowables(page: dict, styles) -> list:
 
     if rows:
         style_cmds.append(
-            ("FONTNAME", (0, header_rows), (0, header_rows + len(rows) - 1), "Helvetica-Bold")
+            ("FONTNAME", (0, header_rows), (0, header_rows + len(rows) - 1), _FONT_BOLD)
         )
 
     for label, sums in total_rows:
@@ -155,7 +162,7 @@ def _page_flowables(page: dict, styles) -> list:
 
     total_start = header_rows + len(rows)
     style_cmds.append(("BACKGROUND", (0, total_start), (-1, -1), colors.HexColor("#E2E8F0")))
-    style_cmds.append(("FONTNAME", (0, total_start), (-1, -1), "Helvetica-Bold"))
+    style_cmds.append(("FONTNAME", (0, total_start), (-1, -1), _FONT_BOLD))
 
     if len(data) > header_rows:
         t = Table(data, repeatRows=header_rows)
