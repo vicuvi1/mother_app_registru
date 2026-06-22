@@ -1,9 +1,11 @@
 """Ecran inițial: Personal, range-uri default, date bibliotecă."""
 
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QInputDialog,
@@ -30,7 +32,13 @@ from core.constants_manager import (
 )
 from core.export_presets import get_print_orientation, set_print_orientation
 from core.ui_theme import get_ui_theme, set_ui_theme
-from database.db_manager import mark_setup_completed
+from core.cloud_backup import (
+    get_cloud_backup_target,
+    is_cloud_backup_enabled,
+    set_cloud_backup_enabled,
+    set_cloud_backup_target,
+)
+from database.db_manager import get_setting, mark_setup_completed, set_setting
 from core.autosave import get_autosave_interval, save_autosave_interval
 
 
@@ -197,7 +205,36 @@ class SetupWizard(QDialog):
                 break
         form.addRow("Orientare printare:", self.combo_print)
         form.addRow(QLabel("Se aplică la previzualizarea de printare din toate părțile."))
+
+        self.chk_encrypt_backup = QCheckBox("Criptează copiile manuale de rezervă (.db.enc)")
+        self.chk_encrypt_backup.setChecked(get_setting("backup_encrypt_enabled", "0") == "1")
+        form.addRow(self.chk_encrypt_backup)
+
+        self.chk_cloud_backup = QCheckBox("Copiază backup-urile în folder cloud (OneDrive/Dropbox)")
+        self.chk_cloud_backup.setChecked(is_cloud_backup_enabled())
+        form.addRow(self.chk_cloud_backup)
+
+        cloud_row = QHBoxLayout()
+        self.edit_cloud_folder = QLineEdit()
+        self.edit_cloud_folder.setText(get_cloud_backup_target())
+        self.edit_cloud_folder.setPlaceholderText("ex. C:\\Users\\…\\OneDrive\\BibliotecaBackup")
+        btn_cloud = QPushButton("Alege folder…")
+        btn_cloud.clicked.connect(self._pick_cloud_folder)
+        cloud_row.addWidget(self.edit_cloud_folder, stretch=1)
+        cloud_row.addWidget(btn_cloud)
+        form.addRow("Folder sincronizat:", cloud_row)
+        form.addRow(
+            QLabel(
+                "Mod portabil: datele (biblioteca.db) se salvează în folderul data/ lângă "
+                "RegistruDigital.exe — potrivit pentru stick USB."
+            )
+        )
         return w
+
+    def _pick_cloud_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Folder backup cloud")
+        if folder:
+            self.edit_cloud_folder.setText(folder)
 
     def _refresh_personal_table(self) -> None:
         names = get_personal_names()
@@ -244,6 +281,9 @@ class SetupWizard(QDialog):
         pidx = self.combo_print.currentIndex()
         if 0 <= pidx < len(self._print_options):
             set_print_orientation(self._print_options[pidx][1])
+        set_setting("backup_encrypt_enabled", "1" if self.chk_encrypt_backup.isChecked() else "0")
+        set_cloud_backup_enabled(self.chk_cloud_backup.isChecked())
+        set_cloud_backup_target(self.edit_cloud_folder.text().strip())
         if self.first_run:
             mark_setup_completed()
         self.accept()

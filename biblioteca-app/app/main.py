@@ -7,11 +7,13 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QGuiApplication
 from PyQt6.QtWidgets import QApplication
 
-APP_ROOT = Path(__file__).resolve().parent
-if str(APP_ROOT) not in sys.path:
-    sys.path.insert(0, str(APP_ROOT))
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core.logging_config import setup_logging  # noqa: E402
+from core.paths import get_bundle_root  # noqa: E402
+
+APP_ROOT = get_bundle_root()
 from core.ui_theme import load_stylesheet  # noqa: E402
 from database.db_manager import init_database, is_first_run  # noqa: E402
 from database.integrity import check_database_integrity, offer_restore_on_corruption  # noqa: E402

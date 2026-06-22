@@ -15,9 +15,10 @@ try:
 except ImportError:
     auto_backup_on_startup = None  # type: ignore[assignment]
 
-# Calea DB conform SPEC secțiunea 2: app/data/biblioteca.db
-APP_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = APP_DIR / "data"
+from core.paths import get_data_dir
+
+# Calea DB — portabil: data/ lângă exe; dev: app/data/
+DATA_DIR = get_data_dir()
 DB_PATH = DATA_DIR / "biblioteca.db"
 
 _engine = None

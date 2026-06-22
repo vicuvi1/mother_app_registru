@@ -1,13 +1,14 @@
-"""Configurare logging — fișier rotativ în app/data/."""
+"""Configurare logging — fișier rotativ în data/."""
 
 from __future__ import annotations
 
 import logging
 import os
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "data"
+from core.paths import get_data_dir
+
+LOG_DIR = get_data_dir()
 LOG_FILE = LOG_DIR / "biblioteca.log"
 
 

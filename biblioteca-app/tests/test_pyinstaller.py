@@ -14,6 +14,12 @@ def test_pyinstaller_spec_exists():
     assert "RegistruDigital" in text
 
 
+def test_installer_spec_exists():
+    iss = ROOT / "installer" / "registru.iss"
+    assert iss.is_file()
+    assert "RegistruDigital.exe" in iss.read_text(encoding="utf-8")
+
+
 def test_build_script_exists():
     bat = ROOT / "build.bat"
     assert bat.is_file()

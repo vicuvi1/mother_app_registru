@@ -14,7 +14,9 @@ _registered = False
 
 
 def _app_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    from core.paths import get_bundle_root
+
+    return get_bundle_root()
 
 
 def _candidate_fonts() -> list[tuple[str, str]]:
