@@ -1,0 +1,159 @@
+"""Export PDF cu reportlab — pagini numerotate, grilă completă, anteturi de grup."""
+
+from pathlib import Path
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
+from ui.export.export_html import group_spans
+
+
+def _on_page(canvas, doc):
+    canvas.saveState()
+    canvas.setFont("Helvetica", 8)
+    w, _h = landscape(A4)
+    canvas.drawRightString(w - 10 * mm, 6 * mm, f"Pagina {doc.page}")
+    canvas.restoreState()
+
+
+def export_to_pdf(out_path: Path, pages: list[dict]) -> Path:
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    doc = SimpleDocTemplate(
+        str(out_path), pagesize=landscape(A4),
+        leftMargin=8 * mm, rightMargin=8 * mm, topMargin=8 * mm, bottomMargin=12 * mm,
+    )
+    styles = getSampleStyleSheet()
+    story = []
+
+    for pi, page in enumerate(pages):
+        if pi > 0:
+            story.append(PageBreak())
+        if page.get("type") == "cover":
+            story.extend(_cover_flowables(page, styles))
+        else:
+            story.extend(_page_flowables(page, styles))
+
+    doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
+    return out_path
+
+
+def _cover_flowables(page: dict, styles) -> list:
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import ParagraphStyle
+
+    def ps(name, size, space):
+        return ParagraphStyle(name, parent=styles["Normal"], alignment=TA_CENTER,
+                              fontSize=size, leading=size + 4, spaceAfter=space,
+                              fontName="Helvetica-Bold")
+
+    flow = [Spacer(1, 90 * mm * 0.5)]
+    if page.get("institutie_1"):
+        flow.append(Paragraph(page["institutie_1"], ps("i1", 15, 4)))
+    if page.get("institutie_2"):
+        flow.append(Paragraph(page["institutie_2"], ps("i2", 15, 30)))
+    if page.get("titlu"):
+        flow.append(Paragraph(page["titlu"], ps("t", 26, 18)))
+    if page.get("biblioteca"):
+        flow.append(Paragraph(page["biblioteca"], ps("b", 22, 10)))
+    if page.get("localitate"):
+        flow.append(Paragraph(page["localitate"], ps("l", 17, 36)))
+    if page.get("an"):
+        flow.append(Paragraph(page["an"], ps("a", 19, 10)))
+    return flow
+
+
+def _page_flowables(page: dict, styles) -> list:
+    headers = page["headers"]
+    groups = page["groups"]
+    col_keys = page["col_keys"]
+    rows = page["rows"]
+    total_rows = page["total_rows"]
+    meta = page["meta"]
+
+    flow = []
+    if meta.get("nume_biblioteca"):
+        loc = f", {meta['localitate']}" if meta.get("localitate") else ""
+        flow.append(Paragraph(f"<b>{meta['nume_biblioteca']}{loc}</b>", styles["Normal"]))
+    flow.append(Paragraph("<b>Registru de evidență a activității bibliotecii</b>", styles["Title"]))
+    partea = f"Partea {meta.get('parte_roman', '')}. {meta.get('title', '')}"
+    if meta.get("luna_name"):
+        partea += f" în luna {meta['luna_name']} anul {meta.get('an', '')}"
+    elif meta.get("an"):
+        partea += f" — anul {meta.get('an', '')}"
+    flow.append(Paragraph(f"<b>{partea}</b>", styles["Heading3"]))
+    flow.append(Spacer(1, 6))
+
+    has_groups = any(groups)
+    spans = group_spans(groups)
+    ncols = len(headers)
+
+    style_cmds = [
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#555555")),
+        ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]
+
+    data: list[list[str]] = []
+    if has_groups:
+        grp_row = [""] * ncols
+        lbl_row = [""] * ncols
+        for start, end, g in spans:
+            if g:
+                grp_row[start] = g
+                style_cmds.append(("SPAN", (start, 0), (end, 0)))
+                for c in range(start, end + 1):
+                    lbl_row[c] = headers[c]
+            else:
+                grp_row[start] = headers[start]
+                style_cmds.append(("SPAN", (start, 0), (start, 1)))
+        data.append(grp_row)
+        data.append(lbl_row)
+        header_rows = 2
+    else:
+        data.append(list(headers))
+        header_rows = 1
+
+    style_cmds.append(("BACKGROUND", (0, 0), (-1, header_rows - 1), colors.HexColor("#DBE3EE")))
+    style_cmds.append(("FONTNAME", (0, 0), (-1, header_rows - 1), "Helvetica-Bold"))
+
+    for row in rows:
+        line = []
+        for k in col_keys:
+            val = row.get(k, "")
+            if isinstance(val, bool):
+                val = "✓" if val else ""
+            line.append(str(val))
+        data.append(line)
+
+    # prima coloană (data) bold
+    style_cmds.append(("FONTNAME", (0, header_rows), (0, header_rows + len(rows) - 1), "Helvetica-Bold"))
+
+    for label, sums in total_rows:
+        line = [label]
+        for k in col_keys[1:]:
+            v = sums.get(k, "")
+            line.append(str(v) if isinstance(v, int) else "")
+        data.append(line)
+
+    total_start = header_rows + len(rows)
+    style_cmds.append(("BACKGROUND", (0, total_start), (-1, -1), colors.HexColor("#E2E8F0")))
+    style_cmds.append(("FONTNAME", (0, total_start), (-1, -1), "Helvetica-Bold"))
+
+    if len(data) > header_rows:
+        t = Table(data, repeatRows=header_rows)
+        t.setStyle(TableStyle(style_cmds))
+        flow.append(t)
+    return flow
