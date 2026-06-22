@@ -3,8 +3,8 @@
 from datetime import datetime
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction, QCloseEvent, QKeySequence
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence
 from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
 from core.autosave import AutosaveManager
 from core.constants_manager import APP_CREDIT, get_biblioteca_info
 from core.parts_registry import PARTS, PART_LAYOUT, get_part_factory
-from database.backup import create_backup, list_backups, restore_backup
+from database.backup import create_backup, ensure_backup_dir, list_backups, restore_backup
 from ui.help_dialog import HelpDialog
 from ui.setup_wizard import SetupWizard
 
@@ -42,6 +42,8 @@ class MainWindow(QMainWindow):
         self._part_pages: dict[str, QWidget] = {}
         self._part_placeholders: dict[str, int] = {}
         self._loaded_parts: set[str] = set()
+        self._register_final_page = None
+        self._register_final_idx: int | None = None
         self._export_in_progress = False
         self._last_save_at: datetime | None = None
         self._build_menu()
@@ -101,6 +103,10 @@ class MainWindow(QMainWindow):
         act_restore.triggered.connect(self._restore_database)
         menu_fisier.addAction(act_restore)
 
+        act_open_backups = QAction("Deschide folderul copii de rezervă…", self)
+        act_open_backups.triggered.connect(self._open_backups_folder)
+        menu_fisier.addAction(act_open_backups)
+
         menu_fisier.addSeparator()
         act_exit = QAction("Ieșire", self)
         act_exit.setShortcut("Ctrl+Q")
@@ -131,6 +137,10 @@ class MainWindow(QMainWindow):
             )
         except OSError as exc:
             QMessageBox.warning(self, "Backup", f"Nu s-a putut crea copia:\n{exc}")
+
+    def _open_backups_folder(self) -> None:
+        folder = ensure_backup_dir()
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder.resolve())))
 
     def _restore_database(self) -> None:
         backups = list_backups()
@@ -212,18 +222,42 @@ class MainWindow(QMainWindow):
             )
 
     def _open_overview(self) -> None:
-        self._show_register_final()
+        from datetime import date
+
+        from ui.register_overview_dialog import RegisterOverviewDialog
+
+        page = self._content_stack.currentWidget()
+        register_final = self._register_final_page
+        if register_final is not None and page is register_final:
+            year = register_final._year.value()
+        else:
+            year = getattr(page, "year", None) or date.today().year
+        RegisterOverviewDialog(self, default_year=year).exec()
+
+    def _get_or_load_register_final(self):
+        if self._register_final_page is None:
+            from ui.register_final_page import RegisterFinalPage
+
+            page = RegisterFinalPage(self)
+            idx = self._register_final_idx
+            old = self._content_stack.widget(idx)
+            self._content_stack.removeWidget(old)
+            old.deleteLater()
+            self._content_stack.insertWidget(idx, page)
+            self._register_final_page = page
+        return self._register_final_page
 
     def _show_register_final(self) -> None:
         page = self._content_stack.currentWidget()
-        year = getattr(page, "year", None) if page != self._register_final_page else None
+        register_final = self._get_or_load_register_final()
+        year = getattr(page, "year", None) if page is not register_final else None
         if year:
-            self._register_final_page._year.setValue(year)
+            register_final._year.setValue(year)
         self._part_list.blockSignals(True)
         self._part_list.clearSelection()
         self._part_list.blockSignals(False)
-        self._register_final_page.refresh()
-        self._content_stack.setCurrentWidget(self._register_final_page)
+        register_final.refresh()
+        self._content_stack.setCurrentWidget(register_final)
         self.statusBar().showMessage(
             "Registru final — selectați pagini, previzualizați sau exportați versiunea numerotată",
             6000,
@@ -259,10 +293,8 @@ class MainWindow(QMainWindow):
         self._content_stack.setObjectName("contentStack")
         root.addWidget(self._content_stack, stretch=1)
 
-        from ui.register_final_page import RegisterFinalPage
-
-        self._register_final_page = RegisterFinalPage(self)
-        self._content_stack.addWidget(self._register_final_page)
+        placeholder = QWidget()
+        self._register_final_idx = self._content_stack.addWidget(placeholder)
 
         for _roman, part_id, _title, _short in PARTS:
             placeholder = QWidget()

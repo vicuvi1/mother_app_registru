@@ -75,3 +75,39 @@ def run_export(
     except Exception:
         logger.exception("Export eșuat: %s -> %s", fmt, path)
         raise
+
+
+def run_export_with_progress(
+    parent,
+    fmt: str,
+    out_path: Path | str,
+    pages: list[dict],
+    *,
+    main_window=None,
+    title: str = "Export",
+) -> Path:
+    """Export cu dialog de progres (blocare UI minimă)."""
+    from PyQt6.QtWidgets import QApplication, QProgressDialog
+
+    if main_window is not None:
+        main_window._export_in_progress = True
+
+    progress = None
+    try:
+        progress = QProgressDialog("Se generează exportul…", None, 0, 0, parent)
+        progress.setWindowTitle(title)
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()
+
+        def on_progress(msg: str) -> None:
+            if progress is not None:
+                progress.setLabelText(msg)
+                QApplication.processEvents()
+
+        return run_export(fmt, out_path, pages, progress_callback=on_progress)
+    finally:
+        if progress is not None:
+            progress.close()
+        if main_window is not None:
+            main_window._export_in_progress = False

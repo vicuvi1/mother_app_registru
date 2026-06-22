@@ -41,7 +41,6 @@ class SplashScreen(QWidget):
                 border-radius: 4px;
                 background-color: #334155;
                 height: 6px;
-                text-visible: false;
             }
             QProgressBar::chunk {
                 border-radius: 4px;
@@ -72,6 +71,7 @@ class SplashScreen(QWidget):
         layout.addSpacing(24)
 
         self._progress = QProgressBar()
+        self._progress.setTextVisible(False)
         self._progress.setRange(0, 0)
         layout.addWidget(self._progress)
 

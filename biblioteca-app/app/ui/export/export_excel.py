@@ -7,6 +7,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.pagebreak import Break
 
+from ui.export.export_common import REGISTER_TITLE, format_biblioteca_line, format_part_heading
 from ui.export.export_html import group_spans
 from ui.export.export_utils import format_cell_value, format_total_value, validate_pages
 
@@ -89,15 +90,9 @@ def _write_page(ws, page: dict, r: int) -> int:
 
     title_lines = []
     if meta.get("nume_biblioteca"):
-        loc = f", {meta['localitate']}" if meta.get("localitate") else ""
-        title_lines.append(f"{meta['nume_biblioteca']}{loc}")
-    title_lines.append("Registru de evidență a activității bibliotecii")
-    partea = f"Partea {meta.get('parte_roman', '')}. {meta.get('title', '')}"
-    if meta.get("luna_name"):
-        partea += f" în luna {meta['luna_name']} anul {meta.get('an', '')}"
-    elif meta.get("an"):
-        partea += f" — anul {meta.get('an', '')}"
-    title_lines.append(partea)
+        title_lines.append(format_biblioteca_line(meta))
+    title_lines.append(REGISTER_TITLE)
+    title_lines.append(format_part_heading(meta))
 
     for line in title_lines:
         ws.cell(r, 1, line).font = Font(bold=True, size=11)

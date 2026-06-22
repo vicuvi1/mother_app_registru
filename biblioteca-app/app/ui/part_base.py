@@ -27,7 +27,7 @@ from core.date_engine import get_working_days
 from core.random_engine import generate_month_data, generate_year_monthly_data
 from database.db_manager import get_session
 from ui.export.export_dialog import ExportDialog
-from ui.export.export_errors import format_export_error, run_export
+from ui.export.export_errors import format_export_error, run_export_with_progress
 from ui.widgets.date_picker_zile_lucratoare import DatePickerZileLucratoare
 from ui.widgets.editable_table import ColumnDef, EditableTable
 from ui.widgets.range_config_dialog import RangeConfigDialog
@@ -79,8 +79,9 @@ class PartPageBase(QWidget):
         from datetime import date
 
         self._has_month_bar = self.show_month and self.mode in ("daily", "events")
-        self._loaded_year = 2025
-        self._loaded_month = date.today().month
+        today = date.today()
+        self._loaded_year = today.year
+        self._loaded_month = today.month
         self._building = True
         # Cache în memorie: (an, lună, categorie) → snapshot tabel (evită DB la revenire)
         self._data_cache: dict[tuple, dict] = {}
@@ -1374,28 +1375,15 @@ class PartPageBase(QWidget):
         if not out_path:
             return
 
-        self.main_window._export_in_progress = True
         self.main_window.statusBar().showMessage("Se generează exportul…")
-        progress = None
         try:
             pages = self._collect_pages(scope, year)
             if not pages:
                 QMessageBox.information(self, "Export", "Nu există date de exportat.")
                 return
-            from PyQt6.QtWidgets import QApplication, QProgressDialog
-
-            progress = QProgressDialog("Se generează exportul…", None, 0, 0, self)
-            progress.setWindowTitle("Export")
-            progress.setMinimumDuration(0)
-            progress.show()
-            QApplication.processEvents()
-
-            def on_progress(msg: str) -> None:
-                if progress:
-                    progress.setLabelText(msg)
-                    QApplication.processEvents()
-
-            run_export(fmt, out_path, pages, progress_callback=on_progress)
+            run_export_with_progress(
+                self, fmt, out_path, pages, main_window=self.main_window
+            )
         except InterruptedError:
             QMessageBox.information(self, "Export", "Exportul a fost anulat.")
             return
@@ -1403,9 +1391,6 @@ class PartPageBase(QWidget):
             QMessageBox.warning(self, "Eroare export", format_export_error(exc))
             return
         finally:
-            if progress:
-                progress.close()
-            self.main_window._export_in_progress = False
             self.main_window.statusBar().clearMessage()
 
         reply = QMessageBox.question(

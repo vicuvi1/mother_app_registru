@@ -1,5 +1,7 @@
 """Selector An + Lună pentru paginile de Parte."""
 
+from datetime import date
+
 from PyQt6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QWidget
 
 from core.constants_manager import LUNI_RO
@@ -26,7 +28,7 @@ class DatePickerZileLucratoare(QFrame):
         self.year_combo.setMinimumWidth(90)
         for y in range(year_start, year_end + 1):
             self.year_combo.addItem(str(y), y)
-        self.year_combo.setCurrentText(str(2025))
+        self.year_combo.setCurrentText(str(date.today().year))
         layout.addWidget(self.year_combo)
 
         self.month_label = QLabel("Lună")
@@ -35,7 +37,7 @@ class DatePickerZileLucratoare(QFrame):
         self.month_combo.setMinimumWidth(130)
         for i, name in enumerate(LUNI_RO, start=1):
             self.month_combo.addItem(name, i)
-        self.month_combo.setCurrentIndex(2)
+        self.month_combo.setCurrentIndex(date.today().month - 1)
         layout.addWidget(self.month_combo)
 
         if not show_month:

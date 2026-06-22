@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from core.constants_manager import LUNI_RO, get_cover_page
-from ui.export.export_errors import format_export_error, run_export
+from ui.export.export_errors import format_export_error, run_export_with_progress
 from ui.export.export_html import build_pages_html
 
 ROLE_META = Qt.ItemDataRole.UserRole
@@ -348,14 +348,18 @@ class RegisterFinalPage(QWidget):
         )
         if not out_path:
             return
-        self.main_window._export_in_progress = True
         try:
-            run_export(fmt, out_path, pages)
+            run_export_with_progress(
+                self,
+                fmt,
+                out_path,
+                pages,
+                main_window=self.main_window,
+                title="Export registru final",
+            )
         except Exception as exc:
             QMessageBox.warning(self, "Eroare export", format_export_error(exc))
             return
-        finally:
-            self.main_window._export_in_progress = False
         QMessageBox.information(
             self,
             "Export reușit",

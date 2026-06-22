@@ -1,5 +1,10 @@
 """Construire HTML pentru print (tabel cu grilă, anteturi de grup, pagini numerotate)."""
 
+from ui.export.export_common import (
+    REGISTER_TITLE,
+    format_biblioteca_line,
+    format_part_heading_html,
+)
 from ui.export.export_utils import escape_html, format_cell_value, format_total_value
 
 
@@ -58,15 +63,9 @@ def _page_html(page: dict, page_number: int, total_pages: int) -> str:
 
     head = "<div style='text-align:center'>"
     if meta.get("nume_biblioteca"):
-        loc = f", {meta['localitate']}" if meta.get("localitate") else ""
-        head += f"<b>{escape_html(meta['nume_biblioteca'])}{escape_html(loc)}</b><br>"
-    head += "<b style='font-size:14px'>Registru de evidență a activității bibliotecii</b><br>"
-    partea = f"Partea {meta['parte_roman']}. {meta['title']}"
-    if meta.get("luna_name"):
-        partea += f" în luna {meta['luna_name']} anul {meta['an']}"
-    elif meta.get("an"):
-        partea += f" — anul {meta['an']}"
-    head += f"<b>{escape_html(partea)}</b></div>"
+        head += f"<b>{escape_html(format_biblioteca_line(meta))}</b><br>"
+    head += f"<b style='font-size:14px'>{escape_html(REGISTER_TITLE)}</b><br>"
+    head += f"<b>{format_part_heading_html(meta)}</b></div>"
 
     cell = "border:1px solid #333; padding:3px; text-align:center;"
     date_cell = cell + " font-weight:bold;"

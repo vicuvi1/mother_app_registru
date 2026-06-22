@@ -10,6 +10,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Mm, Pt
 
+from ui.export.export_common import REGISTER_TITLE, format_biblioteca_line, format_part_heading
 from ui.export.export_html import group_spans
 from ui.export.export_utils import format_cell_value, format_total_value, validate_pages
 
@@ -114,23 +115,18 @@ def _render_page(doc, page: dict) -> None:
     meta = page["meta"]
 
     if meta.get("nume_biblioteca"):
-        loc = f", {meta['localitate']}" if meta.get("localitate") else ""
-        p = doc.add_paragraph(f"{meta['nume_biblioteca']}{loc}")
+        line = format_biblioteca_line(meta)
+        p = doc.add_paragraph(line)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.runs[0].bold = True
         p.runs[0].font.size = Pt(11)
 
-    p = doc.add_paragraph("Registru de evidență a activității bibliotecii")
+    p = doc.add_paragraph(REGISTER_TITLE)
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.runs[0].bold = True
     p.runs[0].font.size = Pt(13)
 
-    partea = f"Partea {meta.get('parte_roman', '')}. {meta.get('title', '')}"
-    if meta.get("luna_name"):
-        partea += f" în luna {meta['luna_name']} anul {meta.get('an', '')}"
-    elif meta.get("an"):
-        partea += f" — anul {meta.get('an', '')}"
-    p = doc.add_paragraph(partea)
+    p = doc.add_paragraph(format_part_heading(meta))
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.runs[0].bold = True
     p.runs[0].font.size = Pt(11)
