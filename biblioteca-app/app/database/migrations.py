@@ -158,8 +158,65 @@ def migrate_etichete_part06() -> None:
     migrate_etichete_for_part("part_06")
 
 
+# Tabele cu coloane an/luna — index pentru încărcare rapidă lună/an
+_INDEXED_TABLES: list[tuple[str, bool]] = [
+    ("evidenta_utilizatori", False),
+    ("evidenta_utilizatori_copii_adulti", True),
+    ("documente_inregistrate", False),
+    ("documente_continut_czu", False),
+    ("cercetari_bibliografice", False),
+    ("activitati_informare", True),
+    ("documente_electronice", False),
+    ("instruiri", False),
+    ("activitati_culturale", True),
+    ("activitati_online", True),
+]
+
+
+def _create_index_if_missing(name: str, table: str, columns: str) -> None:
+    insp = inspect(_engine())
+    if table not in insp.get_table_names():
+        return
+    with _engine().connect() as conn:
+        existing = conn.execute(text(f"PRAGMA index_list({table})")).fetchall()
+        if any(row[1] == name for row in existing):
+            return
+        conn.execute(text(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})"))
+        conn.commit()
+
+
+def migrate_indexes() -> None:
+    for table, has_cat in _INDEXED_TABLES:
+        _create_index_if_missing(f"ix_{table}_an_luna", table, "an, luna")
+        if has_cat:
+            _create_index_if_missing(
+                f"ix_{table}_an_luna_cat", table, "an, luna, categorie_varsta"
+            )
+
+
+SCHEMA_VERSION = 2
+
+
+def migrate_schema_version() -> None:
+    from database.db_manager import get_setting, set_setting
+
+    current = get_setting("schema_version")
+    if current is None:
+        migrate_indexes()
+        set_setting("schema_version", str(SCHEMA_VERSION))
+        return
+    try:
+        ver = int(current)
+    except ValueError:
+        ver = 0
+    if ver < SCHEMA_VERSION:
+        migrate_indexes()
+        set_setting("schema_version", str(SCHEMA_VERSION))
+
+
 def run_migrations() -> None:
     migrate_part05_columns()
     migrate_etichete_part05()
     migrate_part06_columns()
     migrate_etichete_part06()
+    migrate_schema_version()

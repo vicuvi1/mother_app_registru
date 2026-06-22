@@ -7,18 +7,26 @@ import logging
 from pathlib import Path
 from typing import Callable
 
-from ui.export.export_excel import export_to_excel
-from ui.export.export_pdf import export_to_pdf
 from ui.export.export_utils import validate_pages, verify_export_file
-from ui.export.export_word import export_to_word
 
 logger = logging.getLogger(__name__)
 
-_EXPORTERS: dict[str, Callable] = {
-    "excel": export_to_excel,
-    "word": export_to_word,
-    "pdf": export_to_pdf,
-}
+_EXPORTERS: dict[str, Callable] | None = None
+
+
+def _get_exporters() -> dict[str, Callable]:
+    global _EXPORTERS
+    if _EXPORTERS is None:
+        from ui.export.export_excel import export_to_excel
+        from ui.export.export_pdf import export_to_pdf
+        from ui.export.export_word import export_to_word
+
+        _EXPORTERS = {
+            "excel": export_to_excel,
+            "word": export_to_word,
+            "pdf": export_to_pdf,
+        }
+    return _EXPORTERS
 
 
 def format_export_error(exc: BaseException) -> str:
@@ -37,17 +45,30 @@ def format_export_error(exc: BaseException) -> str:
     return f"Nu s-a putut exporta:\n{exc}"
 
 
-def run_export(fmt: str, out_path: Path | str, pages: list[dict]) -> Path:
+def run_export(
+    fmt: str,
+    out_path: Path | str,
+    pages: list[dict],
+    *,
+    progress_callback: Callable[[str], None] | None = None,
+) -> Path:
     """Validează, exportă și verifică fișierul rezultat."""
+    if progress_callback:
+        progress_callback("Validare pagini…")
     validate_pages(pages)
-    exporter = _EXPORTERS.get(fmt)
+    exporters = _get_exporters()
+    exporter = exporters.get(fmt)
     if exporter is None:
         raise ValueError(f"Format necunoscut: {fmt}")
 
     path = Path(out_path)
     logger.info("Export %s -> %s (%d pagini)", fmt, path, len(pages))
     try:
+        if progress_callback:
+            progress_callback(f"Generare {fmt.upper()}…")
         result = exporter(path, pages)
+        if progress_callback:
+            progress_callback("Verificare fișier…")
         verify_export_file(result)
         logger.info("Export reușit: %s (%d bytes)", result, result.stat().st_size)
         return result

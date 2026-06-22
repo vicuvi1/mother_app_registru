@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlalchemy import and_, delete, inspect as sa_inspect, select
+from sqlalchemy import and_, case, delete, func, inspect as sa_inspect, select
 
 from core.constants_manager import get_excluded_days, LUNI_RO, get_all_etichete, set_eticheta_custom
 from core.date_engine import get_working_days
@@ -85,6 +85,7 @@ class PartPageBase(QWidget):
         # Cache în memorie: (an, lună, categorie) → snapshot tabel (evită DB la revenire)
         self._data_cache: dict[tuple, dict] = {}
         self._cumulative_cache: dict[tuple, dict] = {}
+        self._save_pending = False
 
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
@@ -363,11 +364,24 @@ class PartPageBase(QWidget):
     def _on_month_tab_changed(self, index: int) -> None:
         if self._building:
             return
+        old_year, old_month = self._loaded_year, self._loaded_month
         self._cache_current_period()
-        self._save_if_dirty()
+        pending_save = self._dirty
+        if pending_save:
+            self._dirty = False
         self._loaded_month = index + 1
         self._update_heading()
         self._load_current(fast=True)
+        if pending_save:
+            self.main_window.set_save_status(False)
+            QTimer.singleShot(0, lambda: self._deferred_persist(old_year, old_month))
+
+    def flush_pending_save(self) -> None:
+        """Salvare sincronă la ieșire — pentru date în așteptare."""
+        if self._save_pending:
+            self._dirty = True
+        if self._dirty:
+            self.save_all(show_status=False)
 
     def _on_tab_changed(self) -> None:
         if self._building:
@@ -377,7 +391,6 @@ class PartPageBase(QWidget):
 
     def _on_cell_edited(self, row: int, key: str, value) -> None:
         self._dirty = True
-        self._cumulative_cache.clear()
         self.main_window.set_save_status(False)
         self._recompute_visible_totals()
         self._debounce.start()
@@ -392,29 +405,76 @@ class PartPageBase(QWidget):
                 "Total de la început", self._compute_cumulative_live(categorie, table)
             )
 
-    def _compute_cumulative_live(self, categorie: str | None, table: EditableTable) -> dict[str, int]:
-        """Cumulativ = lunile anterioare (din DB) + luna curentă (din tabel, live)."""
-        result: dict[str, int] = {
+    def _prior_months_cache_key(self, categorie: str | None, month: int | None = None) -> tuple:
+        return (self.year, month or self.month, categorie, "prior")
+
+    def _numeric_total_keys(self) -> dict[str, int]:
+        return {
             c.key: 0
             for c in self.columns
             if c.col_type == "int" or (c.col_type == "bool" and c.count_in_total)
         }
+
+    def _accumulate_record(self, result: dict[str, int], rec) -> None:
+        for col in self.columns:
+            if col.col_type == "int":
+                result[col.key] += getattr(rec, col.key, 0) or 0
+            elif col.col_type == "bool" and col.count_in_total:
+                if getattr(rec, col.key, False):
+                    result[col.key] += 1
+
+    def _get_prior_months_totals(self, categorie: str | None, month: int | None = None) -> dict[str, int]:
+        """Sume lunile 1..(luna-1) — agregare SQL, cu cache."""
+        m = month or self.month
+        if m <= 1:
+            return self._numeric_total_keys()
+
+        key = self._prior_months_cache_key(categorie, m)
+        if key in self._cumulative_cache:
+            return dict(self._cumulative_cache[key])
+
+        result = self._numeric_total_keys()
+        sum_exprs = []
+        labels: list[str] = []
+        for col in self.columns:
+            if col.col_type == "int":
+                sum_exprs.append(
+                    func.coalesce(func.sum(getattr(self.model_class, col.key)), 0).label(col.key)
+                )
+                labels.append(col.key)
+            elif col.col_type == "bool" and col.count_in_total:
+                sum_exprs.append(
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (getattr(self.model_class, col.key).is_(True), 1),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ).label(col.key)
+                )
+                labels.append(col.key)
+        if not sum_exprs:
+            return result
+
         with get_session() as session:
-            for m in range(1, self.month):
-                filters = [
-                    self.model_class.an == self.year,
-                    self.model_class.luna == m,
-                ]
-                if categorie and hasattr(self.model_class, "categorie_varsta"):
-                    filters.append(self.model_class.categorie_varsta == categorie)
-                rows = session.scalars(select(self.model_class).where(and_(*filters))).all()
-                for rec in rows:
-                    for col in self.columns:
-                        if col.col_type == "int":
-                            result[col.key] += getattr(rec, col.key, 0) or 0
-                        elif col.col_type == "bool" and col.count_in_total:
-                            if getattr(rec, col.key, False):
-                                result[col.key] += 1
+            filters = [
+                self.model_class.an == self.year,
+                self.model_class.luna < m,
+            ]
+            if categorie and hasattr(self.model_class, "categorie_varsta"):
+                filters.append(self.model_class.categorie_varsta == categorie)
+            row = session.execute(select(*sum_exprs).where(and_(*filters))).one()
+            for label in labels:
+                result[label] = int(row._mapping[label] or 0)
+
+        self._cumulative_cache[key] = dict(result)
+        return result
+
+    def _compute_cumulative_live(self, categorie: str | None, table: EditableTable) -> dict[str, int]:
+        """Cumulativ = lunile anterioare (cache/DB) + luna curentă (din tabel, live)."""
+        result = self._get_prior_months_totals(categorie)
         current = table.compute_column_sums()
         for k, v in current.items():
             result[k] = result.get(k, 0) + v
@@ -426,25 +486,41 @@ class PartPageBase(QWidget):
     def _load_current(self, fast: bool = False) -> None:
         if fast and self.has_copii_adulti:
             self._load_table(self._active_table(), self._active_category(), fast=True)
+            self._schedule_preload_adjacent()
             return
         if self.has_copii_adulti:
             self._load_table(self.table_copii, "copii", fast=fast)
             self._load_table(self.table_adulti, "adulti", fast=fast)
         else:
             self._load_table(self.table, None, fast=fast)
+        self._schedule_preload_adjacent()
 
-    def _load_table(self, table: EditableTable, categorie: str | None, fast: bool = False) -> None:
-        key = self._cache_key(categorie=categorie)
-        if key in self._data_cache:
-            cached = self._data_cache[key]
-            table.load_rows(
-                cached["rows"], cached["ids"], cached["flags"], resize=not fast
-            )
-            self._update_totals(table, categorie)
-            return
-
+    def _fetch_table_data(
+        self, categorie: str | None, year: int | None = None, month: int | None = None
+    ) -> dict:
+        """Citește datele unei luni din DB (fără actualizare UI)."""
+        y = year or self.year
+        m = month or self.month
         with get_session() as session:
-            rows_db = self._query_rows(session, categorie)
+            q = select(self.model_class)
+            filters = []
+            if self.mode != "crud":
+                filters.append(self.model_class.an == y)
+            if self.mode in ("daily", "events") and self.show_month and m:
+                filters.append(self.model_class.luna == m)
+            if categorie and hasattr(self.model_class, "categorie_varsta"):
+                filters.append(self.model_class.categorie_varsta == categorie)
+            if filters:
+                q = q.where(and_(*filters))
+            order_col = getattr(self.model_class, self.date_field, None)
+            if order_col is not None and self.mode == "monthly":
+                q = q.order_by(self.model_class.luna)
+            elif order_col is not None:
+                q = q.order_by(order_col)
+            elif hasattr(self.model_class, "id"):
+                q = q.order_by(self.model_class.id)
+            rows_db = list(session.scalars(q))
+
         rows_data = []
         row_ids = []
         auto_flags = []
@@ -456,11 +532,117 @@ class PartPageBase(QWidget):
         if self.mode == "monthly" and not rows_data:
             rows_data, row_ids, auto_flags = self._ensure_monthly_rows(categorie)
         elif self.mode == "daily" and not rows_data:
-            rows_data, row_ids, auto_flags = self._ensure_daily_rows(categorie)
+            saved_year, saved_month = self._loaded_year, self._loaded_month
+            self._loaded_year, self._loaded_month = y, m
+            try:
+                rows_data, row_ids, auto_flags = self._ensure_daily_rows(categorie)
+            finally:
+                self._loaded_year, self._loaded_month = saved_year, saved_month
 
-        table.load_rows(rows_data, row_ids, auto_flags, resize=not fast)
-        self._update_totals(table, categorie)
-        self._data_cache[key] = {"rows": rows_data, "ids": row_ids, "flags": auto_flags}
+        return {"rows": rows_data, "ids": row_ids, "flags": auto_flags}
+
+    def _load_table(self, table: EditableTable, categorie: str | None, fast: bool = False) -> None:
+        key = self._cache_key(categorie=categorie)
+        if key in self._data_cache:
+            cached = self._data_cache[key]
+            table.load_rows(
+                cached["rows"],
+                cached["ids"],
+                cached["flags"],
+                resize=not fast,
+                resize_rows=not fast,
+            )
+            self._update_totals(table, categorie, fast=fast)
+            return
+
+        cached = self._fetch_table_data(categorie)
+        table.load_rows(
+            cached["rows"],
+            cached["ids"],
+            cached["flags"],
+            resize=not fast,
+            resize_rows=not fast,
+        )
+        self._update_totals(table, categorie, fast=fast)
+        self._data_cache[key] = cached
+
+    def _schedule_preload_adjacent(self) -> None:
+        if not self._has_month_bar:
+            return
+        QTimer.singleShot(80, self._preload_adjacent_months)
+        QTimer.singleShot(2000, self._preload_all_months)
+
+    def _deferred_persist(self, year: int, month: int) -> None:
+        if self._save_pending:
+            return
+        self._save_pending = True
+        try:
+            self._persist_cached_period(year, month)
+            self._cumulative_cache.clear()
+            self.main_window.notify_saved()
+        except Exception as exc:
+            self._dirty = True
+            self.main_window.set_save_status(False)
+            logger.exception("Salvare amânată eșuată Partea %s", self.roman)
+            QMessageBox.warning(self, "Eroare salvare", f"Nu s-au putut salva datele:\n{exc}")
+        finally:
+            self._save_pending = False
+
+    def _persist_cached_period(self, year: int, month: int) -> None:
+        categories: list[str | None] = (
+            ["copii", "adulti"] if self.has_copii_adulti else [None]
+        )
+        for cat in categories:
+            key = self._cache_key(year, month, cat)
+            if key not in self._data_cache:
+                continue
+            cached = self._data_cache[key]
+            self._save_rows_data(
+                cached["rows"], cached["ids"], cached["flags"], cat, year, month
+            )
+
+    def _preload_all_months(self) -> None:
+        if not self._has_month_bar:
+            return
+        year = self._loaded_year
+        categories: list[str | None] = (
+            ["copii", "adulti"] if self.has_copii_adulti else [None]
+        )
+        for month in range(1, 13):
+            for cat in categories:
+                key = self._cache_key(year, month, cat)
+                if key not in self._data_cache:
+                    self._data_cache[key] = self._fetch_table_data(cat, year, month)
+        self._warm_cumulative_cache()
+
+    def _warm_cumulative_cache(self) -> None:
+        if not self.cumulative or self.mode not in ("daily", "events"):
+            return
+        categories: list[str | None] = (
+            ["copii", "adulti"] if self.has_copii_adulti else [None]
+        )
+        for month in range(2, 13):
+            for cat in categories:
+                self._get_prior_months_totals(cat, month=month)
+
+    def _preload_adjacent_months(self) -> None:
+        """Încarcă în cache lunile vecine fără a bloca UI-ul."""
+        if not self._has_month_bar:
+            return
+        year = self._loaded_year
+        current = self._loaded_month
+        categories: list[str | None] = (
+            ["copii", "adulti"] if self.has_copii_adulti else [None]
+        )
+        for delta in (-1, 1):
+            month = current + delta
+            if month < 1 or month > 12:
+                continue
+            for cat in categories:
+                key = self._cache_key(year, month, cat)
+                if key in self._data_cache:
+                    continue
+                self._data_cache[key] = self._fetch_table_data(cat, year, month)
 
     def _query_rows(self, session, categorie: str | None):
         q = select(self.model_class)
@@ -530,7 +712,7 @@ class PartPageBase(QWidget):
             d["data"] = LUNI_RO[rec.luna - 1]
         return d
 
-    def _update_totals(self, table: EditableTable, categorie: str | None) -> None:
+    def _update_totals(self, table: EditableTable, categorie: str | None, fast: bool = False) -> None:
         sums = table.compute_column_sums()
         table.add_total_row("Total", sums)
         if self.cumulative and self.mode in ("daily", "events"):
@@ -776,16 +958,18 @@ class PartPageBase(QWidget):
             self.main_window.set_save_status(True)
         self._dirty = False
         self._cumulative_cache.clear()
-        # Actualizează cache-ul perioadei curente după salvare
         self._cache_current_period()
+        self.main_window.notify_saved()
 
-    def _save_table(
-        self, table: EditableTable, categorie: str | None, reload: bool = False
+    def _save_rows_data(
+        self,
+        rows: list[dict],
+        ids: list[int | None],
+        flags: list[bool],
+        categorie: str | None,
+        year: int,
+        month: int,
     ) -> None:
-        rows = table.get_data_rows()
-        ids = table.get_row_ids()
-        flags = table.get_auto_flags()
-
         with get_session() as session:
             try:
                 for i, row in enumerate(rows):
@@ -800,18 +984,23 @@ class PartPageBase(QWidget):
                         and not row_copy.get(self.date_field)
                     ):
                         row_copy[self.date_field] = f"_r{i + 1}"
-                        table.set_row_extra(i, self.date_field, row_copy[self.date_field])
-                    kwargs = self._row_to_kwargs(row_copy, categorie, for_update=False, row_index=i)
+                    kwargs = self._row_to_kwargs(
+                        row_copy, categorie, for_update=False, row_index=i, year=year, month=month
+                    )
                     if "is_auto_generated" in self._model_keys:
                         kwargs["is_auto_generated"] = flags[i] if i < len(flags) else False
 
                     if row_id is None:
-                        row_id = self._find_existing_id(session, row_copy, categorie)
+                        row_id = self._find_existing_id(
+                            session, row_copy, categorie, year=year, month=month
+                        )
 
                     if row_id:
                         rec = session.get(self.model_class, row_id)
                         if rec:
-                            update_kw = self._row_to_kwargs(row_copy, categorie, for_update=True)
+                            update_kw = self._row_to_kwargs(
+                                row_copy, categorie, for_update=True, year=year, month=month
+                            )
                             if "is_auto_generated" in self._model_keys:
                                 update_kw["is_auto_generated"] = kwargs.get("is_auto_generated", False)
                             if (
@@ -835,18 +1024,47 @@ class PartPageBase(QWidget):
                 )
                 raise
 
+    def _save_table(
+        self, table: EditableTable, categorie: str | None, reload: bool = False
+    ) -> None:
+        rows = table.get_data_rows()
+        ids = table.get_row_ids()
+        flags = table.get_auto_flags()
+
+        for i, row in enumerate(rows):
+            if (
+                self.mode == "events"
+                and self.date_field in self._model_keys
+                and not any(c.key == self.date_field for c in self.columns)
+                and not row.get(self.date_field)
+            ):
+                extra = f"_r{i + 1}"
+                table.set_row_extra(i, self.date_field, extra)
+
+        self._save_rows_data(rows, ids, flags, categorie, self.year, self.month)
+
         if reload:
             self._load_table(table, categorie)
         else:
             self._sync_ids_after_save(table, categorie)
 
-    def _find_existing_id(self, session, row: dict, categorie: str | None) -> int | None:
+    def _find_existing_id(
+        self,
+        session,
+        row: dict,
+        categorie: str | None,
+        *,
+        year: int | None = None,
+        month: int | None = None,
+    ) -> int | None:
         """Găsește înregistrarea existentă pentru upsert (evită duplicate)."""
+        y = year if year is not None else self.year
+        m = month if month is not None else self.month
         filters = []
         if self.mode != "crud":
-            filters.append(self.model_class.an == self.year)
+            filters.append(self.model_class.an == y)
         if self.mode in ("daily", "events") and self.show_month:
-            filters.append(self.model_class.luna == self.month)
+            filters.append(self.model_class.luna == m)
         if self.mode == "monthly":
             luna = row.get("luna")
             if luna:
@@ -897,12 +1115,23 @@ class PartPageBase(QWidget):
                 self._compute_cumulative_live(categorie, table),
             )
 
-    def _row_to_kwargs(self, row: dict, categorie: str | None, for_update: bool = False, row_index: int = 0) -> dict:
+    def _row_to_kwargs(
+        self,
+        row: dict,
+        categorie: str | None,
+        for_update: bool = False,
+        row_index: int = 0,
+        *,
+        year: int | None = None,
+        month: int | None = None,
+    ) -> dict:
         kwargs: dict[str, Any] = {}
+        y = year if year is not None else self.year
+        m = month if month is not None else self.month
         if self.mode != "crud":
-            kwargs["an"] = self.year
+            kwargs["an"] = y
         if self.mode in ("daily", "events") and self.show_month:
-            kwargs["luna"] = self.month
+            kwargs["luna"] = m
         if self.mode == "monthly":
             luna = row.get("luna")
             if luna:
@@ -1147,12 +1376,26 @@ class PartPageBase(QWidget):
 
         self.main_window._export_in_progress = True
         self.main_window.statusBar().showMessage("Se generează exportul…")
+        progress = None
         try:
             pages = self._collect_pages(scope, year)
             if not pages:
                 QMessageBox.information(self, "Export", "Nu există date de exportat.")
                 return
-            run_export(fmt, out_path, pages)
+            from PyQt6.QtWidgets import QApplication, QProgressDialog
+
+            progress = QProgressDialog("Se generează exportul…", None, 0, 0, self)
+            progress.setWindowTitle("Export")
+            progress.setMinimumDuration(0)
+            progress.show()
+            QApplication.processEvents()
+
+            def on_progress(msg: str) -> None:
+                if progress:
+                    progress.setLabelText(msg)
+                    QApplication.processEvents()
+
+            run_export(fmt, out_path, pages, progress_callback=on_progress)
         except InterruptedError:
             QMessageBox.information(self, "Export", "Exportul a fost anulat.")
             return
@@ -1160,6 +1403,8 @@ class PartPageBase(QWidget):
             QMessageBox.warning(self, "Eroare export", format_export_error(exc))
             return
         finally:
+            if progress:
+                progress.close()
             self.main_window._export_in_progress = False
             self.main_window.statusBar().clearMessage()
 

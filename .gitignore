@@ -17,6 +17,7 @@ env/
 *.db-wal
 *.db-shm
 *.log
+app/data/backups/
 .env
 .env.*
 

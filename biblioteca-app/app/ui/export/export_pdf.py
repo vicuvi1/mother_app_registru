@@ -15,6 +15,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from ui.export.export_common import REGISTER_TITLE, format_part_heading_reportlab
 from ui.export.export_html import group_spans
 from ui.export.export_utils import (
     escape_reportlab,
@@ -96,13 +97,9 @@ def _page_flowables(page: dict, styles) -> list:
             f"<b>{escape_reportlab(meta['nume_biblioteca'])}{escape_reportlab(loc)}</b>",
             styles["Normal"],
         ))
-    flow.append(Paragraph("<b>Registru de evidență a activității bibliotecii</b>", styles["Title"]))
-    partea = f"Partea {meta.get('parte_roman', '')}. {meta.get('title', '')}"
-    if meta.get("luna_name"):
-        partea += f" în luna {meta['luna_name']} anul {meta.get('an', '')}"
-    elif meta.get("an"):
-        partea += f" — anul {meta.get('an', '')}"
-    flow.append(Paragraph(f"<b>{escape_reportlab(partea)}</b>", styles["Heading3"]))
+    flow.append(Paragraph(f"<b>{escape_reportlab(REGISTER_TITLE)}</b>", styles["Title"]))
+    partea = format_part_heading_reportlab(meta)
+    flow.append(Paragraph(f"<b>{partea}</b>", styles["Heading3"]))
     flow.append(Spacer(1, 6))
 
     has_groups = any(groups)

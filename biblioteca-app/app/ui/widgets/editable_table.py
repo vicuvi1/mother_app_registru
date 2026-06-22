@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal, QEvent, QTimer
-from PyQt6.QtGui import QBrush, QColor, QFont, QKeyEvent, QPainter, QPen
+from PyQt6.QtGui import QBrush, QColor, QFont, QKeyEvent, QKeySequence, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
     QInputDialog,
+    QShortcut,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -142,6 +143,8 @@ class EditableTable(QTableWidget):
         self._computed_rules: dict[str, list[str]] = {}
         self._part_id = ""
         self._updating = False
+        self._columns_sized = False
+        self._undo: tuple[int, int, str] | None = None
 
         self._grouped_header = GroupedHeaderView(self)
         self.setHorizontalHeader(self._grouped_header)
@@ -167,6 +170,31 @@ class EditableTable(QTableWidget):
         self.horizontalHeader().sectionDoubleClicked.connect(self._edit_header_label)
         self.setWordWrap(True)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
+        QShortcut(QKeySequence("Ctrl+Z"), self, self.undo_last)
+
+    def undo_last(self) -> None:
+        if self._undo is None:
+            return
+        row, col, old_text = self._undo
+        self._undo = None
+        item = self.item(row, col)
+        if item is None:
+            return
+        self._updating = True
+        item.setText(old_text)
+        item.setBackground(QBrush(Qt.GlobalColor.white))
+        self._updating = False
+        col_def = self._columns[col]
+        if col_def.col_type == "int":
+            self._apply_computed_row(row)
+            try:
+                val = max(0, int(old_text)) if old_text.strip() else 0
+            except ValueError:
+                val = 0
+        else:
+            val = old_text
+        self.cell_edited.emit(row, col_def.key, val)
 
     def is_data_row(self, row: int) -> bool:
         vh = self.verticalHeaderItem(row)
@@ -440,6 +468,7 @@ class EditableTable(QTableWidget):
         row_ids: list[int | None] | None = None,
         auto_flags: list[bool] | None = None,
         resize: bool = True,
+        resize_rows: bool = True,
     ) -> None:
         self.setUpdatesEnabled(False)
         self._updating = True
@@ -461,10 +490,23 @@ class EditableTable(QTableWidget):
         self._updating = False
         self._apply_computed_all()
         self._refresh_styles()
-        if resize:
+        if resize and not self._columns_sized:
             self.resize_columns_to_contents()
-        self._resize_content_rows()
+            self._columns_sized = True
+        if resize_rows:
+            self._resize_content_rows()
+        else:
+            self._apply_fixed_row_heights()
         self.setUpdatesEnabled(True)
+
+    def _apply_fixed_row_heights(self) -> None:
+        """Înălțimi fixe — mult mai rapid decât resizeRowToContents la schimbare lună."""
+        for r in range(self.rowCount()):
+            vh = self.verticalHeaderItem(r)
+            if vh and vh.text() in ("Total", "Total de la început"):
+                self.setRowHeight(r, 34)
+            else:
+                self.setRowHeight(r, 40)
 
     def _resize_content_rows(self) -> None:
         for r in range(self.rowCount()):
@@ -777,6 +819,8 @@ class EditableTable(QTableWidget):
         if item is None:
             return
 
+        old_text = item.text()
+
         if col_def.col_type == "int":
             text = item.text().strip()
             try:
@@ -800,6 +844,7 @@ class EditableTable(QTableWidget):
 
         if col_def.col_type == "int":
             self._apply_computed_row(row)
+        self._undo = (row, col, old_text)
         self.cell_edited.emit(row, col_def.key, val)
 
     def _bool_changed(self, row: int, key: str) -> None:

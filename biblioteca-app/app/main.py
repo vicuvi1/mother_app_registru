@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QGuiApplication
 from PyQt6.QtWidgets import QApplication
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -15,6 +15,7 @@ from core.logging_config import setup_logging  # noqa: E402
 from database.db_manager import init_database, is_first_run  # noqa: E402
 from ui.main_window import MainWindow  # noqa: E402
 from ui.setup_wizard import SetupWizard  # noqa: E402
+from ui.splash_screen import SplashScreen  # noqa: E402
 
 
 def _load_stylesheet(app: QApplication) -> None:
@@ -23,10 +24,17 @@ def _load_stylesheet(app: QApplication) -> None:
         app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
 
 
-def main() -> int:
-    setup_logging()
-    init_database(seed=True)
+def _center_on_screen(widget) -> None:
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        return
+    geo = screen.availableGeometry()
+    frame = widget.frameGeometry()
+    frame.moveCenter(geo.center())
+    widget.move(frame.topLeft())
 
+
+def main() -> int:
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
@@ -38,13 +46,37 @@ def main() -> int:
     app.setFont(font)
     _load_stylesheet(app)
 
+    splash = SplashScreen()
+    _center_on_screen(splash)
+    splash.show()
+    app.processEvents()
+
+    splash.set_message("Inițializare jurnal")
+    setup_logging()
+
+    splash.set_message("Pregătire bază de date")
+    splash.set_progress(25, 100)
+    init_database(seed=True)
+
     if is_first_run():
+        splash.hide()
         wizard = SetupWizard(first_run=True)
         if wizard.exec() != wizard.DialogCode.Accepted:
             return 0
+        splash.show()
+        _center_on_screen(splash)
+        app.processEvents()
 
-    window = MainWindow()
-    window.show()
+    splash.set_message("Construire interfață")
+    splash.set_progress(55, 100)
+    window = MainWindow(load_first_part=False)
+
+    splash.set_message("Încărcare registru")
+    splash.set_progress(80, 100)
+    window.load_initial_part()
+    app.processEvents()
+
+    splash.finish(window)
     return app.exec()
 
 

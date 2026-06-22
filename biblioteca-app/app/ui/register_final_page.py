@@ -138,7 +138,7 @@ class RegisterFinalPage(QWidget):
         self._tree.currentItemChanged.connect(self._on_selection_changed)
 
     def refresh(self) -> None:
-        from ui.main_window import PART_LAYOUT
+        from core.parts_registry import PART_LAYOUT
         from ui.export.register_pages import iter_register_slots
 
         self._tree.blockSignals(True)

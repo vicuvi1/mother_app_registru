@@ -6,7 +6,7 @@ import logging
 from typing import Callable
 
 from core.constants_manager import get_cover_page
-from ui.main_window import PARTS, PART_LAYOUT
+from core.parts_registry import PARTS, PART_LAYOUT
 
 logger = logging.getLogger(__name__)
 

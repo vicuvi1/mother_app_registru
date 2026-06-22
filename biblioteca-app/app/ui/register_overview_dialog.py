@@ -89,7 +89,7 @@ class RegisterOverviewDialog(QDialog):
         self._rebuild_tree()
 
     def _build_parts(self) -> None:
-        from ui.main_window import PARTS
+        from core.parts_registry import PARTS, PART_LAYOUT
 
         for roman, part_id, title, _short in PARTS:
             self._parts.append((roman, title, part_id))
@@ -98,7 +98,7 @@ class RegisterOverviewDialog(QDialog):
         return self.main_window._get_or_load_part(part_id)
 
     def _rebuild_tree(self) -> None:
-        from ui.main_window import PART_LAYOUT
+        from core.parts_registry import PART_LAYOUT
 
         self._tree.clear()
         for roman, title, part_id in self._parts:
@@ -135,7 +135,7 @@ class RegisterOverviewDialog(QDialog):
 
     def _selected_pages(self) -> list[dict]:
         from ui.export.register_pages import iter_register_slots
-        from ui.main_window import PART_LAYOUT
+        from core.parts_registry import PART_LAYOUT
 
         year = self._year.value()
         checked: set[tuple] = set()

@@ -10,6 +10,11 @@ from database.models import AppSetting, Base
 from database.migrations import run_migrations
 from database.seed_defaults import seed_all_defaults
 
+try:
+    from database.backup import auto_backup_on_startup
+except ImportError:
+    auto_backup_on_startup = None  # type: ignore[assignment]
+
 # Calea DB conform SPEC secțiunea 2: app/data/biblioteca.db
 APP_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = APP_DIR / "data"
@@ -61,6 +66,9 @@ def init_database(seed: bool = True) -> None:
         with get_session() as session:
             seed_all_defaults(session)
             session.commit()
+
+    if auto_backup_on_startup is not None:
+        auto_backup_on_startup()
 
 
 def is_first_run() -> bool:
