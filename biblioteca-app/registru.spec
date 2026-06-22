@@ -15,6 +15,7 @@ a = Analysis(
         (str(APP / "resources" / "stylesheet.qss"), "resources"),
         (str(APP / "resources" / "stylesheet_dark.qss"), "resources"),
         (str(APP / "resources" / "fonts"), "resources/fonts"),
+        (str(APP / "resources" / "guides"), "resources/guides"),
     ],
     hiddenimports=[
         "sqlalchemy.dialects.sqlite",

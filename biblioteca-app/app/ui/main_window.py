@@ -211,6 +211,10 @@ class MainWindow(QMainWindow):
         menu_fisier.addAction(act_exit)
 
         menu_ajutor = self.menuBar().addMenu("Ajutor")
+        act_guide = QAction("Ghid rapid pentru bibliotecar…", self)
+        act_guide.triggered.connect(self._open_user_guide)
+        menu_ajutor.addAction(act_guide)
+
         act_help = QAction("Scurtături tastatură…", self)
         act_help.setShortcut("F1")
         act_help.triggered.connect(self._show_help)
@@ -227,6 +231,11 @@ class MainWindow(QMainWindow):
 
     def _show_help(self) -> None:
         HelpDialog(self).exec()
+
+    def _open_user_guide(self) -> None:
+        from core.user_guide import open_user_guide
+
+        open_user_guide(self)
 
     def _show_about(self) -> None:
         AboutDialog(self).exec()

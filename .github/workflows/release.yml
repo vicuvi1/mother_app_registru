@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: biblioteca-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Generate user guide PDF
+        env:
+          PYTHONPATH: app
+        run: python scripts/generate_user_guide.py
+
+      - name: Build portable executable
+        run: pyinstaller registru.spec --noconfirm
+
+      - name: Copy guide to docs folder
+        run: |
+          if (!(Test-Path dist\RegistruDigital\docs)) { New-Item -ItemType Directory -Path dist\RegistruDigital\docs | Out-Null }
+          Copy-Item app\resources\guides\ghid_bibliotecar.pdf dist\RegistruDigital\docs\
+
+      - name: Create portable ZIP
+        run: |
+          Compress-Archive -Path dist\RegistruDigital\* -DestinationPath dist\RegistruDigital-portable.zip -Force
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        env:
+          PYTHONPATH: app
+        run: |
+          $ver = python -c "from core.version import APP_VERSION; print(APP_VERSION)"
+          echo "APP_VERSION=$ver" >> $env:GITHUB_ENV
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DMyAppVersion=$ver installer\registru.iss
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Registru Digital ${{ env.APP_VERSION }}
+          generate_release_notes: true
+          files: |
+            dist/RegistruDigital-portable.zip
+            installer/output/RegistruDigital_Setup_${{ env.APP_VERSION }}.exe

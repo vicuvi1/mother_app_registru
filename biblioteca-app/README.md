@@ -2,8 +2,9 @@
 
 Aplicație desktop **100% offline** pentru înlocuirea registrului fizic de evidență a activității bibliotecii publice din România. Datele sunt stocate local pe calculator; nu este necesară conexiune la internet.
 
-**Versiune curentă:** 1.4.0  
-**Repository GitHub:** [mother_app_registru](https://github.com/vicuvi1/mother_app_registru.git)
+**Versiune curentă:** 1.7.0  
+**Repository GitHub:** [mother_app_registru](https://github.com/vicuvi1/mother_app_registru.git)  
+**Descărcare pentru biblioteci:** [GitHub Releases](https://github.com/vicuvi1/mother_app_registru/releases) — instalator Windows sau arhivă portabilă
 
 **Ultima actualizare documentație:** 22 iunie 2026
 
@@ -308,12 +309,22 @@ Copiați întregul folder `RegistruDigital/` pe USB pentru utilizare portabilă.
 
 ## Pornire și instalare
 
+### Pentru biblioteci (recomandat)
+
+1. Deschideți [GitHub Releases](https://github.com/vicuvi1/mother_app_registru/releases).
+2. Descărcați **`RegistruDigital_Setup_X.X.X.exe`** (instalator) sau **`RegistruDigital-portable.zip`** (fără instalare).
+3. Rulați instalatorul sau dezarhivați ZIP-ul și porniți **`RegistruDigital.exe`**.
+4. La prima pornire: asistent configurare + tur rapid (opțional).
+5. Consultați **Ghid rapid pentru bibliotecar** (PDF în Meniu Start sau **Ajutor** în aplicație).
+
+Nu este nevoie de Python instalat pe PC-ul bibliotecii.
+
 ### Cerințe
 
 - **Windows 10/11**
-- **Python 3.11+** (doar pentru dezvoltare; utilizatorii finali pot folosi `.exe`)
+- **Python 3.11+** (doar pentru dezvoltare; utilizatorii finali folosesc `.exe`)
 
-### Dezvoltare
+### Dezvoltare (surse Python)
 
 ```bat
 cd biblioteca-app
@@ -329,7 +340,7 @@ run.bat
 3. Asistent configurare (dacă e prima rulare).
 4. Se încarcă ultima sesiune sau Partea I, anul și luna curente.
 
-### Instalator Windows (opțional)
+### Instalator Windows (dezvoltatori)
 
 Cu [Inno Setup](https://jrsoftware.org/isinfo.php) instalat și `iscc` în PATH:
 
@@ -338,7 +349,18 @@ cd biblioteca-app
 build_installer.bat
 ```
 
-Rezultat: `installer/output/RegistruDigital_Setup_*.exe` — shortcut în Start Menu, dezinstalare, ștergere `data/` la uninstall.
+Generează ghidul PDF, build PyInstaller, copiază ghidul în `docs/`, apoi Inno Setup.
+
+Rezultat: `installer/output/RegistruDigital_Setup_*.exe` — shortcut în Start Menu, ghid PDF, dezinstalare, ștergere `data/` la uninstall.
+
+### Release automat (GitHub)
+
+La push pe tag `v*` (ex. `v1.7.0`), workflow-ul `.github/workflows/release.yml` construiește ZIP portabil + instalator și publică pe **GitHub Releases**.
+
+```bat
+git tag v1.7.0
+git push origin v1.7.0
+```
 
 ---
 
@@ -373,7 +395,7 @@ venv\Scripts\python.exe -m pytest tests\ -v
 
 **55 teste** acoperă: backup/restaurare, export PDF/utilitare, salvare roundtrip, agregări SQL, motor date, sesiune, audit luni incomplete, model tabel, căi portabile, import Excel, cloud backup, integritate DB, autosalvare, **smoke tests PyQt** (`pytest-qt`).
 
-**CI GitHub Actions:** la fiecare push pe `main`, rulează testele pe `windows-latest` cu Python 3.12.
+**CI GitHub Actions:** la fiecare push pe `main`, rulează testele pe `windows-latest` cu Python 3.12. La tag `v*`, workflow **Release** publică `.exe` + ZIP pe GitHub Releases.
 
 ---
 
@@ -429,6 +451,14 @@ Clasa de bază a paginilor este împărțită în mixin-uri (`app/ui/parts/mixin
 ## Istoric modificări (changelog)
 
 Toate orele sunt **ora României (UTC+3)** din jurnalul Git.
+
+### 22 iunie 2026 — Sprint I–III UX și distribuție (v1.5.0 → v1.7.0)
+
+| Commit | Descriere |
+|--------|-----------|
+| *(Sprint III)* | **v1.7.0 — Distribuție:** ghid PDF 1 pagină pentru bibliotecar; instalator ca produs principal; GitHub Release automat (ZIP + Setup); **Ajutor → Ghid rapid** |
+| `97f905d` | **Sprint II — v1.6.0:** panou Acasă; badge-uri progres sidebar; tur onboarding 5 pași |
+| `4ed3a64` | **Sprint I — v1.5.0:** toast-uri; evidențiere rând azi; stări goale; icon aplicație |
 
 ### 22 iunie 2026 — Batch E–H (v1.1.0 → v1.4.0)
 
