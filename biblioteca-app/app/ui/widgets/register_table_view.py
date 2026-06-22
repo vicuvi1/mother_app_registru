@@ -522,6 +522,9 @@ class RegisterTableView(QTableView):
             )
         else:
             self._register_model.setData(index, old_text)
+        widget = self.indexWidget(index)
+        if isinstance(widget, PresetTextCell):
+            widget.set_value(old_text)
         if col_def.col_type == "int":
             try:
                 val = max(0, int(old_text)) if old_text.strip() else 0

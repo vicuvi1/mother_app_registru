@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -28,7 +27,7 @@ from core.ui_theme import load_stylesheet
 from core.constants_manager import APP_CREDIT, get_biblioteca_info
 from core.parts_registry import PARTS, PART_LAYOUT, get_part_factory
 from core.session_state import load_session, save_session
-from database.backup import create_backup, ensure_backup_dir, is_encrypt_backups_enabled, list_backups, restore_backup
+from database.backup import create_backup, ensure_backup_dir, list_backups, restore_backup
 from ui.excel_import.import_dialog import ImportExcelDialog
 from ui.about_dialog import AboutDialog
 from ui.help_dialog import HelpDialog
@@ -171,26 +170,14 @@ class MainWindow(QMainWindow):
         AboutDialog(self).exec()
 
     def _backup_database(self) -> None:
-        passphrase = None
-        if is_encrypt_backups_enabled():
-            from PyQt6.QtWidgets import QInputDialog
-
-            passphrase, ok = QInputDialog.getText(
-                self,
-                "Parolă backup",
-                "Introduceți parola pentru criptarea copiei:",
-                echo=QLineEdit.EchoMode.Password,
-            )
-            if not ok or not passphrase.strip():
-                return
-            passphrase = passphrase.strip()
         try:
-            path = create_backup("manual", passphrase=passphrase)
-            msg = f"Copia registrului a fost salvată:\n{path}"
-            if is_encrypt_backups_enabled():
-                msg += "\n\nFișier criptat (.db.enc) — păstrați parola în siguranță."
-            QMessageBox.information(self, "Backup reușit", msg)
-        except (OSError, ValueError) as exc:
+            path = create_backup("manual")
+            QMessageBox.information(
+                self,
+                "Backup reușit",
+                f"Copia registrului a fost salvată:\n{path}",
+            )
+        except OSError as exc:
             QMessageBox.warning(self, "Backup", f"Nu s-a putut crea copia:\n{exc}")
 
     def _import_excel(self) -> None:
@@ -221,22 +208,10 @@ class MainWindow(QMainWindow):
             self,
             "Selectați copia de restaurat",
             default,
-            "Copii registru (*.db *.db.enc)",
+            "Copii registru (*.db)",
         )
         if not path:
             return
-        passphrase = None
-        if path.lower().endswith(".enc"):
-            from PyQt6.QtWidgets import QInputDialog
-
-            passphrase, ok = QInputDialog.getText(
-                self,
-                "Parolă restaurare",
-                "Introduceți parola copiei criptate:",
-                echo=QLineEdit.EchoMode.Password,
-            )
-            if not ok:
-                return
         reply = QMessageBox.warning(
             self,
             "Confirmare restaurare",
@@ -246,8 +221,8 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
         try:
-            pre_restore = restore_backup(Path(path), passphrase=passphrase)
-        except (OSError, ValueError) as exc:
+            pre_restore = restore_backup(Path(path))
+        except OSError as exc:
             QMessageBox.warning(self, "Restaurare", f"Restaurarea a eșuat:\n{exc}")
             return
         detail = "Datele au fost restaurate. Aplicația se repornește…"

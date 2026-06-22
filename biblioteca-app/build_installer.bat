@@ -4,7 +4,7 @@ if not exist venv\Scripts\python.exe (
   python -m venv venv
   venv\Scripts\pip install -r requirements.txt
 )
-venv\Scripts\pip install pyinstaller cryptography -q
+venv\Scripts\pip install pyinstaller -q
 echo [1/2] PyInstaller...
 venv\Scripts\pyinstaller registru.spec --noconfirm
 if errorlevel 1 exit /b 1

@@ -1,4 +1,8 @@
-"""Generează mixin-uri din part_base.py."""
+"""Generează mixin-uri din part_base.py.
+
+NOTĂ: Script arhival (Batch D). Sursa de adevăr este app/ui/parts/mixins/.
+Nu rulați din nou — part_base.py este doar re-export.
+"""
 
 import re
 from pathlib import Path

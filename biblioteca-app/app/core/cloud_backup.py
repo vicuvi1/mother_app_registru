@@ -66,7 +66,7 @@ def maybe_sync_backup(backup_path: Path) -> Path | None:
 
 def _prune_cloud_backups(dest_dir: Path, suffix: str) -> None:
     keep = get_cloud_backup_keep_count()
-    patterns = ("biblioteca_*.db", "biblioteca_*.db.enc")
+    patterns = ("biblioteca_*.db",)
     files: list[Path] = []
     for pat in patterns:
         files.extend(dest_dir.glob(pat))

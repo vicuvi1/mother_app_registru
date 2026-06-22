@@ -21,7 +21,6 @@ a = Analysis(
         "openpyxl",
         "docx",
         "reportlab",
-        "cryptography",
         "ui.widgets.table.delegates.checkbox_delegate",
         "ui.widgets.table.delegates.responsabil_delegate",
     ],

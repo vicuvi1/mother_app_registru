@@ -25,5 +25,12 @@ def format_part_heading_html(meta: dict) -> str:
     return escape_html(format_part_heading(meta))
 
 
+def format_biblioteca_line_reportlab(meta: dict) -> str:
+    line = format_biblioteca_line(meta)
+    if not line:
+        return ""
+    return f"<b>{escape_reportlab(line)}</b>"
+
+
 def format_part_heading_reportlab(meta: dict) -> str:
     return escape_reportlab(format_part_heading(meta))

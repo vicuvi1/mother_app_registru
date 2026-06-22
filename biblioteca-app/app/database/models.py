@@ -1,9 +1,13 @@
 """Scheme SQLite (SQLAlchemy) pentru toate Părțile I–VII, IX, XI–XIV."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Base(DeclarativeBase):
@@ -101,9 +105,9 @@ class EvidentaUtilizatori(Base):
     sex_adulti_m: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -152,9 +156,9 @@ class EvidentaUtilizatoriCopiiAdulti(Base):
     twitter_interactiuni: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -194,9 +198,9 @@ class DocumenteInregistrate(Base):
     alte_limbi: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -231,9 +235,9 @@ class DocumenteContinutCZU(Base):
     czu_9_geografie: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -273,9 +277,9 @@ class CercetariBibliografice(Base):
     tip_referinta_grup: Mapped[str | None] = mapped_column(String, nullable=True)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -303,9 +307,9 @@ class ActivitatiInformare(Base):
     gen_activitate: Mapped[str | None] = mapped_column(String, nullable=True)  # vechi — migrare
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -340,9 +344,9 @@ class DocumenteElectronice(Base):
     alte_limbi: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -373,9 +377,9 @@ class Instruiri(Base):
     copii_pana_16: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -400,9 +404,9 @@ class ActivitatiCulturale(Base):
     total_participanti: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -430,9 +434,9 @@ class ActivitatiOnline(Base):
     participanti_copii: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -459,9 +463,9 @@ class Parteneri(Base):
     participanti_copii: Mapped[int] = mapped_column(Integer, default=0)
     impact: Mapped[int] = mapped_column(Integer, default=0)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 
@@ -482,9 +486,9 @@ class Voluntariat(Base):
     activitati_realizate: Mapped[str | None] = mapped_column(Text, nullable=True)
     coordonator: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=_utc_now, onupdate=_utc_now
     )
 
 

@@ -206,10 +206,6 @@ class SetupWizard(QDialog):
         form.addRow("Orientare printare:", self.combo_print)
         form.addRow(QLabel("Se aplică la previzualizarea de printare din toate părțile."))
 
-        self.chk_encrypt_backup = QCheckBox("Criptează copiile manuale de rezervă (.db.enc)")
-        self.chk_encrypt_backup.setChecked(get_setting("backup_encrypt_enabled", "0") == "1")
-        form.addRow(self.chk_encrypt_backup)
-
         self.chk_cloud_backup = QCheckBox("Copiază backup-urile în folder cloud (OneDrive/Dropbox)")
         self.chk_cloud_backup.setChecked(is_cloud_backup_enabled())
         form.addRow(self.chk_cloud_backup)
@@ -281,7 +277,6 @@ class SetupWizard(QDialog):
         pidx = self.combo_print.currentIndex()
         if 0 <= pidx < len(self._print_options):
             set_print_orientation(self._print_options[pidx][1])
-        set_setting("backup_encrypt_enabled", "1" if self.chk_encrypt_backup.isChecked() else "0")
         set_cloud_backup_enabled(self.chk_cloud_backup.isChecked())
         set_cloud_backup_target(self.edit_cloud_folder.text().strip())
         if self.first_run:

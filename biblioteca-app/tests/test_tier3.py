@@ -1,13 +1,8 @@
 """Teste Batch G — Tier 3 distribuție și date."""
 
-import sqlite3
-import tempfile
 from pathlib import Path
 
-import pytest
-
 from core import paths
-from core.backup_crypto import decrypt_file, encrypt_file, is_encrypted_backup
 from core.cloud_backup import maybe_sync_backup, set_cloud_backup_enabled, set_cloud_backup_target
 from core.part_import_meta import list_importable_parts
 from ui.excel_import.import_excel import _coerce_value, _find_header_row
@@ -29,21 +24,6 @@ def test_data_dir_env_override(monkeypatch, tmp_path):
     monkeypatch.setenv("BIBLIOTECA_DATA_DIR", str(custom))
     monkeypatch.setattr(paths.sys, "frozen", False, raising=False)
     assert paths.get_data_dir() == custom.resolve()
-
-
-def test_backup_encrypt_roundtrip(tmp_path):
-    plain = tmp_path / "plain.db"
-    enc = tmp_path / "backup.db.enc"
-    out = tmp_path / "restored.db"
-    with sqlite3.connect(plain) as conn:
-        conn.execute("CREATE TABLE t (id INTEGER)")
-        conn.commit()
-    encrypt_file(plain, enc, "parola-test")
-    assert is_encrypted_backup(enc)
-    decrypt_file(enc, out, "parola-test")
-    assert out.exists()
-    with sqlite3.connect(out) as conn:
-        conn.execute("SELECT 1 FROM t")
 
 
 def test_cloud_backup_copy(tmp_path, monkeypatch):

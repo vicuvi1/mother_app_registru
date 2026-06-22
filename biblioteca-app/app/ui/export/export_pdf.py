@@ -15,7 +15,11 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from ui.export.export_common import REGISTER_TITLE, format_part_heading_reportlab
+from ui.export.export_common import (
+    REGISTER_TITLE,
+    format_biblioteca_line_reportlab,
+    format_part_heading_reportlab,
+)
 from ui.export.export_html import group_spans
 from ui.export.export_utils import (
     escape_reportlab,
@@ -98,12 +102,9 @@ def _page_flowables(page: dict, styles) -> list:
     meta = page["meta"]
 
     flow = []
-    if meta.get("nume_biblioteca"):
-        loc = f", {meta['localitate']}" if meta.get("localitate") else ""
-        flow.append(Paragraph(
-            f"<b>{escape_reportlab(meta['nume_biblioteca'])}{escape_reportlab(loc)}</b>",
-            styles["Normal"],
-        ))
+    bib_line = format_biblioteca_line_reportlab(meta)
+    if bib_line:
+        flow.append(Paragraph(bib_line, styles["Normal"]))
     flow.append(Paragraph(f"<b>{escape_reportlab(REGISTER_TITLE)}</b>", styles["Title"]))
     partea = format_part_heading_reportlab(meta)
     flow.append(Paragraph(f"<b>{partea}</b>", styles["Heading3"]))
