@@ -97,6 +97,9 @@ class PartPageBase(QWidget):
         self._build_ui()
         if self.mode == "events":
             QShortcut(QKeySequence("Ctrl+D"), self, self._duplicate_selected_row)
+        if self._has_month_bar:
+            QShortcut(QKeySequence("Ctrl+Left"), self, lambda: self._go_month(-1))
+            QShortcut(QKeySequence("Ctrl+Right"), self, lambda: self._go_month(1))
         QTimer.singleShot(0, self._load_current)
 
     def _working_days(self, year: int | None = None, month: int | None = None) -> list[str]:
@@ -283,6 +286,33 @@ class PartPageBase(QWidget):
         if hasattr(self, "_heading_label"):
             self._heading_label.setText(self._heading_text())
 
+    def apply_session_state(self, year: int | None, month: int | None) -> None:
+        """Restaurează anul/luna salvate la pornire."""
+        if year and self.date_picker:
+            self.date_picker.set_year(year)
+            self._loaded_year = year
+        if month and self._has_month_bar and self._month_bar:
+            month = max(1, min(12, month))
+            self._loaded_month = month
+            self._month_bar.blockSignals(True)
+            self._month_bar.setCurrentIndex(month - 1)
+            self._month_bar.blockSignals(False)
+        self._update_heading()
+
+    def has_unsaved_changes(self) -> bool:
+        return bool(self._dirty or self._debounce.isActive() or self._save_pending)
+
+    def _go_month(self, delta: int) -> None:
+        if not self._has_month_bar or not self._month_bar:
+            return
+        new_index = self._month_bar.currentIndex() + delta
+        if 0 <= new_index < self._month_bar.count():
+            self._month_bar.setCurrentIndex(new_index)
+
+    def _notify_session_changed(self) -> None:
+        if hasattr(self.main_window, "persist_session_from_page"):
+            self.main_window.persist_session_from_page(self)
+
     def navigate_to(self, month: int | None = None, category: str | None = None) -> None:
         """Sari la o lună/categorie (apelat din Registru final)."""
         self._cache_current_period()
@@ -361,6 +391,7 @@ class PartPageBase(QWidget):
         self._invalidate_caches()
         self._update_heading()
         self._load_current()
+        self._notify_session_changed()
 
     def _on_month_tab_changed(self, index: int) -> None:
         if self._building:
@@ -376,13 +407,16 @@ class PartPageBase(QWidget):
         if pending_save:
             self.main_window.set_save_status(False)
             QTimer.singleShot(0, lambda: self._deferred_persist(old_year, old_month))
+        self._notify_session_changed()
 
-    def flush_pending_save(self) -> None:
+    def flush_pending_save(self) -> bool:
         """Salvare sincronă la ieșire — pentru date în așteptare."""
+        self._debounce.stop()
         if self._save_pending:
             self._dirty = True
         if self._dirty:
-            self.save_all(show_status=False)
+            return self.save_all(show_status=False)
+        return True
 
     def _on_tab_changed(self) -> None:
         if self._building:
@@ -931,11 +965,14 @@ class PartPageBase(QWidget):
         self._debounce.start()
         self.main_window.statusBar().showMessage("Rând duplicat — modificați ce trebuie și salvați.", 4000)
 
-    def save_all(self, show_status: bool = True, reload: bool = False) -> None:
+    def save_all(self, show_status: bool = True, reload: bool = False) -> bool:
+        self._debounce.stop()
+        if self._save_pending:
+            self._dirty = True
         if not self._dirty:
             if show_status:
                 self.main_window.set_save_status(True)
-            return
+            return True
         if show_status:
             self.main_window.set_save_status(False)
 
@@ -953,14 +990,16 @@ class PartPageBase(QWidget):
                 len(self.table.get_data_rows()) if hasattr(self, "table") else 0,
             )
             QMessageBox.warning(self, "Eroare salvare", f"Nu s-au putut salva datele:\n{exc}")
-            return
+            return False
 
         if show_status:
             self.main_window.set_save_status(True)
         self._dirty = False
+        self._save_pending = False
         self._cumulative_cache.clear()
         self._cache_current_period()
         self.main_window.notify_saved()
+        return True
 
     def _save_rows_data(
         self,

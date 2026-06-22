@@ -18,6 +18,7 @@ env/
 *.db-shm
 *.log
 app/data/backups/
+biblioteca-app/app/data/session.json
 .env
 .env.*
 

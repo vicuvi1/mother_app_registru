@@ -21,9 +21,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from core.app_restart import restart_application
 from core.autosave import AutosaveManager
 from core.constants_manager import APP_CREDIT, get_biblioteca_info
 from core.parts_registry import PARTS, PART_LAYOUT, get_part_factory
+from core.session_state import load_session, save_session
 from database.backup import create_backup, ensure_backup_dir, list_backups, restore_backup
 from ui.help_dialog import HelpDialog
 from ui.setup_wizard import SetupWizard
@@ -55,13 +57,29 @@ class MainWindow(QMainWindow):
             self.load_initial_part()
 
     def load_initial_part(self) -> None:
+        session = load_session()
+        part_id = session.get("part_id", PARTS[0][1])
+        if not any(pid == part_id for _roman, pid, _title, _short in PARTS):
+            part_id = PARTS[0][1]
+
+        row = 0
+        for i, (_roman, pid, _title, _short) in enumerate(PARTS):
+            if pid == part_id:
+                row = i
+                break
+
         self._part_list.blockSignals(True)
-        self._get_or_load_part(PARTS[0][1])
-        self._part_list.setCurrentRow(0)
+        page = self._get_or_load_part(part_id)
+        if page is not None and hasattr(page, "apply_session_state"):
+            year = session.get("year")
+            month = session.get("month")
+            if isinstance(year, int):
+                page.apply_session_state(year, month if isinstance(month, int) else None)
+        self._part_list.setCurrentRow(row)
         self._part_list.blockSignals(False)
-        page = self._part_pages.get(PARTS[0][1])
         if page is not None:
             self._content_stack.setCurrentWidget(page)
+            self.persist_session_from_page(page)
 
     def _build_menu(self) -> None:
         menu_setari = self.menuBar().addMenu("Setări")
@@ -169,15 +187,15 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.StandardButton.Yes:
             return
         try:
-            restore_backup(Path(path))
+            pre_restore = restore_backup(Path(path))
         except OSError as exc:
             QMessageBox.warning(self, "Restaurare", f"Restaurarea a eșuat:\n{exc}")
             return
-        QMessageBox.information(
-            self,
-            "Restaurare reușită",
-            "Datele au fost restaurate. Reporniți aplicația.",
-        )
+        detail = "Datele au fost restaurate. Aplicația se repornește…"
+        if pre_restore is not None:
+            detail += f"\n\nCopie de siguranță a datelor curente:\n{pre_restore}"
+        QMessageBox.information(self, "Restaurare reușită", detail)
+        restart_application()
 
     def _export_current(self) -> None:
         page = self._content_stack.currentWidget()
@@ -196,11 +214,84 @@ class MainWindow(QMainWindow):
         ts = self._last_save_at.strftime("%H:%M:%S")
         self._save_label.setToolTip(f"Ultima salvare: {ts}")
 
+    def persist_session_from_page(self, page) -> None:
+        part_id = self._part_id_for_page(page)
+        if part_id is None:
+            return
+        year = getattr(page, "year", None)
+        month = getattr(page, "month", None) if getattr(page, "_has_month_bar", False) else None
+        save_session(
+            part_id=part_id,
+            year=year if isinstance(year, int) else None,
+            month=month if isinstance(month, int) else None,
+        )
+
+    def _part_id_for_page(self, page) -> str | None:
+        for part_id, part_page in self._part_pages.items():
+            if part_page is page:
+                return part_id
+        return None
+
+    def _any_unsaved_changes(self) -> bool:
+        for part_id in self._loaded_parts:
+            page = self._part_pages.get(part_id)
+            if page is not None and hasattr(page, "has_unsaved_changes"):
+                if page.has_unsaved_changes():
+                    return True
+        return False
+
+    def _save_all_dirty_pages(self) -> bool:
+        ok = True
+        for part_id in self._loaded_parts:
+            page = self._part_pages.get(part_id)
+            if page is None or not hasattr(page, "save_all"):
+                continue
+            if hasattr(page, "has_unsaved_changes") and page.has_unsaved_changes():
+                if not page.save_all(show_status=False):
+                    ok = False
+        if ok:
+            self.notify_saved()
+        return ok
+
     def closeEvent(self, event: QCloseEvent) -> None:
+        if self._any_unsaved_changes():
+            reply = QMessageBox.question(
+                self,
+                "Modificări nesalvate",
+                "Există modificări care nu au fost salvate.\n\nSalvați înainte de ieșire?",
+                QMessageBox.StandardButton.Save
+                | QMessageBox.StandardButton.Discard
+                | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Save,
+            )
+            if reply == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+            if reply == QMessageBox.StandardButton.Save:
+                if not self._save_all_dirty_pages():
+                    QMessageBox.warning(
+                        self,
+                        "Salvare eșuată",
+                        "Nu s-au putut salva toate modificările. Ieșirea a fost anulată.",
+                    )
+                    event.ignore()
+                    return
+        else:
+            page = self._content_stack.currentWidget()
+            if hasattr(page, "flush_pending_save"):
+                if not page.flush_pending_save():
+                    QMessageBox.warning(
+                        self,
+                        "Salvare eșuată",
+                        "Nu s-au putut salva datele în așteptare. Ieșirea a fost anulată.",
+                    )
+                    event.ignore()
+                    return
+            self._autosave.on_page_changed()
+
         page = self._content_stack.currentWidget()
-        if hasattr(page, "flush_pending_save"):
-            page.flush_pending_save()
-        self._autosave.on_page_changed()
+        if page is not None:
+            self.persist_session_from_page(page)
         super().closeEvent(event)
 
     def _open_cover(self) -> None:
@@ -375,6 +466,7 @@ class MainWindow(QMainWindow):
         if page is not None:
             self._content_stack.setCurrentWidget(page)
             self.statusBar().showMessage(item.toolTip())
+            self.persist_session_from_page(page)
             self._autosave.on_page_changed()
 
     def _get_or_load_part(self, part_id: str) -> QWidget | None:

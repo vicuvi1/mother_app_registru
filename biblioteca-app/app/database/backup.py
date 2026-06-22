@@ -68,8 +68,11 @@ def list_backups() -> list[Path]:
     return sorted(BACKUP_DIR.glob("biblioteca_*.db"), key=lambda p: p.stat().st_mtime, reverse=True)
 
 
-def restore_backup(backup_path: Path) -> None:
-    """Restaurează din copie (închide conexiunile active mai întâi)."""
+def restore_backup(backup_path: Path) -> Path | None:
+    """Restaurează din copie (închide conexiunile active mai întâi).
+
+    Returnează calea copiei de siguranță pre-restaurare, dacă există.
+    """
     backup_path = Path(backup_path)
     if not backup_path.exists():
         raise FileNotFoundError(str(backup_path))
@@ -77,10 +80,13 @@ def restore_backup(backup_path: Path) -> None:
     engine = get_engine()
     engine.dispose()
 
+    pre_restore: Path | None = None
     if DB_PATH.exists():
         pre_restore = BACKUP_DIR / f"biblioteca_prerestore_{_timestamp()}.db"
         ensure_backup_dir()
         shutil.copy2(DB_PATH, pre_restore)
+        logger.info("Copie pre-restaurare: %s", pre_restore)
 
     shutil.copy2(backup_path, DB_PATH)
     logger.info("Bază de date restaurată din %s", backup_path)
+    return pre_restore

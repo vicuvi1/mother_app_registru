@@ -13,6 +13,7 @@ SHORTCUTS_TEXT = """
 <tr><td><b>Ctrl+Z</b></td><td>Anulează ultima editare (celulă)</td></tr>
 <tr><td><b>Ctrl+,</b></td><td>Setări bibliotecă</td></tr>
 <tr><td><b>Ctrl+Q</b></td><td>Ieșire</td></tr>
+<tr><td><b>Ctrl+← / Ctrl+→</b></td><td>Luna anterioară / următoare</td></tr>
 <tr><td><b>Ctrl+D</b></td><td>Duplică rând (părți evenimente)</td></tr>
 </table>
 <p style="color:#64748b">Datele se salvează automat la 60s și la schimbarea părții.</p>
