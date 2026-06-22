@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 from PyQt6.QtCore import QTimer, Qt
@@ -26,13 +27,13 @@ from core.date_engine import get_working_days
 from core.random_engine import generate_month_data, generate_year_monthly_data
 from database.db_manager import get_session
 from ui.export.export_dialog import ExportDialog
-from ui.export.export_excel import export_to_excel
-from ui.export.export_pdf import export_to_pdf
-from ui.export.export_word import export_to_word
+from ui.export.export_errors import format_export_error, run_export
 from ui.widgets.date_picker_zile_lucratoare import DatePickerZileLucratoare
 from ui.widgets.editable_table import ColumnDef, EditableTable
 from ui.widgets.range_config_dialog import RangeConfigDialog
 from ui.widgets.table_scroll_wrapper import TableScrollWrapper
+
+logger = logging.getLogger(__name__)
 
 
 class PartPageBase(QWidget):
@@ -762,6 +763,12 @@ class PartPageBase(QWidget):
             else:
                 self._save_table(self.table, None, reload=reload)
         except Exception as exc:
+            logger.exception(
+                "Eroare salvare Partea %s (%s), %d rânduri",
+                self.roman,
+                self.part_id,
+                len(self.table.get_data_rows()) if hasattr(self, "table") else 0,
+            )
             QMessageBox.warning(self, "Eroare salvare", f"Nu s-au putut salva datele:\n{exc}")
             return
 
@@ -780,43 +787,53 @@ class PartPageBase(QWidget):
         flags = table.get_auto_flags()
 
         with get_session() as session:
-            for i, row in enumerate(rows):
-                row_id = ids[i] if i < len(ids) else None
-                row_copy = dict(row)
-                if self.mode == "monthly" and "luna" not in row_copy:
-                    row_copy["luna"] = i + 1
-                if (
-                    self.mode == "events"
-                    and self.date_field in self._model_keys
-                    and not any(c.key == self.date_field for c in self.columns)
-                    and not row_copy.get(self.date_field)
-                ):
-                    row_copy[self.date_field] = f"_r{i + 1}"
-                    table.set_row_extra(i, self.date_field, row_copy[self.date_field])
-                kwargs = self._row_to_kwargs(row_copy, categorie, for_update=False, row_index=i)
-                if "is_auto_generated" in self._model_keys:
-                    kwargs["is_auto_generated"] = flags[i] if i < len(flags) else False
+            try:
+                for i, row in enumerate(rows):
+                    row_id = ids[i] if i < len(ids) else None
+                    row_copy = dict(row)
+                    if self.mode == "monthly" and "luna" not in row_copy:
+                        row_copy["luna"] = i + 1
+                    if (
+                        self.mode == "events"
+                        and self.date_field in self._model_keys
+                        and not any(c.key == self.date_field for c in self.columns)
+                        and not row_copy.get(self.date_field)
+                    ):
+                        row_copy[self.date_field] = f"_r{i + 1}"
+                        table.set_row_extra(i, self.date_field, row_copy[self.date_field])
+                    kwargs = self._row_to_kwargs(row_copy, categorie, for_update=False, row_index=i)
+                    if "is_auto_generated" in self._model_keys:
+                        kwargs["is_auto_generated"] = flags[i] if i < len(flags) else False
 
-                if row_id is None:
-                    row_id = self._find_existing_id(session, row_copy, categorie)
+                    if row_id is None:
+                        row_id = self._find_existing_id(session, row_copy, categorie)
 
-                if row_id:
-                    rec = session.get(self.model_class, row_id)
-                    if rec:
-                        update_kw = self._row_to_kwargs(row_copy, categorie, for_update=True)
-                        if "is_auto_generated" in self._model_keys:
-                            update_kw["is_auto_generated"] = kwargs.get("is_auto_generated", False)
-                        if (
-                            self.mode == "events"
-                            and self.date_field in self._model_keys
-                            and not getattr(rec, self.date_field, None)
-                        ):
-                            update_kw[self.date_field] = row_copy.get(self.date_field) or f"_r{i + 1}"
-                        for k, v in update_kw.items():
-                            setattr(rec, k, v)
-                else:
-                    session.add(self.model_class(**kwargs))
-            session.commit()
+                    if row_id:
+                        rec = session.get(self.model_class, row_id)
+                        if rec:
+                            update_kw = self._row_to_kwargs(row_copy, categorie, for_update=True)
+                            if "is_auto_generated" in self._model_keys:
+                                update_kw["is_auto_generated"] = kwargs.get("is_auto_generated", False)
+                            if (
+                                self.mode == "events"
+                                and self.date_field in self._model_keys
+                                and not getattr(rec, self.date_field, None)
+                            ):
+                                update_kw[self.date_field] = row_copy.get(self.date_field) or f"_r{i + 1}"
+                            for k, v in update_kw.items():
+                                setattr(rec, k, v)
+                    else:
+                        session.add(self.model_class(**kwargs))
+                session.commit()
+            except Exception:
+                session.rollback()
+                logger.exception(
+                    "Tranzacție eșuată la salvare Partea %s (%s), %d rânduri",
+                    self.roman,
+                    self.part_id,
+                    len(rows),
+                )
+                raise
 
         if reload:
             self._load_table(table, categorie)
@@ -1089,9 +1106,9 @@ class PartPageBase(QWidget):
         if scope == "year":
             return self._pages_for_part(self, year)
         # full register — toate părțile (adulți), apoi toate părțile (copii)
-        from ui.export.register_pages import collect_full_register_pages
+        from ui.export.register_pages import collect_full_register_pages_with_dialog
 
-        return collect_full_register_pages(self.main_window, year)
+        return collect_full_register_pages_with_dialog(self, self.main_window, year)
 
     def _suggested_filename(self, ext: str, scope: str, year: int) -> str:
         if scope == "full":
@@ -1128,22 +1145,22 @@ class PartPageBase(QWidget):
         if not out_path:
             return
 
+        self.main_window._export_in_progress = True
         self.main_window.statusBar().showMessage("Se generează exportul…")
         try:
             pages = self._collect_pages(scope, year)
             if not pages:
                 QMessageBox.information(self, "Export", "Nu există date de exportat.")
                 return
-            if fmt == "excel":
-                export_to_excel(out_path, pages)
-            elif fmt == "word":
-                export_to_word(out_path, pages)
-            else:
-                export_to_pdf(out_path, pages)
+            run_export(fmt, out_path, pages)
+        except InterruptedError:
+            QMessageBox.information(self, "Export", "Exportul a fost anulat.")
+            return
         except Exception as exc:
-            QMessageBox.warning(self, "Eroare export", f"Nu s-a putut exporta:\n{exc}")
+            QMessageBox.warning(self, "Eroare export", format_export_error(exc))
             return
         finally:
+            self.main_window._export_in_progress = False
             self.main_window.statusBar().clearMessage()
 
         reply = QMessageBox.question(
@@ -1166,8 +1183,13 @@ class PartPageBase(QWidget):
                 subprocess.run(["open", path], check=False)
             else:
                 subprocess.run(["xdg-open", path], check=False)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("Nu s-a putut deschide fișierul: %s", path)
+            QMessageBox.warning(
+                self,
+                "Deschidere fișier",
+                f"Nu s-a putut deschide fișierul:\n{path}\n\n{exc}",
+            )
 
     def _print_table(self) -> None:
         from PyQt6.QtGui import QTextDocument

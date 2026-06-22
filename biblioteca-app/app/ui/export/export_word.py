@@ -11,6 +11,7 @@ from docx.oxml.ns import qn
 from docx.shared import Mm, Pt
 
 from ui.export.export_html import group_spans
+from ui.export.export_utils import format_cell_value, format_total_value, validate_pages
 
 # Fonturi — mai mari decât înainte, lizibile la print
 FONT_HEADER = 8.5
@@ -19,6 +20,7 @@ FONT_TOTAL = 9.5
 
 
 def export_to_word(out_path: Path, pages: list[dict]) -> Path:
+    validate_pages(pages)
     doc = Document()
     _configure_section(doc.sections[0])
 
@@ -88,7 +90,7 @@ def _render_cover(doc, page: dict) -> None:
             return
         if space_before:
             doc.add_paragraph()
-        p = doc.add_paragraph(text)
+        p = doc.add_paragraph(str(text))
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p.runs[0].bold = True
         p.runs[0].font.size = Pt(size)
@@ -168,11 +170,9 @@ def _render_page(doc, page: dict) -> None:
     base = header_rows
     for ri, row in enumerate(rows):
         for ci, key in enumerate(col_keys):
-            val = row.get(key, "")
-            if isinstance(val, bool):
-                val = "✓" if val else ""
+            val = format_cell_value(row.get(key, ""))
             cell = table.rows[base + ri].cells[ci]
-            cell.text = str(val)
+            cell.text = val
             _style_cell(cell, bold=(ci == 0), size_pt=FONT_DATA)
 
     base = header_rows + len(rows)
@@ -183,8 +183,8 @@ def _render_page(doc, page: dict) -> None:
         for ci, key in enumerate(col_keys):
             if ci == 0:
                 continue
-            val = sums.get(key, "")
-            rr.cells[ci].text = str(val) if isinstance(val, int) else ""
+            val = format_total_value(sums.get(key, ""))
+            rr.cells[ci].text = val
             _style_cell(rr.cells[ci], bold=True, size_pt=FONT_TOTAL)
 
     _set_table_full_width(table, ncols, doc)

@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QStackedWidget,
     QStatusBar,
@@ -91,6 +92,7 @@ class MainWindow(QMainWindow):
         self._part_pages: dict[str, QWidget] = {}
         self._part_placeholders: dict[str, int] = {}
         self._loaded_parts: set[str] = set()
+        self._export_in_progress = False
         self._build_menu()
         self._build_ui()
         self._build_status_bar()
@@ -133,6 +135,12 @@ class MainWindow(QMainWindow):
         page = self._content_stack.currentWidget()
         if hasattr(page, "_export"):
             page._export()
+            return
+        QMessageBox.information(
+            self,
+            "Export",
+            "Selectați o parte din registru pentru export.",
+        )
 
     def _open_cover(self) -> None:
         from ui.cover_page_dialog import CoverPageDialog

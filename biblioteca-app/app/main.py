@@ -11,6 +11,7 @@ APP_ROOT = Path(__file__).resolve().parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
 
+from core.logging_config import setup_logging  # noqa: E402
 from database.db_manager import init_database, is_first_run  # noqa: E402
 from ui.main_window import MainWindow  # noqa: E402
 from ui.setup_wizard import SetupWizard  # noqa: E402
@@ -23,6 +24,7 @@ def _load_stylesheet(app: QApplication) -> None:
 
 
 def main() -> int:
+    setup_logging()
     init_database(seed=True)
 
     QApplication.setHighDpiScaleFactorRoundingPolicy(

@@ -8,6 +8,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.pagebreak import Break
 
 from ui.export.export_html import group_spans
+from ui.export.export_utils import format_cell_value, format_total_value, validate_pages
 
 _thin = Side(style="thin", color="555555")
 BORDER = Border(left=_thin, right=_thin, top=_thin, bottom=_thin)
@@ -19,6 +20,7 @@ TOTAL_FILL = PatternFill("solid", fgColor="E2E8F0")
 
 
 def export_to_excel(out_path: Path, pages: list[dict]) -> Path:
+    validate_pages(pages)
     wb = Workbook()
     ws = wb.active
     ws.title = "Registru"
@@ -140,9 +142,7 @@ def _write_page(ws, page: dict, r: int) -> int:
 
     for row in rows:
         for c, key in enumerate(col_keys, 1):
-            val = row.get(key, "")
-            if isinstance(val, bool):
-                val = "✓" if val else ""
+            val = format_cell_value(row.get(key, ""))
             cell = ws.cell(r, c, val)
             cell.border = BORDER
             cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -158,8 +158,8 @@ def _write_page(ws, page: dict, r: int) -> int:
         for c, key in enumerate(col_keys, 1):
             if c == 1:
                 continue
-            val = sums.get(key, "")
-            cell = ws.cell(r, c, val if isinstance(val, int) else "")
+            val = format_total_value(sums.get(key, ""))
+            cell = ws.cell(r, c, val)
             cell.font = BOLD
             cell.fill = TOTAL_FILL
             cell.border = BORDER

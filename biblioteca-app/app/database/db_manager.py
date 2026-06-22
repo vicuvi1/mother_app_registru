@@ -1,8 +1,9 @@
 """Conexiune SQLite, inițializare schema și operații comune."""
 
+import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from database.models import AppSetting, Base
@@ -16,6 +17,7 @@ DB_PATH = DATA_DIR / "biblioteca.db"
 
 _engine = None
 _SessionLocal = None
+logger = logging.getLogger(__name__)
 
 
 def get_db_path() -> Path:
@@ -31,6 +33,10 @@ def get_engine():
             echo=False,
             connect_args={"check_same_thread": False},
         )
+        with _engine.connect() as conn:
+            conn.execute(text("PRAGMA journal_mode=WAL"))
+            conn.commit()
+        logger.info("Bază de date inițializată (WAL): %s", DB_PATH)
     return _engine
 
 

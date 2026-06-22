@@ -25,10 +25,8 @@ from PyQt6.QtWidgets import (
 )
 
 from core.constants_manager import LUNI_RO, get_cover_page
-from ui.export.export_excel import export_to_excel
+from ui.export.export_errors import format_export_error, run_export
 from ui.export.export_html import build_pages_html
-from ui.export.export_pdf import export_to_pdf
-from ui.export.export_word import export_to_word
 
 ROLE_META = Qt.ItemDataRole.UserRole
 
@@ -350,16 +348,14 @@ class RegisterFinalPage(QWidget):
         )
         if not out_path:
             return
+        self.main_window._export_in_progress = True
         try:
-            if fmt == "pdf":
-                export_to_pdf(out_path, pages)
-            elif fmt == "word":
-                export_to_word(out_path, pages)
-            else:
-                export_to_excel(out_path, pages)
+            run_export(fmt, out_path, pages)
         except Exception as exc:
-            QMessageBox.warning(self, "Eroare export", f"Nu s-a putut exporta:\n{exc}")
+            QMessageBox.warning(self, "Eroare export", format_export_error(exc))
             return
+        finally:
+            self.main_window._export_in_progress = False
         QMessageBox.information(
             self,
             "Export reușit",

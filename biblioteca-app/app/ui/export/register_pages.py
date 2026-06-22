@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+from typing import Callable
+
 from core.constants_manager import get_cover_page
 from ui.main_window import PARTS, PART_LAYOUT
+
+logger = logging.getLogger(__name__)
 
 CATEGORY_ORDER = ["adulti", "copii"]
 
@@ -51,18 +56,78 @@ def collect_full_register_pages(
     *,
     include_cover: bool = True,
     get_page_obj=None,
+    progress_callback: Callable[[int, int, str], bool] | None = None,
 ) -> list[dict]:
-    """Registru complet: copertă + toate părțile (adulți), apoi toate părțile (copii)."""
+    """
+    Registru complet: copertă + toate părțile (adulți), apoi toate părțile (copii).
+
+    progress_callback(current, total, label) -> False pentru anulare.
+  """
     if get_page_obj is None:
         get_page_obj = main_window._get_or_load_part
 
+    slots = iter_register_slots()
+    total_steps = (1 if include_cover else 0) + len(slots)
+    step = 0
+
     pages: list[dict] = []
     if include_cover:
+        if progress_callback and not progress_callback(step, total_steps, "Copertă"):
+            raise InterruptedError("Export anulat de utilizator.")
         pages.append(cover_page(year))
+        step += 1
 
-    for _roman, part_id, _title, _short, cat in iter_register_slots():
-        page_obj = get_page_obj(part_id)
-        if page_obj is None:
-            continue
-        pages.extend(pages_for_part_category(page_obj, year, cat))
+    for roman, part_id, title, short, cat in slots:
+        label = f"Partea {roman}. {title}"
+        if cat:
+            label += f" ({cat})"
+        if progress_callback and not progress_callback(step, total_steps, label):
+            raise InterruptedError("Export anulat de utilizator.")
+
+        try:
+            page_obj = get_page_obj(part_id)
+            if page_obj is None:
+                logger.warning("Partea %s (%s) nu a putut fi încărcată", roman, part_id)
+                raise ValueError(f"Partea {roman}. {title} nu a putut fi încărcată.")
+            pages.extend(pages_for_part_category(page_obj, year, cat))
+        except InterruptedError:
+            raise
+        except Exception as exc:
+            logger.exception("Eroare la colectarea părții %s (%s)", roman, part_id)
+            raise ValueError(f"Partea {roman}. {title}: {exc}") from exc
+        step += 1
+
     return pages
+
+
+def collect_full_register_pages_with_dialog(parent, main_window, year: int) -> list[dict]:
+    """Colectează paginile registrului complet cu dialog de progres."""
+    from PyQt6.QtWidgets import QApplication, QProgressDialog
+
+    progress = QProgressDialog("Se pregătesc paginile pentru export…", "Anulează", 0, 100, parent)
+    progress.setWindowTitle("Export registru complet")
+    progress.setMinimumDuration(0)
+    progress.setValue(0)
+
+    cancelled = False
+
+    def on_progress(current: int, total: int, label: str) -> bool:
+        nonlocal cancelled
+        if cancelled or progress.wasCanceled():
+            cancelled = True
+            return False
+        if total > 0:
+            progress.setMaximum(total)
+            progress.setValue(current)
+        progress.setLabelText(label)
+        QApplication.processEvents()
+        return not progress.wasCanceled()
+
+    try:
+        return collect_full_register_pages(
+            main_window,
+            year,
+            progress_callback=on_progress,
+        )
+    finally:
+        progress.close()

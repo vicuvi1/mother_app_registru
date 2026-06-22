@@ -13,11 +13,15 @@ class AutosaveManager(QObject):
         self._timer.start()
 
     def _on_timer(self) -> None:
+        if getattr(self._main_window, "_export_in_progress", False):
+            return
         page = self._current_part_page()
         if page is not None and hasattr(page, "save_all"):
             page.save_all(show_status=True)
 
     def on_page_changed(self) -> None:
+        if getattr(self._main_window, "_export_in_progress", False):
+            return
         page = self._current_part_page()
         if page is not None and hasattr(page, "save_all"):
             if hasattr(page, "_debounce") and page._debounce.isActive():

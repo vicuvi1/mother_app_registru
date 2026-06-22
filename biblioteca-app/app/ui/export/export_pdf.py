@@ -16,6 +16,12 @@ from reportlab.platypus import (
 )
 
 from ui.export.export_html import group_spans
+from ui.export.export_utils import (
+    escape_reportlab,
+    format_cell_value,
+    format_total_value,
+    validate_pages,
+)
 
 
 def _on_page(canvas, doc):
@@ -27,6 +33,7 @@ def _on_page(canvas, doc):
 
 
 def export_to_pdf(out_path: Path, pages: list[dict]) -> Path:
+    validate_pages(pages)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -60,17 +67,17 @@ def _cover_flowables(page: dict, styles) -> list:
 
     flow = [Spacer(1, 90 * mm * 0.5)]
     if page.get("institutie_1"):
-        flow.append(Paragraph(page["institutie_1"], ps("i1", 15, 4)))
+        flow.append(Paragraph(escape_reportlab(page["institutie_1"]), ps("i1", 15, 4)))
     if page.get("institutie_2"):
-        flow.append(Paragraph(page["institutie_2"], ps("i2", 15, 30)))
+        flow.append(Paragraph(escape_reportlab(page["institutie_2"]), ps("i2", 15, 30)))
     if page.get("titlu"):
-        flow.append(Paragraph(page["titlu"], ps("t", 26, 18)))
+        flow.append(Paragraph(escape_reportlab(page["titlu"]), ps("t", 26, 18)))
     if page.get("biblioteca"):
-        flow.append(Paragraph(page["biblioteca"], ps("b", 22, 10)))
+        flow.append(Paragraph(escape_reportlab(page["biblioteca"]), ps("b", 22, 10)))
     if page.get("localitate"):
-        flow.append(Paragraph(page["localitate"], ps("l", 17, 36)))
+        flow.append(Paragraph(escape_reportlab(page["localitate"]), ps("l", 17, 36)))
     if page.get("an"):
-        flow.append(Paragraph(page["an"], ps("a", 19, 10)))
+        flow.append(Paragraph(escape_reportlab(page["an"]), ps("a", 19, 10)))
     return flow
 
 
@@ -85,14 +92,17 @@ def _page_flowables(page: dict, styles) -> list:
     flow = []
     if meta.get("nume_biblioteca"):
         loc = f", {meta['localitate']}" if meta.get("localitate") else ""
-        flow.append(Paragraph(f"<b>{meta['nume_biblioteca']}{loc}</b>", styles["Normal"]))
+        flow.append(Paragraph(
+            f"<b>{escape_reportlab(meta['nume_biblioteca'])}{escape_reportlab(loc)}</b>",
+            styles["Normal"],
+        ))
     flow.append(Paragraph("<b>Registru de evidență a activității bibliotecii</b>", styles["Title"]))
     partea = f"Partea {meta.get('parte_roman', '')}. {meta.get('title', '')}"
     if meta.get("luna_name"):
         partea += f" în luna {meta['luna_name']} anul {meta.get('an', '')}"
     elif meta.get("an"):
         partea += f" — anul {meta.get('an', '')}"
-    flow.append(Paragraph(f"<b>{partea}</b>", styles["Heading3"]))
+    flow.append(Paragraph(f"<b>{escape_reportlab(partea)}</b>", styles["Heading3"]))
     flow.append(Spacer(1, 6))
 
     has_groups = any(groups)
@@ -132,20 +142,18 @@ def _page_flowables(page: dict, styles) -> list:
     for row in rows:
         line = []
         for k in col_keys:
-            val = row.get(k, "")
-            if isinstance(val, bool):
-                val = "✓" if val else ""
-            line.append(str(val))
+            line.append(format_cell_value(row.get(k, "")))
         data.append(line)
 
-    # prima coloană (data) bold
-    style_cmds.append(("FONTNAME", (0, header_rows), (0, header_rows + len(rows) - 1), "Helvetica-Bold"))
+    if rows:
+        style_cmds.append(
+            ("FONTNAME", (0, header_rows), (0, header_rows + len(rows) - 1), "Helvetica-Bold")
+        )
 
     for label, sums in total_rows:
         line = [label]
         for k in col_keys[1:]:
-            v = sums.get(k, "")
-            line.append(str(v) if isinstance(v, int) else "")
+            line.append(format_total_value(sums.get(k, "")))
         data.append(line)
 
     total_start = header_rows + len(rows)
