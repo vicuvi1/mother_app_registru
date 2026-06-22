@@ -4,12 +4,20 @@ from dataclasses import dataclass
 from typing import Any
 
 from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal, QEvent, QTimer
-from PyQt6.QtGui import QBrush, QColor, QFont, QKeyEvent, QKeySequence, QPainter, QPen
+from PyQt6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QKeyEvent,
+    QKeySequence,
+    QPainter,
+    QPen,
+    QShortcut,
+)
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
     QInputDialog,
-    QShortcut,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
