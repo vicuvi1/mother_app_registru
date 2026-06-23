@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QGuiApplication, QKeyEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -76,11 +76,67 @@ class RegisterTableView(QTableView):
         self.horizontalHeader().sectionDoubleClicked.connect(self._edit_header_label)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.viewport().installEventFilter(self)
 
         QShortcut(QKeySequence("Ctrl+Z"), self, self.undo_last)
         QShortcut(QKeySequence("Ctrl+F"), self, self.open_find)
         QShortcut(QKeySequence("Ctrl+C"), self, self.copy_selection)
         QShortcut(QKeySequence("Ctrl+V"), self, self.paste_from_clipboard)
+
+    def eventFilter(self, obj, event) -> bool:
+        """Click pe celule preset / responsabil / numere — ca în EditableTable."""
+        if obj is self.viewport():
+            et = event.type()
+            if et == QEvent.Type.MouseButtonRelease:
+                pos = event.position().toPoint()
+                index = self.indexAt(pos)
+                if not index.isValid():
+                    return False
+                row, col = index.row(), index.column()
+                if col < 0 or col >= len(self._columns):
+                    return False
+                if not self.is_data_row(row):
+                    return False
+                col_def = self._columns[col]
+                w = self.indexWidget(index)
+
+                if event.button() == Qt.MouseButton.LeftButton:
+                    if (
+                        col_def.col_type in ("preset_text", "inline_text")
+                        and isinstance(w, PresetTextCell)
+                    ):
+                        self.close_all_inline_edits(
+                            except_cell=w if col_def.col_type == "inline_text" else None
+                        )
+                    else:
+                        self.close_all_inline_edits()
+
+                if col_def.col_type in ("preset_text", "inline_text") and isinstance(w, PresetTextCell):
+                    if event.button() == Qt.MouseButton.RightButton and col_def.col_type == "preset_text":
+                        w._suppress_open = True
+                        w.close_picker()
+                        QTimer.singleShot(0, w.start_inline_edit)
+                        QTimer.singleShot(300, lambda cell=w: setattr(cell, "_suppress_open", False))
+                        return True
+                    if event.button() == Qt.MouseButton.LeftButton and not w.is_editing():
+                        if col_def.col_type == "inline_text":
+                            QTimer.singleShot(0, w.start_inline_edit)
+                        elif not w._suppress_open:
+                            QTimer.singleShot(0, w.open_picker)
+                        return True
+                elif event.button() == Qt.MouseButton.LeftButton and col_def.col_type == "responsabil":
+                    QTimer.singleShot(0, lambda i=index: self.edit(i))
+                    return True
+                elif (
+                    event.button() == Qt.MouseButton.LeftButton
+                    and w is None
+                    and col_def.col_type in ("int", "date", "text")
+                    and col_def.editable
+                    and not col_def.computed_from
+                ):
+                    QTimer.singleShot(0, lambda i=index: self.edit(i))
+                    return True
+        return super().eventFilter(obj, event)
 
     def attach_find_bar(self, bar: TableFindBar) -> None:
         self._find_bar = bar

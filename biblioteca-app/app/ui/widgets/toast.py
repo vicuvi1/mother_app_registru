@@ -23,6 +23,7 @@ class ToastHost(QWidget):
         self._label.setWordWrap(True)
         self._label.setMaximumWidth(420)
         self._label.setTextFormat(Qt.TextFormat.PlainText)
+        self._label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         layout.addWidget(self._label)
 
         self._timer = QTimer(self)

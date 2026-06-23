@@ -1,6 +1,6 @@
 """Celulă text: click stânga = listă, click dreapta = scriere direct în celulă."""
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
 from PyQt6.QtWidgets import (
     QApplication,
@@ -244,15 +244,21 @@ class PresetTextCell(QWidget):
         self._editor.navigate.connect(self._on_editor_navigate)
 
         self._stack = QStackedWidget()
-        self._stack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._stack.addWidget(self._label)
         self._stack.addWidget(self._editor)
+        self._stack.installEventFilter(self)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
         layout.addWidget(self._stack)
 
         self.set_value("")
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is self._stack and event.type() == QEvent.Type.MouseButtonRelease:
+            self._handle_click(event)
+            return True
+        return super().eventFilter(watched, event)
 
     def _update_tooltips(self) -> None:
         if self._picker_on_click:
@@ -333,7 +339,6 @@ class PresetTextCell(QWidget):
         self._editing = True
         self._edit_snapshot = self._value
         self._editor.setPlainText(self._value)
-        self._stack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self._stack.setCurrentWidget(self._editor)
         self.setCursor(Qt.CursorShape.IBeamCursor)
         self._editor.setFocus()
@@ -355,7 +360,7 @@ class PresetTextCell(QWidget):
         new_val = self._editor.toPlainText().strip()
         self._editing = False
         self._suppress_open = False
-        self._stack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._stack.setCurrentWidget(self._label)
         self.set_value(new_val)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         if new_val != self._edit_snapshot:
@@ -366,7 +371,7 @@ class PresetTextCell(QWidget):
             return
         self._editing = False
         self._suppress_open = False
-        self._stack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._stack.setCurrentWidget(self._label)
         self.set_value(self._edit_snapshot)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 

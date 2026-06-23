@@ -46,17 +46,17 @@ class TableEmptyState(QWidget):
 
         self._btn_regenerate = QPushButton("📅 Regenerează zilele lunii")
         self._btn_regenerate.setObjectName("btnPrimary")
-        self._btn_regenerate.clicked.connect(self.regenerate_clicked.emit)
+        self._btn_regenerate.clicked.connect(lambda: self.regenerate_clicked.emit())
         btn_layout.addWidget(self._btn_regenerate)
 
         self._btn_copy = QPushButton("⎘ Copiază din luna trecută")
         self._btn_copy.setObjectName("btnGhost")
-        self._btn_copy.clicked.connect(self.copy_month_clicked.emit)
+        self._btn_copy.clicked.connect(lambda: self.copy_month_clicked.emit())
         btn_layout.addWidget(self._btn_copy)
 
         self._btn_add = QPushButton("+ Adaugă primul rând")
         self._btn_add.setObjectName("btnPrimary")
-        self._btn_add.clicked.connect(self.add_row_clicked.emit)
+        self._btn_add.clicked.connect(lambda: self.add_row_clicked.emit())
         btn_layout.addWidget(self._btn_add)
 
         layout.addWidget(btn_row)
