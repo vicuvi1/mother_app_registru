@@ -373,6 +373,8 @@ class Instruiri(Base):
     tema_instruirii: Mapped[str | None] = mapped_column(Text, nullable=True)
     formator: Mapped[str | None] = mapped_column(String, nullable=True)
     total_participanti: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_feminin: Mapped[int] = mapped_column(Integer, default=0)
     adulti: Mapped[int] = mapped_column(Integer, default=0)
     copii_pana_16: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -430,6 +432,8 @@ class ActivitatiOnline(Base):
     vizualizari: Mapped[int] = mapped_column(Integer, default=0)
     impact: Mapped[int] = mapped_column(Integer, default=0)
     participanti_total: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_feminin: Mapped[int] = mapped_column(Integer, default=0)
     participanti_adulti: Mapped[int] = mapped_column(Integer, default=0)
     participanti_copii: Mapped[int] = mapped_column(Integer, default=0)
 

@@ -11,9 +11,7 @@ SUB = [
 G_DIN_CARE = "Din care"
 G_VIZITE = "Vizite virtuale"
 G_VIZITATORI = "Vizitatori virtuali"
-G_FB = "Facebook"
-G_IG = "Instagram"
-G_TW = "Twitter"
+G_RETELE = "Indicatori ai rețelelor sociale"
 
 COLUMNS = [
     ColumnDef("data", "date", editable=False),
@@ -25,15 +23,15 @@ COLUMNS = [
     ColumnDef("vizitatori_virtuali_total", "int", group=G_VIZITATORI, computed_from=["vizitatori_virtuali_pagina_web", "vizitatori_virtuali_blog"]),
     ColumnDef("vizitatori_virtuali_pagina_web", "int", group=G_VIZITATORI),
     ColumnDef("vizitatori_virtuali_blog", "int", group=G_VIZITATORI),
-    ColumnDef("facebook_vizualizari", "int", group=G_FB),
-    ColumnDef("facebook_impact", "int", group=G_FB),
-    ColumnDef("facebook_interactiuni", "int", group=G_FB),
-    ColumnDef("instagram_vizualizari", "int", group=G_IG),
-    ColumnDef("instagram_impact", "int", group=G_IG),
-    ColumnDef("instagram_interactiuni", "int", group=G_IG),
-    ColumnDef("twitter_vizualizari", "int", group=G_TW),
-    ColumnDef("twitter_impact", "int", group=G_TW),
-    ColumnDef("twitter_interactiuni", "int", group=G_TW),
+    ColumnDef("facebook_vizualizari", "int", group=G_RETELE),
+    ColumnDef("facebook_impact", "int", group=G_RETELE),
+    ColumnDef("facebook_interactiuni", "int", group=G_RETELE),
+    ColumnDef("instagram_vizualizari", "int", group=G_RETELE),
+    ColumnDef("instagram_impact", "int", group=G_RETELE),
+    ColumnDef("instagram_interactiuni", "int", group=G_RETELE),
+    ColumnDef("twitter_vizualizari", "int", group=G_RETELE),
+    ColumnDef("twitter_impact", "int", group=G_RETELE),
+    ColumnDef("twitter_interactiuni", "int", group=G_RETELE),
 ]
 
 COMPUTED = {

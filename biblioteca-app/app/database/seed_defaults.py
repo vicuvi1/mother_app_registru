@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from database.models import EtichetaCustom, Personal, RangeConfig
+from database.models import EtichetaCustom, Personal, RangeConfig, TextPreset
 
 DEFAULT_PERSONAL = [
     "Bărbuță O.",
@@ -154,8 +154,8 @@ DEFAULT_ETICHETE: dict[str, list[tuple[str, str]]] = {
         ("tema_instruirii", "Tema instruirii"),
         ("formator", "Formator (nume, prenume)"),
         ("total_participanti", "Total participanți"),
-        ("adulti", "Adulți"),
-        ("copii_pana_16", "Din care copii până la 16 ani"),
+        ("participanti_masculin", "Masculin"),
+        ("participanti_feminin", "Feminin"),
     ],
     "part_11": [
         ("data", "Data"),
@@ -173,8 +173,8 @@ DEFAULT_ETICHETE: dict[str, list[tuple[str, str]]] = {
         ("vizualizari", "Vizualizări"),
         ("impact", "Impact"),
         ("participanti_total", "Total participanți"),
-        ("participanti_adulti", "Adulți"),
-        ("participanti_copii", "Copii până la 16 ani"),
+        ("participanti_masculin", "Masculin"),
+        ("participanti_feminin", "Feminin"),
     ],
     "part_13": [
         ("partener", "Partener"),
@@ -241,17 +241,74 @@ PERSOANE_ZI_COLS = {
     ],
     "part_09": [
         "ore_formala", "ore_non_formala", "ore_informala",
-        "total_participanti", "adulti", "copii_pana_16",
+        "total_participanti", "participanti_masculin", "participanti_feminin",
     ],
     "part_11": ["total_activitati", "din_care_expozitii", "total_participanti"],
     "part_12": [
-        "vizualizari", "impact", "participanti_total", "participanti_adulti", "participanti_copii",
+        "vizualizari", "impact", "participanti_total", "participanti_masculin", "participanti_feminin",
     ],
     "part_13": ["participanti_total", "participanti_adulti", "participanti_copii", "impact"],
     "part_14": ["numar_ore"],
 }
 
 ACTIVITATI_ZI_PARTS = {"part_05", "part_06", "part_09", "part_11", "part_12"}
+
+DEFAULT_TEXT_PRESETS: dict[tuple[str, str], list[str]] = {
+    ("part_05", "statut_socio_profesional"): [
+        "Elev",
+        "Student",
+        "Profesor",
+        "Pensionar",
+        "Muncitor",
+        "Intelectual",
+        "Casnică",
+        "Șomer",
+        "Coordonator",
+    ],
+    ("part_09", "tema_instruirii"): [
+        "Clubul de dame - pe table și online",
+        "Engleza este amuzantă cu jocuri și cântece",
+        "Informare utilizatori noi",
+        "Workshop digital literacy",
+        "Utilizarea catalogului online",
+        "Reguli de comportament în bibliotecă",
+        "Cum găsim informația rapid",
+    ],
+    ("part_12", "tipul_activitatii"): [
+        "Expoziție",
+        "Activitate literar-culturală",
+        "Oră educativă",
+        "Oră de lectură",
+        "Oră de desen",
+        "Excursie",
+    ],
+    ("part_12", "platforma"): [
+        "Facebook",
+        "Instagram",
+        "Zoom",
+        "YouTube",
+        "TikTok",
+    ],
+}
+
+
+def seed_text_presets() -> None:
+    """Liste preset text — adaugă valori lipsă fără a șterge personalizările."""
+    from database.db_manager import get_session
+
+    with get_session() as session:
+        for (parte, camp), values in DEFAULT_TEXT_PRESETS.items():
+            for valoare in values:
+                exists = session.scalar(
+                    select(TextPreset.id).where(
+                        TextPreset.parte == parte,
+                        TextPreset.camp == camp,
+                        TextPreset.valoare == valoare,
+                    ).limit(1)
+                )
+                if exists is None:
+                    session.add(TextPreset(parte=parte, camp=camp, valoare=valoare))
+        session.commit()
 
 
 def seed_personal(session: Session) -> None:
@@ -307,3 +364,4 @@ def seed_all_defaults(session: Session) -> None:
     seed_personal(session)
     seed_etichete(session)
     seed_range_configs(session)
+    seed_text_presets()

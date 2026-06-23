@@ -15,11 +15,11 @@ COLUMNS = [
     ColumnDef("ore_formala", "int", group=FORMA),
     ColumnDef("ore_non_formala", "int", group=FORMA),
     ColumnDef("ore_informala", "int", group=FORMA),
-    ColumnDef("tema_instruirii", "inline_text"),
+    ColumnDef("tema_instruirii", "preset_text"),
     ColumnDef("formator", "responsabil"),
     ColumnDef("total_participanti", "int", group=PARTICIPANTI),
-    ColumnDef("adulti", "int", group=PARTICIPANTI),
-    ColumnDef("copii_pana_16", "int", group=PARTICIPANTI),
+    ColumnDef("participanti_masculin", "int", group=PARTICIPANTI),
+    ColumnDef("participanti_feminin", "int", group=PARTICIPANTI),
 ]
 
 

@@ -158,6 +158,57 @@ def migrate_etichete_part06() -> None:
     migrate_etichete_for_part("part_06")
 
 
+def migrate_part09_part12_gender_columns() -> None:
+    """Coloane masculin/feminin pentru Părțile IX și XII."""
+    _add_column("instruiri", "participanti_masculin", "INTEGER DEFAULT 0")
+    _add_column("instruiri", "participanti_feminin", "INTEGER DEFAULT 0")
+    _add_column("activitati_online", "participanti_masculin", "INTEGER DEFAULT 0")
+    _add_column("activitati_online", "participanti_feminin", "INTEGER DEFAULT 0")
+
+    if "instruiri" in inspect(_engine()).get_table_names():
+        with _engine().connect() as conn:
+            conn.execute(
+                text(
+                    "UPDATE instruiri SET participanti_masculin = adulti "
+                    "WHERE participanti_masculin = 0 AND adulti > 0"
+                )
+            )
+            conn.execute(
+                text(
+                    "UPDATE instruiri SET participanti_feminin = copii_pana_16 "
+                    "WHERE participanti_feminin = 0 AND copii_pana_16 > 0"
+                )
+            )
+            conn.commit()
+
+    if "activitati_online" in inspect(_engine()).get_table_names():
+        with _engine().connect() as conn:
+            conn.execute(
+                text(
+                    "UPDATE activitati_online SET participanti_masculin = participanti_adulti "
+                    "WHERE participanti_masculin = 0 AND participanti_adulti > 0"
+                )
+            )
+            conn.execute(
+                text(
+                    "UPDATE activitati_online SET participanti_feminin = participanti_copii "
+                    "WHERE participanti_feminin = 0 AND participanti_copii > 0"
+                )
+            )
+            conn.commit()
+
+
+def migrate_etichete_part09_part12() -> None:
+    migrate_etichete_for_part("part_09")
+    migrate_etichete_for_part("part_12")
+
+
+def migrate_text_presets() -> None:
+    from database.seed_defaults import seed_text_presets
+
+    seed_text_presets()
+
+
 # Tabele cu coloane an/luna — index pentru încărcare rapidă lună/an
 _INDEXED_TABLES: list[tuple[str, bool]] = [
     ("evidenta_utilizatori", False),
@@ -194,7 +245,7 @@ def migrate_indexes() -> None:
             )
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def migrate_schema_version() -> None:
@@ -210,6 +261,10 @@ def migrate_schema_version() -> None:
     except ValueError:
         ver = 0
     if ver < SCHEMA_VERSION:
+        if ver < 3:
+            migrate_part09_part12_gender_columns()
+            migrate_etichete_part09_part12()
+            migrate_text_presets()
         migrate_indexes()
         set_setting("schema_version", str(SCHEMA_VERSION))
 
@@ -219,4 +274,7 @@ def run_migrations() -> None:
     migrate_etichete_part05()
     migrate_part06_columns()
     migrate_etichete_part06()
+    migrate_part09_part12_gender_columns()
+    migrate_etichete_part09_part12()
+    migrate_text_presets()
     migrate_schema_version()

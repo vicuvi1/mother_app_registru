@@ -234,7 +234,7 @@ class PresetTextCell(QWidget):
         self._label = QLabel()
         self._label.setObjectName("presetTextLabel")
         self._label.setWordWrap(True)
-        self._label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
 
         self._editor = InlineTextEdit(cell=self)

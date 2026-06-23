@@ -315,6 +315,7 @@ QTabBar::tab:hover:!selected {
     border-right: 1px solid #d4dce8;
     border-bottom: 1px solid #d4dce8;
     padding: 2px 4px;
+    text-align: center;
 }
 
 #dataTable QHeaderView::section {

@@ -218,8 +218,8 @@ def _gen_part07_row(ranges: dict[str, tuple[int, int]]) -> dict[str, Any]:
 
 def _gen_part09_row(ranges: dict[str, tuple[int, int]], data: str, personal: list[str]) -> dict[str, Any]:
     total = _rng("part_09", "total_participanti", ranges)
-    copii = min(_rng("part_09", "copii_pana_16", ranges), total)
-    adulti = max(0, total - copii)
+    feminin = min(_rng("part_09", "participanti_feminin", ranges), total)
+    masculin = max(0, total - feminin)
     return {
         "data": data,
         "format_online": random.choice([True, False]),
@@ -230,8 +230,8 @@ def _gen_part09_row(ranges: dict[str, tuple[int, int]], data: str, personal: lis
         "tema_instruirii": random.choice(DEFAULT_TEME_INSTRUIRI),
         "formator": random.choice(personal) if personal else "",
         "total_participanti": total,
-        "adulti": adulti,
-        "copii_pana_16": copii,
+        "participanti_masculin": masculin,
+        "participanti_feminin": feminin,
     }
 
 
@@ -345,7 +345,7 @@ def generate_month_data(
         n = max(1, len(days) // 4)
         for d in random.sample(days, min(n, len(days))):
             total = _rng(parte, "participanti_total", ranges)
-            copii = min(_rng(parte, "participanti_copii", ranges), total)
+            feminin = min(_rng(parte, "participanti_feminin", ranges), total)
             rows.append({
                 "data": d,
                 "denumirea_activitatii": "Activitate online",
@@ -354,8 +354,8 @@ def generate_month_data(
                 "vizualizari": _rng(parte, "vizualizari", ranges),
                 "impact": _rng(parte, "impact", ranges),
                 "participanti_total": total,
-                "participanti_adulti": max(0, total - copii),
-                "participanti_copii": copii,
+                "participanti_masculin": max(0, total - feminin),
+                "participanti_feminin": feminin,
             })
 
     if categorie_varsta:

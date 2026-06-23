@@ -14,8 +14,8 @@ COLUMNS = [
     ColumnDef("vizualizari", "int"),
     ColumnDef("impact", "int"),
     ColumnDef("participanti_total", "int", group=G_PARTICIPANTI),
-    ColumnDef("participanti_adulti", "int", group=G_PARTICIPANTI),
-    ColumnDef("participanti_copii", "int", group=G_PARTICIPANTI),
+    ColumnDef("participanti_masculin", "int", group=G_PARTICIPANTI),
+    ColumnDef("participanti_feminin", "int", group=G_PARTICIPANTI),
 ]
 
 
