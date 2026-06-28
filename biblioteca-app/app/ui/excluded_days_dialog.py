@@ -22,11 +22,18 @@ from core.constants_manager import get_excluded_days_for_year, set_excluded_days
 
 
 class ExcludedDaysDialog(QDialog):
-    def __init__(self, parent=None, default_year: int | None = None) -> None:
+    def __init__(
+        self,
+        parent=None,
+        default_year: int | None = None,
+        default_month: int | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Zile nelucrătoare (concediu)")
         self.setMinimumSize(520, 480)
 
+        self._initial_month = default_month
+        self._saved_year: int | None = None
         self._excluded: set[str] = set()
         self._fmt_excluded = self._make_excluded_format()
         self._fmt_weekend = self._make_weekend_format()
@@ -34,10 +41,26 @@ class ExcludedDaysDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
-                "Click pe zilele din calendar pentru a le marca ca nelucrătoare (concediu, sărbători, etc.).\n"
-                "Zilele marcate cu roșu nu apar în registru și nu sunt incluse la „Generează automat”."
+                "Sâmbăta și duminica sunt <b>automat excluse</b> din registru (nu trebuie marcate).\n"
+                "Click pe zilele <b>luni–vineri</b> pentru concediu/sărbători — marcate cu roșu.\n"
+                "Zilele marcate nu apar în tabele și nu sunt incluse la „Generează automat”."
             )
         )
+        self._context_label = QLabel()
+        self._context_label.setStyleSheet("color: #0f766e; font-weight: 600;")
+        if default_month and 1 <= default_month <= 12:
+            from core.constants_manager import LUNI_RO
+
+            layout.addWidget(
+                self._context_label,
+            )
+            self._context_label.setText(
+                f"Registrul afișează: {LUNI_RO[default_month - 1]} {default_year or date.today().year} "
+                f"— marcați zilele nelucrătoare pentru această lună."
+            )
+        else:
+            self._context_label.hide()
+            layout.addWidget(self._context_label)
 
         top = QHBoxLayout()
         top.addWidget(QLabel("Anul:"))
@@ -116,10 +139,15 @@ class ExcludedDaysDialog(QDialog):
 
         self._calendar.setDateRange(QDate(year, 1, 1), QDate(year, 12, 31))
         today = date.today()
-        if today.year == year:
-            self._calendar.setSelectedDate(QDate(today.year, today.month, today.day))
+        if self._initial_month and 1 <= self._initial_month <= 12:
+            month = self._initial_month
+            self._initial_month = None
+        elif today.year == year:
+            month = today.month
         else:
-            self._calendar.setSelectedDate(QDate(year, 1, 1))
+            month = 1
+        day = today.day if today.year == year and month == today.month else 1
+        self._calendar.setSelectedDate(QDate(year, month, day))
 
         self._paint_calendar()
         self._update_labels()
@@ -149,6 +177,8 @@ class ExcludedDaysDialog(QDialog):
 
     def _toggle_day(self, qdate: QDate) -> None:
         if qdate.year() != self._year.value():
+            return
+        if qdate.dayOfWeek() in (Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday):
             return
         dd_mm = f"{qdate.day():02d}.{qdate.month():02d}"
         if dd_mm in self._excluded:
@@ -202,6 +232,10 @@ class ExcludedDaysDialog(QDialog):
         self._paint_calendar()
         self._update_labels()
 
+    def saved_year(self) -> int | None:
+        """Anul pentru care s-au salvat zilele (după accept)."""
+        return self._saved_year
+
     def _save(self) -> None:
         year = self._year.value()
         by_month: dict[int, list[str]] = {m: [] for m in range(1, 13)}
@@ -209,4 +243,5 @@ class ExcludedDaysDialog(QDialog):
             _day, mon = dd_mm.split(".")
             by_month[int(mon)].append(dd_mm)
         set_excluded_days_for_year(year, by_month)
+        self._saved_year = year
         self.accept()

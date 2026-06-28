@@ -40,12 +40,29 @@ class PartCacheMixin:
         return (year or self._loaded_year, month or self._loaded_month, categorie)
     def _snapshot_table(self, table: EditableTable) -> dict:
         ids = table.get_row_ids()
+        row_extra: list[dict] = []
+        store = getattr(getattr(table, "_register_model", None), "store", None)
+        if store is not None and hasattr(store, "row_extra"):
+            row_extra = [dict(x) for x in store.row_extra]
+        elif hasattr(table, "_row_extra"):
+            row_extra = [dict(x) for x in table._row_extra]
         return {
             "rows": table.get_data_rows(),
             "ids": ids,
             "flags": table.get_auto_flags(),
+            "row_extra": row_extra,
             "db_empty": self.mode == "daily" and bool(ids) and all(i is None for i in ids),
         }
+
+    def _restore_table_row_extra(self, table: EditableTable, cached: dict) -> None:
+        extras = cached.get("row_extra") or []
+        if not extras:
+            return
+        store = getattr(getattr(table, "_register_model", None), "store", None)
+        if store is not None:
+            store.row_extra = [dict(x) for x in extras]
+        elif hasattr(table, "_row_extra"):
+            table._row_extra = [dict(x) for x in extras]
     def _cache_current_period(self) -> None:
         """Memorează starea tabelelor pentru perioada curentă (înainte de navigare)."""
         y, m = self._loaded_year, self._loaded_month
@@ -131,10 +148,6 @@ class PartCacheMixin:
             result[k] = result.get(k, 0) + v
         return result
     def _load_current(self, fast: bool = False) -> None:
-        if fast and self.has_copii_adulti:
-            self._load_table(self._active_table(), self._active_category(), fast=True)
-            self._schedule_preload_adjacent()
-            return
         if self.has_copii_adulti:
             self._load_table(self.table_copii, "copii", fast=fast)
             self._load_table(self.table_adulti, "adulti", fast=fast)
@@ -179,11 +192,16 @@ class PartCacheMixin:
 
         if self.mode == "monthly" and not rows_data:
             rows_data, row_ids, auto_flags = self._ensure_monthly_rows(categorie)
-        elif self.mode == "daily" and not rows_data:
+        elif self.mode == "daily":
             saved_year, saved_month = self._loaded_year, self._loaded_month
             self._loaded_year, self._loaded_month = y, m
             try:
-                rows_data, row_ids, auto_flags = self._ensure_daily_rows(categorie)
+                if not rows_data:
+                    rows_data, row_ids, auto_flags = self._ensure_daily_rows(categorie)
+                else:
+                    rows_data, row_ids, auto_flags = self._merge_daily_rows(
+                        rows_data, row_ids, auto_flags, categorie, y, m
+                    )
             finally:
                 self._loaded_year, self._loaded_month = saved_year, saved_month
 
@@ -203,6 +221,7 @@ class PartCacheMixin:
             resize=not fast,
             resize_rows=not fast,
         )
+        self._restore_table_row_extra(table, cached)
         self._update_totals(table, categorie, fast=fast)
         is_active = table is self._active_table()
         self._refresh_table_chrome(table, cached, update_stack=is_active)
@@ -213,6 +232,8 @@ class PartCacheMixin:
         QTimer.singleShot(2000, self._preload_all_months)
     def _deferred_persist(self, year: int, month: int) -> None:
         if self._save_pending:
+            if (year, month) not in self._queued_persist_periods:
+                self._queued_persist_periods.append((year, month))
             return
         self._save_pending = True
         try:
@@ -226,6 +247,11 @@ class PartCacheMixin:
             QMessageBox.warning(self, "Eroare salvare", f"Nu s-au putut salva datele:\n{exc}")
         finally:
             self._save_pending = False
+            if self._queued_persist_periods:
+                next_year, next_month = self._queued_persist_periods.pop(0)
+                QTimer.singleShot(
+                    0, lambda y=next_year, m=next_month: self._deferred_persist(y, m)
+                )
     def _persist_cached_period(self, year: int, month: int) -> None:
         categories: list[str | None] = (
             ["copii", "adulti"] if self.has_copii_adulti else [None]

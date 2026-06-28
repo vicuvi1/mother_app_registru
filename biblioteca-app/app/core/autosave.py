@@ -57,24 +57,34 @@ class AutosaveManager(QObject):
                         "Autosalvarea a eșuat. Apăsați Ctrl+S pentru a reîncerca."
                     )
 
-    def on_page_changed(self) -> None:
-        if getattr(self._main_window, "_export_in_progress", False):
+    def save_leaving_page(self, page) -> None:
+        """Salvează pagina părăsită (înainte de schimbarea din stack)."""
+        if page is None or getattr(self._main_window, "_export_in_progress", False):
             return
-        page = self._current_part_page()
-        if page is not None and hasattr(page, "save_all"):
-            if hasattr(page, "_debounce") and page._debounce.isActive():
-                page._debounce.stop()
-                if not page.save_all(show_status=True):
-                    if hasattr(self._main_window, "show_save_error"):
-                        self._main_window.show_save_error(
-                            "Nu s-au putut salva modificările la schimbarea părții."
-                        )
-            elif getattr(page, "_dirty", False):
-                if not page.save_all(show_status=True):
-                    if hasattr(self._main_window, "show_save_error"):
-                        self._main_window.show_save_error(
-                            "Nu s-au putut salva modificările la schimbarea părții."
-                        )
+        if hasattr(page, "flush_pending_save"):
+            if not page.flush_pending_save():
+                if hasattr(self._main_window, "show_save_error"):
+                    self._main_window.show_save_error(
+                        "Nu s-au putut salva modificările la schimbarea părții."
+                    )
+            return
+        if hasattr(page, "_debounce") and page._debounce.isActive():
+            page._debounce.stop()
+            if hasattr(page, "save_all") and not page.save_all(show_status=True):
+                if hasattr(self._main_window, "show_save_error"):
+                    self._main_window.show_save_error(
+                        "Nu s-au putut salva modificările la schimbarea părții."
+                    )
+        elif getattr(page, "_dirty", False) and hasattr(page, "save_all"):
+            if not page.save_all(show_status=True):
+                if hasattr(self._main_window, "show_save_error"):
+                    self._main_window.show_save_error(
+                        "Nu s-au putut salva modificările la schimbarea părții."
+                    )
+
+    def on_page_changed(self) -> None:
+        """Compatibilitate — salvează pagina curentă (folosiți save_leaving_page înainte de switch)."""
+        self.save_leaving_page(self._current_part_page())
 
     def _current_part_page(self):
         stack = self._main_window._content_stack

@@ -20,7 +20,7 @@ from ui.widgets.table_find_bar import TableFindBar
 from ui.widgets.table.column_def import ColumnDef
 from ui.widgets.table.delegates.checkbox_delegate import CheckBoxDelegate
 from ui.widgets.table.delegates.responsabil_delegate import ResponsabilDelegate
-from ui.widgets.table.grouped_header import GroupedHeaderView
+from ui.widgets.table.grouped_header import GroupedHeaderView, header_label_width
 from ui.widgets.table.register_table_model import RegisterTableModel
 
 
@@ -59,6 +59,7 @@ class RegisterTableView(QTableView):
         self._grouped_header = GroupedHeaderView(self)
         self.setHorizontalHeader(self._grouped_header)
 
+        self.setSizeAdjustPolicy(QAbstractItemView.SizeAdjustPolicy.AdjustIgnored)
         self.setAlternatingRowColors(True)
         self.setShowGrid(True)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
@@ -72,7 +73,7 @@ class RegisterTableView(QTableView):
         self.verticalHeader().setDefaultSectionSize(40)
         self.horizontalHeader().setDefaultSectionSize(88)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setStretchLastSection(False)
         self.horizontalHeader().sectionDoubleClicked.connect(self._edit_header_label)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -190,6 +191,10 @@ class RegisterTableView(QTableView):
         index = self.currentIndex()
         if not index.isValid() or not self.is_data_row(index.row()):
             return
+        widget = self.indexWidget(index)
+        if isinstance(widget, PresetTextCell):
+            QGuiApplication.clipboard().setText(widget.value())
+            return
         val = self._register_model.data(index, Qt.ItemDataRole.DisplayRole)
         QGuiApplication.clipboard().setText(str(val if val is not None else ""))
 
@@ -233,6 +238,8 @@ class RegisterTableView(QTableView):
                 parsed = self._parse_paste_value(col_def, raw)
                 if parsed is None:
                     continue
+                if not self._accept_parsed_value(row, col_def, parsed):
+                    continue
                 data_rows[row][col_def.key] = parsed
                 changed = True
 
@@ -260,6 +267,16 @@ class RegisterTableView(QTableView):
         if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
             return False
         return ""
+
+    def _accept_parsed_value(self, row: int, col_def: ColumnDef, parsed) -> bool:
+        validator = self._register_model._cell_validator
+        if validator is None:
+            return True
+        ok, msg = validator(row, col_def.key, parsed)
+        if not ok:
+            self.validation_error.emit(msg or "Valoare nepermisă")
+            return False
+        return True
 
     def _parse_paste_value(self, col_def: ColumnDef, raw: str):
         text = raw.strip()
@@ -294,6 +311,7 @@ class RegisterTableView(QTableView):
         self._columns = list(columns)
         self._column_keys = [c.key for c in columns]
         self._groups = [c.group or "" for c in columns]
+        self._super_groups = [c.super_group or "" for c in columns]
         self._computed_rules = computed_rules or {}
         self._part_id = part_id
         self._register_model.setup(columns, computed_rules, part_id=part_id)
@@ -308,7 +326,7 @@ class RegisterTableView(QTableView):
 
     def set_header_labels(self, labels: list[str]) -> None:
         self._header_labels = list(labels)
-        self._grouped_header.set_model_groups(labels, self._groups)
+        self._grouped_header.set_model_groups(labels, self._groups, self._super_groups)
 
     def _edit_header_label(self, section: int) -> None:
         if section < 0 or section >= len(self._column_keys):
@@ -323,7 +341,9 @@ class RegisterTableView(QTableView):
         )
         if ok and new_text.strip():
             self._header_labels[section] = new_text.strip()
-            self._grouped_header.set_model_groups(self._header_labels, self._groups)
+            self._grouped_header.set_model_groups(
+                self._header_labels, self._groups, self._super_groups
+            )
             self.header_label_changed.emit(col_key, new_text.strip())
 
     def load_rows(
@@ -342,19 +362,51 @@ class RegisterTableView(QTableView):
         if resize_rows:
             for r in range(self._register_model.rowCount()):
                 self.setRowHeight(r, 34 if self.store.is_total_row(r) else 40)
+        self.horizontalHeader().updateGeometry()
+
+    def refresh_horizontal_layout(self) -> None:
+        """Dimensionează coloanele o dată; apoi doar actualizează intervalul de scroll."""
+        if not self._columns_sized:
+            self.resize_columns_to_contents()
+            self._columns_sized = True
+        self.horizontalHeader().updateGeometry()
+        self.viewport().update()
 
     def update_today_highlight(self, date_field: str, dd_mm: str | None) -> None:
         self._register_model.set_highlight_date(date_field, dd_mm)
 
+    def _header_width_for_column(self, index: int) -> int:
+        col = self._columns[index]
+        label = self._header_labels[index] if index < len(self._header_labels) else col.key
+        width = header_label_width(label)
+        if col.group:
+            span = sum(
+                1
+                for c in self._columns
+                if c.group == col.group and (c.super_group or "") == (col.super_group or "")
+            )
+            width = max(width, header_label_width(col.group) // max(1, span) + 14)
+        if col.super_group:
+            span = sum(1 for c in self._columns if c.super_group == col.super_group)
+            width = max(width, header_label_width(col.super_group) // max(1, span) + 10)
+        return width
+
     def resize_columns_to_contents(self) -> None:
+        if not self._columns:
+            return
         self.resizeColumnsToContents()
         for i, col in enumerate(self._columns):
-            min_w = 72
-            max_w = 200 if col.col_type in ("text", "date") else 200
-            if self.columnWidth(i) < min_w:
-                self.setColumnWidth(i, min_w)
-            elif self.columnWidth(i) > max_w:
-                self.setColumnWidth(i, max_w)
+            header_w = self._header_width_for_column(i)
+            data_w = self.columnWidth(i)
+            if col.col_type in ("preset_text", "inline_text"):
+                floor = 140
+            elif col.col_type in ("text", "date", "responsabil"):
+                floor = 88
+            else:
+                floor = 72
+            self.setColumnWidth(i, max(floor, data_w, header_w))
+        self.horizontalHeader().updateGeometry()
+        self.viewport().update()
 
     def rowCount(self) -> int:
         return self._register_model.rowCount()
@@ -383,21 +435,29 @@ class RegisterTableView(QTableView):
         return self.store.compute_column_sums()
 
     def add_total_row(self, label: str, sums: dict[str, int]) -> None:
-        totals = list(self.store.total_rows)
-        replaced = False
-        for i, (lbl, _) in enumerate(totals):
-            if lbl == label:
-                totals[i] = (label, dict(sums))
-                replaced = True
-                break
-        if not replaced:
+        if any(lbl == label for lbl, _ in self.store.total_rows):
+            self._register_model.update_total(label, sums)
+        else:
+            totals = list(self.store.total_rows)
             totals.append((label, dict(sums)))
-        self._register_model.set_total_rows(totals)
+            self._register_model.set_total_rows(totals)
+            self._sync_preset_widgets()
         for r in range(self._register_model.rowCount()):
             self.setRowHeight(r, 34 if self.store.is_total_row(r) else 40)
 
     def update_totals_only(self, label: str, sums: dict[str, int]) -> None:
-        self.add_total_row(label, sums)
+        """Actualizează rândul Total fără resetarea modelului (păstrează editorul deschis)."""
+        had_label = any(lbl == label for lbl, _ in self.store.total_rows)
+        self._register_model.update_total(label, sums)
+        if not had_label:
+            self._sync_preset_widgets()
+            for r in range(self._register_model.rowCount()):
+                self.setRowHeight(r, 34 if self.store.is_total_row(r) else 40)
+
+    def is_editing_cell(self) -> bool:
+        if self.state() == QAbstractItemView.State.EditingState:
+            return True
+        return any(cell.is_editing() for cell in self._preset_cells)
 
     def set_row_ids(self, ids: list[int | None]) -> None:
         self.store.row_ids = list(ids)
@@ -406,6 +466,16 @@ class RegisterTableView(QTableView):
         while len(self.store.row_extra) <= data_row_index:
             self.store.row_extra.append({})
         self.store.row_extra[data_row_index][key] = value
+
+    def set_data_cell_silent(self, data_row: int, key: str, value: Any) -> bool:
+        """Actualizează o celulă fără a emite cell_edited (pentru sincronizări automate)."""
+        if key not in self._column_keys or not self.is_data_row(data_row):
+            return False
+        col = self._column_keys.index(key)
+        self.store.set_cell(data_row, col, value)
+        idx = self._register_model.index(data_row, col)
+        self._register_model.dataChanged.emit(idx, idx)
+        return True
 
     def append_row(self, row_data: dict, row_id: int | None = None, is_auto: bool = False) -> int:
         rows = self.get_data_rows()
@@ -447,13 +517,13 @@ class RegisterTableView(QTableView):
                     parent=self,
                     picker_on_click=col.col_type == "preset_text",
                 )
-                cell.set_value(str(self._register_model.data(idx, Qt.ItemDataRole.DisplayRole) or ""))
+                cell.set_value(str(self._register_model.store.get_cell(r, c) or ""))
                 cell.setSizePolicy(
                     QSizePolicy.Policy.Expanding,
                     QSizePolicy.Policy.Expanding,
                 )
                 cell.value_changed.connect(
-                    lambda _v, row=r, col_idx=c: self._on_preset_changed(row, col_idx)
+                    lambda row=r, col_idx=c: self._on_preset_changed(row, col_idx)
                 )
                 self.setIndexWidget(idx, cell)
                 self._preset_cells.append(cell)
@@ -462,7 +532,9 @@ class RegisterTableView(QTableView):
         cell = self.sender()
         if not isinstance(cell, PresetTextCell):
             return
-        self._register_model.commit_widget_cell(row, col, cell.value())
+        value = cell.value()
+        cell.commit_new_value()
+        self._register_model.commit_widget_cell(row, col, value)
 
     def refresh_preset_dropdowns(self) -> None:
         for cell in self._preset_cells:

@@ -229,7 +229,10 @@ def get_text_presets(parte: str, camp: str) -> list[str]:
             .where(TextPreset.parte == parte, TextPreset.camp == camp)
             .order_by(TextPreset.valoare)
         ).all()
-        return list(rows)
+        presets = list(rows)
+    if parte == "part_09" and camp == "formator":
+        return sorted({*presets, *get_personal_names(active_only=True)})
+    return presets
 
 
 def set_text_presets(parte: str, camp: str, values: list[str]) -> None:
@@ -241,6 +244,9 @@ def set_text_presets(parte: str, camp: str, values: list[str]) -> None:
         for val in cleaned:
             session.add(TextPreset(parte=parte, camp=camp, valoare=val))
         session.commit()
+    if parte == "part_09" and camp == "formator":
+        for val in cleaned:
+            ensure_personal_in_list(val)
 
 
 def ensure_text_preset(parte: str, camp: str, valoare: str) -> None:
@@ -258,6 +264,8 @@ def ensure_text_preset(parte: str, camp: str, valoare: str) -> None:
         if not existing:
             session.add(TextPreset(parte=parte, camp=camp, valoare=valoare))
             session.commit()
+    if parte == "part_09" and camp == "formator":
+        ensure_personal_in_list(valoare)
 
 
 def _excluded_days_key(year: int) -> str:

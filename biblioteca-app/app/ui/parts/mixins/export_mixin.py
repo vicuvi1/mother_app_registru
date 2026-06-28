@@ -79,11 +79,17 @@ class PartExportMixin:
         with get_session() as session:
             recs = self._query_rows_period(session, categorie, year, month)
         rows = [self._record_to_dict(rec) for rec in recs]
-        if not rows:
-            if self.mode == "daily":
+        ids = [rec.id for rec in recs]
+        flags = [getattr(rec, "is_auto_generated", False) for rec in recs]
+        if self.mode == "daily":
+            if not rows:
                 rows = self._skeleton_daily(year, month, categorie)
-            elif self.mode == "monthly":
-                rows = self._skeleton_monthly()
+            else:
+                rows, ids, flags = self._merge_daily_rows(
+                    rows, ids, flags, categorie, year, month
+                )
+        elif not rows and self.mode == "monthly":
+            rows = self._skeleton_monthly()
         for row in rows:
             for col in self.columns:
                 if col.col_type == "int" and row.get(col.key) is None:

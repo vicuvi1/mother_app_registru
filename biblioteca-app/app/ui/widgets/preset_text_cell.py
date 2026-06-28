@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from core.constants_manager import get_all_etichete, get_text_presets
+from core.constants_manager import ensure_text_preset, get_all_etichete, get_text_presets
 
 
 def _widget_alive(widget: QWidget | None) -> bool:
@@ -157,8 +157,7 @@ class PresetPickerPopup(QFrame):
         self._search.setFocus()
 
     def _rebuild_list(self, filter_text: str = "") -> None:
-        if not self._all_values:
-            self._all_values = get_text_presets(self._parte, self._camp)
+        self._all_values = get_text_presets(self._parte, self._camp)
         filt = (filter_text if isinstance(filter_text, str) else self._search.text()).strip().casefold()
         self._list.clear()
         shown = [v for v in self._all_values if not filt or filt in v.casefold()]
@@ -301,7 +300,9 @@ class PresetTextCell(QWidget):
             self._popup.refresh()
 
     def commit_new_value(self) -> None:
-        pass
+        val = self.value()
+        if val:
+            ensure_text_preset(self._parte, self._camp, val)
 
     def close_picker(self) -> None:
         popup = self._popup
@@ -386,7 +387,6 @@ class PresetTextCell(QWidget):
         return table
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        self._handle_click(event)
         super().mouseReleaseEvent(event)
 
     def _handle_click(self, event: QMouseEvent) -> None:

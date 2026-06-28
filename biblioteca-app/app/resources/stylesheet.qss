@@ -416,15 +416,16 @@ QScrollArea {
 
 QScrollBar:horizontal {
     background: #e2e8f0;
-    height: 18px;
-    border-radius: 9px;
-    margin: 3px 4px;
+    height: 20px;
+    border-radius: 10px;
+    margin: 4px 6px;
 }
 
 QScrollBar::handle:horizontal {
     background: #3b82f6;
-    border-radius: 9px;
-    min-width: 48px;
+    border-radius: 10px;
+    min-width: 64px;
+    margin: 2px 3px;
 }
 
 QScrollBar::handle:horizontal:hover {
@@ -433,16 +434,17 @@ QScrollBar::handle:horizontal:hover {
 
 #tableHScrollTop {
     background: #dbeafe;
-    height: 22px;
+    height: 24px;
     border: 1px solid #93c5fd;
-    border-radius: 11px;
-    margin: 0 2px;
+    border-radius: 12px;
+    margin: 0 4px;
 }
 
 #tableHScrollTop::handle {
     background: #2563eb;
-    border-radius: 10px;
-    min-width: 56px;
+    border-radius: 11px;
+    min-width: 72px;
+    margin: 2px 4px;
 }
 
 #tableHScrollTop::handle:hover {
@@ -516,7 +518,7 @@ QCheckBox::indicator:checked {
 
 /* —— Liste text: celule și tag-uri —— */
 #presetTextCell {
-    background: transparent;
+    background: #ffffff;
 }
 
 #presetTextCell:hover {

@@ -10,6 +10,7 @@ class ColumnDef:
     editable: bool = True
     computed_from: list[str] | None = None
     group: str | None = None
+    super_group: str | None = None
     count_in_total: bool = False
 
     def counts_checked_in_total(self) -> bool:

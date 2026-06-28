@@ -34,6 +34,7 @@ class HomePage(QWidget):
         self.setObjectName("homePage")
         self._build_ui()
 
+    @property
     def year(self) -> int:
         return self._year.value()
 

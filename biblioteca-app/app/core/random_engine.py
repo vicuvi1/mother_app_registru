@@ -100,6 +100,15 @@ def _rng(parte: str, coloana: str, ranges: dict[str, tuple[int, int]]) -> int:
     return generate_random_in_range(lo, hi)
 
 
+def _gen_participanti_split(
+    parte: str, total_key: str, ranges: dict[str, tuple[int, int]]
+) -> tuple[int, int, int]:
+    total = _rng(parte, total_key, ranges)
+    feminin = min(_rng(parte, "participanti_feminin", ranges), total)
+    masculin = max(0, total - feminin)
+    return total, masculin, feminin
+
+
 def _gen_type_a_row(
     ranges: dict[str, tuple[int, int]],
     sources: list[str],
@@ -113,7 +122,7 @@ def _gen_type_a_row(
 
 def _gen_part01_row(ranges: dict[str, tuple[int, int]]) -> dict[str, int]:
     statut_cols = [
-        "adulti", "copii_pana_16", "prescolari", "elevi", "studenti",
+        "adulti", "copii_pana_16", "studenti",
         "intelectuali", "muncitori", "pensionari", "someri", "alte_categorii",
     ]
     varsta_cols = ["tineri_17_34", "adulti_35_64", "varstnici_65_plus"]
@@ -145,6 +154,9 @@ def _gen_part01_row(ranges: dict[str, tuple[int, int]]) -> dict[str, int]:
         row[c] = v
     for c, v in zip(sex_cols, sex):
         row[c] = v
+    # La generare automată: preșcolari = 0, elevi = copii (utilizatorul poate edita preșcolari manual).
+    row["prescolari"] = 0
+    row["elevi"] = int(row.get("copii_pana_16", 0))
     return row
 
 
@@ -191,6 +203,9 @@ def _gen_part03_row(ranges: dict[str, tuple[int, int]]) -> dict[str, Any]:
         row[c] = _rng("part_03", c, ranges)
     row["limba_romana"] = _rng("part_03", "limba_romana", ranges)
     row["alte_limbi"] = _rng("part_03", "alte_limbi", ranges)
+    from core.part_sync import apply_part03_default_mirrors
+
+    apply_part03_default_mirrors(row)
     return row
 
 
@@ -200,7 +215,10 @@ def _gen_part04_row(ranges: dict[str, tuple[int, int]]) -> dict[str, Any]:
         "czu_5_matematica", "czu_6_stiinte_aplicate", "czu_7_arte", "czu_8_limbi",
         "czu_9_geografie",
     ]
-    return _gen_type_a_row(ranges, czu, "total_imprumuturi")
+    row = {c: _rng("part_04", c, ranges) for c in czu}
+    # Totalul vine din Partea III la încărcare/sincronizare, nu din suma CZU.
+    row["total_imprumuturi"] = 0
+    return row
 
 
 def _gen_part07_row(ranges: dict[str, tuple[int, int]]) -> dict[str, Any]:
@@ -216,22 +234,87 @@ def _gen_part07_row(ranges: dict[str, tuple[int, int]]) -> dict[str, Any]:
     return row
 
 
-def _gen_part09_row(ranges: dict[str, tuple[int, int]], data: str, personal: list[str]) -> dict[str, Any]:
+def _gen_part09_forma(ranges: dict[str, tuple[int, int]]) -> dict[str, Any]:
+    kind = random.choice(["formala", "non_formala", "informala"])
+    ore_f = _rng("part_09", "ore_formala", ranges) if kind == "formala" else 0
+    ore_nf = _rng("part_09", "ore_non_formala", ranges) if kind == "non_formala" else 0
+    return {
+        "forma_formala": kind == "formala",
+        "ore_formala": ore_f,
+        "forma_non_formala": kind == "non_formala",
+        "ore_non_formala": ore_nf,
+        "forma_informala": kind == "informala",
+        "ore_informala": 0,
+    }
+
+
+def _gen_part09_copii_row(
+    ranges: dict[str, tuple[int, int]], data: str, personal: list[str]
+) -> dict[str, Any]:
     total = _rng("part_09", "total_participanti", ranges)
+    prescolari = min(_rng("part_09", "prescolari", ranges), total)
+    elevi = min(_rng("part_09", "elevi", ranges), max(0, total - prescolari))
+    rest = max(0, total - prescolari - elevi)
+    feminin = min(_rng("part_09", "participanti_feminin", ranges), rest)
+    masculin = max(0, rest - feminin)
+    return {
+        "data": data,
+        "format_online": random.choice([True, False]),
+        "format_offline": random.choice([True, False]),
+        **_gen_part09_forma(ranges),
+        "tema_instruirii": random.choice(DEFAULT_TEME_INSTRUIRI),
+        "formator": random.choice(personal) if personal else "",
+        "total_participanti": total,
+        "prescolari": prescolari,
+        "elevi": elevi,
+        "participanti_feminin": feminin,
+        "participanti_masculin": masculin,
+    }
+
+
+def _gen_part09_adulti_row(
+    ranges: dict[str, tuple[int, int]], data: str, personal: list[str]
+) -> dict[str, Any]:
+    total = _rng("part_09", "total_participanti", ranges)
+    studenti = min(_rng("part_09", "studenti", ranges), total)
+    intelectuali = min(_rng("part_09", "intelectuali", ranges), max(0, total - studenti))
+    pensionari = min(
+        _rng("part_09", "pensionari", ranges),
+        max(0, total - studenti - intelectuali),
+    )
+    someri = min(
+        _rng("part_09", "someri", ranges),
+        max(0, total - studenti - intelectuali - pensionari),
+    )
+    muncitori = min(
+        _rng("part_09", "muncitori", ranges),
+        max(0, total - studenti - intelectuali - pensionari - someri),
+    )
+    alte = max(0, total - studenti - intelectuali - pensionari - someri - muncitori)
+    tineri = min(_rng("part_09", "tineri_17_34", ranges), total)
+    adulti = min(_rng("part_09", "adulti_35_64", ranges), max(0, total - tineri))
+    varstnici = max(0, total - tineri - adulti)
     feminin = min(_rng("part_09", "participanti_feminin", ranges), total)
     masculin = max(0, total - feminin)
     return {
         "data": data,
         "format_online": random.choice([True, False]),
         "format_offline": random.choice([True, False]),
-        "ore_formala": _rng("part_09", "ore_formala", ranges),
-        "ore_non_formala": _rng("part_09", "ore_non_formala", ranges),
-        "ore_informala": _rng("part_09", "ore_informala", ranges),
+        **_gen_part09_forma(ranges),
         "tema_instruirii": random.choice(DEFAULT_TEME_INSTRUIRI),
         "formator": random.choice(personal) if personal else "",
         "total_participanti": total,
-        "participanti_masculin": masculin,
+        "studenti": studenti,
+        "intelectuali": intelectuali,
+        "pensionari": pensionari,
+        "someri": someri,
+        "muncitori": muncitori,
+        "alte_categorii": alte,
+        "tineri_17_34": tineri,
+        "adulti_35_64": adulti,
+        "varstnici_65_plus": varstnici,
         "participanti_feminin": feminin,
+        "participanti_masculin": masculin,
     }
 
 
@@ -311,13 +394,18 @@ def generate_month_data(
         ]
         for i, d in enumerate(random.sample(days, min(n, len(days)))):
             kind = i % 3
+            total, masculin, feminin = _gen_participanti_split(
+                parte, "numar_participanti", ranges
+            )
             rows.append({
                 "data": f"_r{i + 1}",
                 "grup_tinta_subiect": random.choice(subiecte),
                 "activitate_individuala": "DSI" if kind == 0 else "",
                 "activitate_grup": "Ziua specialistului" if kind == 1 else "",
                 "activitate_public_larg": "Ziua de informare" if kind == 2 else "",
-                "numar_participanti": _rng(parte, "numar_participanti", ranges),
+                "numar_participanti": total,
+                "participanti_masculin": masculin,
+                "participanti_feminin": feminin,
                 "documente_consultate": _rng(parte, "documente_consultate", ranges),
                 "responsabil": random.choice(personal) if personal else "",
             })
@@ -326,20 +414,26 @@ def generate_month_data(
         row["luna"] = luna
         rows.append(row)
     elif parte == "part_09":
+        gen = _gen_part09_copii_row if categorie_varsta == "copii" else _gen_part09_adulti_row
         for d in days:
             n_instr = random.randint(0, 2)
             for _ in range(n_instr):
-                rows.append(_gen_part09_row(ranges, d, personal))
+                rows.append(gen(ranges, d, personal))
     elif parte == "part_11":
         n = max(1, len(days) // 5)
         for _ in range(n):
+            total, masculin, feminin = _gen_participanti_split(
+                parte, "total_participanti", ranges
+            )
             rows.append({
                 "data": random.choice(days),
                 "total_activitati": 1,
                 "din_care_expozitii": random.choice([0, 1]),
                 "tipul_activitatii": random.choice(DEFAULT_TIPURI_ACTIVITATE),
                 "denumirea_activitatii": "Activitate culturală",
-                "total_participanti": _rng(parte, "total_participanti", ranges),
+                "total_participanti": total,
+                "participanti_masculin": masculin,
+                "participanti_feminin": feminin,
             })
     elif parte == "part_12":
         n = max(1, len(days) // 4)

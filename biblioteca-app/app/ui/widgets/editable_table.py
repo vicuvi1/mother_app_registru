@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
 from ui.widgets.responsabil_dropdown import ResponsabilDropdown
 from ui.widgets.preset_text_cell import InlineTextEdit, PresetTextCell
 from ui.widgets.table.column_def import ColumnDef
-from ui.widgets.table.grouped_header import GroupedHeaderView
+from ui.widgets.table.grouped_header import GroupedHeaderView, header_label_width
 
 AUTO_COLOR = QColor("#dbeafe")
 TOTAL_COLOR = QColor("#e2e8f0")
@@ -79,7 +79,7 @@ class EditableTable(QTableWidget):
         self.verticalHeader().setDefaultSectionSize(40)
         self.horizontalHeader().setDefaultSectionSize(88)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setStretchLastSection(False)
         self.horizontalHeader().sectionDoubleClicked.connect(self._edit_header_label)
         self.setWordWrap(True)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
@@ -224,10 +224,13 @@ class EditableTable(QTableWidget):
         self._columns = columns
         self._column_keys = [c.key for c in columns]
         self._groups = [c.group or "" for c in columns]
+        self._super_groups = [c.super_group or "" for c in columns]
         self._computed_rules = computed_rules or {}
         self.setColumnCount(len(columns))
         self.setHorizontalHeaderLabels([c.key for c in columns])
-        self._grouped_header.set_model_groups([c.key for c in columns], self._groups)
+        self._grouped_header.set_model_groups(
+            [c.key for c in columns], self._groups, self._super_groups
+        )
 
     def eventFilter(self, obj, event) -> bool:
         if obj is self.viewport():
@@ -336,7 +339,9 @@ class EditableTable(QTableWidget):
 
     def set_header_labels(self, labels: list[str]) -> None:
         self.setHorizontalHeaderLabels(labels)
-        self._grouped_header.set_model_groups(labels, getattr(self, "_groups", []))
+        self._grouped_header.set_model_groups(
+            labels, getattr(self, "_groups", []), getattr(self, "_super_groups", [])
+        )
 
     def _edit_header_label(self, section: int) -> None:
         if section < 0 or section >= len(self._column_keys):
@@ -356,18 +361,27 @@ class EditableTable(QTableWidget):
                 self.horizontalHeaderItem(i).text() if self.horizontalHeaderItem(i) else ""
                 for i in range(self.columnCount())
             ]
-            self._grouped_header.set_model_groups(labels, getattr(self, "_groups", []))
+            self._grouped_header.set_model_groups(
+                labels, getattr(self, "_groups", []), getattr(self, "_super_groups", [])
+            )
             self.header_label_changed.emit(col_key, new_text.strip())
 
     def resize_columns_to_contents(self) -> None:
+        if not self._columns:
+            return
         self.resizeColumnsToContents()
         for i, col in enumerate(self._columns):
-            min_w = 100 if col.col_type in ("preset_text", "inline_text") else 72
-            max_w = 260 if col.col_type in ("preset_text", "inline_text", "text") else 200
-            if self.columnWidth(i) < min_w:
-                self.setColumnWidth(i, min_w)
-            elif self.columnWidth(i) > max_w:
-                self.setColumnWidth(i, max_w)
+            item = self.horizontalHeaderItem(i)
+            label = item.text() if item else col.key
+            header_w = header_label_width(label)
+            data_w = self.columnWidth(i)
+            if col.col_type in ("preset_text", "inline_text"):
+                floor = 100
+            elif col.col_type in ("text", "date", "responsabil"):
+                floor = 80
+            else:
+                floor = 72
+            self.setColumnWidth(i, max(floor, data_w, header_w))
 
     def _split_row_data(self, row_data: dict) -> tuple[dict, dict]:
         visible = {k: row_data.get(k) for k in self._column_keys if k in row_data}

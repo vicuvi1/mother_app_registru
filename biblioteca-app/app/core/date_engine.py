@@ -80,3 +80,38 @@ def date_dd_mm_to_sort_key(date_str: str, year: int) -> tuple[int, int]:
     if parsed is None:
         return (0, 0)
     return (parsed.month, parsed.day)
+
+
+def purge_excluded_days_from_registers(year: int) -> int:
+    """Șterge din DB rândurile părților zilnice care nu sunt zile lucrătoare."""
+    from sqlalchemy import and_, select
+
+    from core.constants_manager import get_excluded_days
+    from core.part_models import get_part_model
+    from core.parts_registry import PART_ENTRIES
+    from database.db_manager import get_session
+
+    removed = 0
+    with get_session() as session:
+        for entry in PART_ENTRIES:
+            if entry.get("mode") != "daily":
+                continue
+            model = get_part_model(entry["part_id"])
+            if model is None or not hasattr(model, "data"):
+                continue
+            for month in range(1, 13):
+                allowed = set(
+                    get_working_days(year, month, get_excluded_days(year, month))
+                )
+                records = session.scalars(
+                    select(model).where(
+                        and_(model.an == year, model.luna == month)
+                    )
+                ).all()
+                for rec in records:
+                    day = getattr(rec, "data", None)
+                    if day and day not in allowed:
+                        session.delete(rec)
+                        removed += 1
+        session.commit()
+    return removed

@@ -302,6 +302,8 @@ class ActivitatiInformare(Base):
     activitate_grup: Mapped[str | None] = mapped_column(String, nullable=True)
     activitate_public_larg: Mapped[str | None] = mapped_column(String, nullable=True)
     numar_participanti: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_feminin: Mapped[int] = mapped_column(Integer, default=0)
     documente_consultate: Mapped[int] = mapped_column(Integer, default=0)
     responsabil: Mapped[str | None] = mapped_column(String, nullable=True)
     gen_activitate: Mapped[str | None] = mapped_column(String, nullable=True)  # vechi — migrare
@@ -351,7 +353,7 @@ class DocumenteElectronice(Base):
 
 
 # ---------------------------------------------------------------------------
-# PARTEA IX — Instruiri (tabel comun, multiple rânduri/zi)
+# PARTEA IX — Instruiri (Copii / Adulți, multiple rânduri/zi)
 # ---------------------------------------------------------------------------
 
 
@@ -361,20 +363,44 @@ class Instruiri(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     an: Mapped[int] = mapped_column(Integer, nullable=False)
     luna: Mapped[int] = mapped_column(Integer, nullable=False)
+    categorie_varsta: Mapped[str] = mapped_column(String, nullable=False, default="copii")
 
     data: Mapped[str] = mapped_column(String, nullable=False)
     format_online: Mapped[bool] = mapped_column(Boolean, default=False)
     format_offline: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    forma_formala: Mapped[bool] = mapped_column(Boolean, default=False)
     ore_formala: Mapped[int] = mapped_column(Integer, default=0)
+    forma_non_formala: Mapped[bool] = mapped_column(Boolean, default=False)
     ore_non_formala: Mapped[int] = mapped_column(Integer, default=0)
+    forma_informala: Mapped[bool] = mapped_column(Boolean, default=False)
     ore_informala: Mapped[int] = mapped_column(Integer, default=0)
 
     tema_instruirii: Mapped[str | None] = mapped_column(Text, nullable=True)
     formator: Mapped[str | None] = mapped_column(String, nullable=True)
     total_participanti: Mapped[int] = mapped_column(Integer, default=0)
-    participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Copii
+    prescolari: Mapped[int] = mapped_column(Integer, default=0)
+    elevi: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Adulți — statut ocupațional
+    studenti: Mapped[int] = mapped_column(Integer, default=0)
+    intelectuali: Mapped[int] = mapped_column(Integer, default=0)
+    pensionari: Mapped[int] = mapped_column(Integer, default=0)
+    someri: Mapped[int] = mapped_column(Integer, default=0)
+    muncitori: Mapped[int] = mapped_column(Integer, default=0)
+    alte_categorii: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Adulți — vârstă
+    tineri_17_34: Mapped[int] = mapped_column(Integer, default=0)
+    adulti_35_64: Mapped[int] = mapped_column(Integer, default=0)
+    varstnici_65_plus: Mapped[int] = mapped_column(Integer, default=0)
+
     participanti_feminin: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Câmpuri legacy (migrare date vechi)
     adulti: Mapped[int] = mapped_column(Integer, default=0)
     copii_pana_16: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -404,6 +430,8 @@ class ActivitatiCulturale(Base):
     tipul_activitatii: Mapped[str | None] = mapped_column(String, nullable=True)
     denumirea_activitatii: Mapped[str | None] = mapped_column(Text, nullable=True)
     total_participanti: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
+    participanti_feminin: Mapped[int] = mapped_column(Integer, default=0)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)

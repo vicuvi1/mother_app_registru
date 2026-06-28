@@ -89,6 +89,56 @@ class PartDataMixin:
             ids.append(None)
             flags.append(False)
         return rows, ids, flags
+
+    def _merge_daily_rows(
+        self,
+        rows_data: list[dict],
+        row_ids: list[int | None],
+        auto_flags: list[bool],
+        categorie: str | None,
+        year: int,
+        month: int,
+    ) -> tuple[list[dict], list[int | None], list[bool]]:
+        """Completează zilele lucrătoare lipsă — același calendar în toate părțile zilnice."""
+        saved_year, saved_month = self._loaded_year, self._loaded_month
+        self._loaded_year, self._loaded_month = year, month
+        try:
+            scaffold, _, _ = self._ensure_daily_rows(categorie)
+        finally:
+            self._loaded_year, self._loaded_month = saved_year, saved_month
+
+        by_date: dict[str, tuple[dict, int | None, bool]] = {}
+        for i, row in enumerate(rows_data):
+            d = row.get(self.date_field)
+            if not d:
+                continue
+            by_date[d] = (
+                row,
+                row_ids[i] if i < len(row_ids) else None,
+                auto_flags[i] if i < len(auto_flags) else False,
+            )
+
+        merged_rows: list[dict] = []
+        merged_ids: list[int | None] = []
+        merged_flags: list[bool] = []
+
+        for sc in scaffold:
+            d = sc[self.date_field]
+            if d in by_date:
+                db_row, rid, fl = by_date[d]
+                merged = dict(sc)
+                merged.update(db_row)
+                merged[self.date_field] = d
+                merged_rows.append(merged)
+                merged_ids.append(rid)
+                merged_flags.append(fl)
+            else:
+                merged_rows.append(dict(sc))
+                merged_ids.append(None)
+                merged_flags.append(False)
+
+        return merged_rows, merged_ids, merged_flags
+
     def _record_to_dict(self, rec) -> dict:
         d = {}
         for col in self.columns:
@@ -150,7 +200,6 @@ class PartDataMixin:
 
         days = self._working_days()
         categorie = self._active_category()
-        existing = {self._active_table().item(r, 0).text(): r for r in range(self._active_table().rowCount()) if self._active_table().item(r, 0)}
 
         with get_session() as session:
             for d in days:
@@ -470,6 +519,10 @@ class PartDataMixin:
     def _save_table(
         self, table: EditableTable, categorie: str | None, reload: bool = False
     ) -> None:
+        model = getattr(table, "model", lambda: None)()
+        if model is not None and hasattr(model, "store"):
+            model.store.apply_computed_all()
+
         rows = table.get_data_rows()
         ids = table.get_row_ids()
         flags = table.get_auto_flags()
@@ -487,6 +540,8 @@ class PartDataMixin:
         self._save_rows_data(rows, ids, flags, categorie, self.year, self.month)
 
         if reload:
+            key = self._cache_key(categorie=categorie)
+            self._data_cache.pop(key, None)
             self._load_table(table, categorie)
         else:
             self._sync_ids_after_save(table, categorie)

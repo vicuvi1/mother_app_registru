@@ -40,6 +40,15 @@ def test_get_working_days_excludes_custom():
     assert "02.01" not in days
 
 
+def test_get_working_days_excludes_weekends_june_2026():
+    days = get_working_days(2026, 6)
+    assert "06.06" not in days
+    assert "07.06" not in days
+    assert "01.06" in days
+    assert "05.06" in days
+    assert "08.06" in days
+
+
 def test_sort_dates_dd_mm():
     assert sort_dates_dd_mm(["15.03", "01.02", "10.01"], 2025) == ["10.01", "01.02", "15.03"]
 

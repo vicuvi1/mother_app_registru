@@ -84,11 +84,12 @@ class PartUiMixin:
         self._data_cache: dict[tuple, dict] = {}
         self._cumulative_cache: dict[tuple, dict] = {}
         self._save_pending = False
+        self._queued_persist_periods: list[tuple[int, int]] = []
 
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
-        self._debounce.setInterval(1500)
-        self._debounce.timeout.connect(lambda: self.save_all(show_status=True))
+        self._debounce.setInterval(4000)
+        self._debounce.timeout.connect(self._on_debounced_save)
 
         self._dirty = False
         self._build_ui()
@@ -186,7 +187,7 @@ class PartUiMixin:
 
         btn_save = QPushButton("Salvează")
         btn_save.setObjectName("btnSuccess")
-        btn_save.clicked.connect(lambda: self.save_all(show_status=True, reload=True))
+        btn_save.clicked.connect(lambda: self.save_all(show_status=True, reload=False))
         toolbar.addWidget(btn_save)
 
         btn_print = QPushButton("Printează")
@@ -364,6 +365,12 @@ class PartUiMixin:
 
     @property
     def year(self) -> int:
+        try:
+            picker = self.date_picker
+        except (AttributeError, RuntimeError):
+            picker = None
+        if picker is not None:
+            return picker.year
         return self._loaded_year
 
     @property
@@ -385,6 +392,7 @@ class PartUiMixin:
     def _on_month_tab_changed(self, index: int) -> None:
         if self._building:
             return
+        self._debounce.stop()
         old_year, old_month = self._loaded_year, self._loaded_month
         self._cache_current_period()
         pending_save = self._dirty
@@ -402,9 +410,24 @@ class PartUiMixin:
         self._debounce.stop()
         if self._save_pending:
             self._dirty = True
+        self._drain_queued_persists()
         if self._dirty:
             return self.save_all(show_status=False)
         return True
+
+    def _drain_queued_persists(self) -> None:
+        while getattr(self, "_queued_persist_periods", []):
+            year, month = self._queued_persist_periods.pop(0)
+            try:
+                self._persist_cached_period(year, month)
+            except Exception as exc:
+                self._dirty = True
+                self.main_window.set_save_status(False)
+                logger.exception("Salvare amânată eșuată Partea %s", self.roman)
+                QMessageBox.warning(
+                    self, "Eroare salvare", f"Nu s-au putut salva datele:\n{exc}"
+                )
+                return
     def _on_tab_changed(self) -> None:
         if self._building:
             return
@@ -416,6 +439,19 @@ class PartUiMixin:
         self.main_window.set_save_status(False)
         self._recompute_visible_totals()
         self._debounce.start()
+
+    def _is_any_table_editing(self) -> bool:
+        for attr in ("table", "table_copii", "table_adulti"):
+            table = getattr(self, attr, None)
+            if table is not None and getattr(table, "is_editing_cell", lambda: False)():
+                return True
+        return False
+
+    def _on_debounced_save(self) -> None:
+        if self._is_any_table_editing():
+            self._debounce.start()
+            return
+        self.save_all(show_status=True)
     def _recompute_visible_totals(self) -> None:
         """Recalcul live al rândurilor Total (ca în Excel) la fiecare editare."""
         table = self._active_table()

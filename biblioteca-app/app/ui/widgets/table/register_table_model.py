@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor
 
@@ -26,6 +29,12 @@ class RegisterTableModel(QAbstractTableModel):
         self._invalid_cells: set[tuple[int, int]] = set()
         self._highlight_field: str = ""
         self._highlight_dd_mm: str | None = None
+        self._cell_validator: Callable[[int, str, Any], tuple[bool, str]] | None = None
+
+    def set_cell_validator(
+        self, validator: Callable[[int, str, Any], tuple[bool, str]] | None
+    ) -> None:
+        self._cell_validator = validator
 
     def setup(
         self,
@@ -146,6 +155,12 @@ class RegisterTableModel(QAbstractTableModel):
                 or col_def.counts_checked_in_total()
             ):
                 return str(val)
+            if col_def.col_type in ("preset_text", "inline_text"):
+                if role == Qt.ItemDataRole.DisplayRole:
+                    return ""
+                return str(val) if val is not None else ""
+            if col_def.col_type == "responsabil" and role == Qt.ItemDataRole.DisplayRole:
+                return ""
             return str(val) if val is not None else ""
         if role == Qt.ItemDataRole.BackgroundRole:
             if (row, col) in self._invalid_cells:
@@ -223,6 +238,13 @@ class RegisterTableModel(QAbstractTableModel):
                 self.dataChanged.emit(index, index, [Qt.ItemDataRole.BackgroundRole])
                 self.validation_error.emit("Doar numere întregi ≥ 0")
                 return False
+            if self._cell_validator is not None:
+                ok, msg = self._cell_validator(row, col_def.key, num)
+                if not ok:
+                    self._invalid_cells.add((row, col))
+                    self.dataChanged.emit(index, index, [Qt.ItemDataRole.BackgroundRole])
+                    self.validation_error.emit(msg or "Valoare nepermisă")
+                    return False
             self._invalid_cells.discard((row, col))
             self.store.set_cell(row, col, num)
             if row < len(self.store.auto_flags):

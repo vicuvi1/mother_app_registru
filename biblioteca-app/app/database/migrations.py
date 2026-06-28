@@ -103,6 +103,40 @@ def migrate_etichete_for_part(parte: str) -> None:
                 session.commit()
 
 
+def sync_etichete_defaults(parte: str, *, reset_obsolete_custom: bool = False) -> None:
+    """Actualizează eticheta_default din seed; opțional resetează custom vechi."""
+    from sqlalchemy import select
+
+    from database.db_manager import get_session
+
+    obsolete = {"Feminin", "Masculin", "Femin", "Masculin"}
+    for camp, default_label in DEFAULT_ETICHETE.get(parte, []):
+        with get_session() as session:
+            row = session.scalar(
+                select(EtichetaCustom).where(
+                    EtichetaCustom.parte == parte,
+                    EtichetaCustom.camp == camp,
+                )
+            )
+            if row is None:
+                session.add(
+                    EtichetaCustom(
+                        parte=parte,
+                        camp=camp,
+                        eticheta_default=default_label,
+                        eticheta_custom=None,
+                    )
+                )
+            else:
+                old_default = row.eticheta_default
+                row.eticheta_default = default_label
+                if reset_obsolete_custom:
+                    custom = (row.eticheta_custom or "").strip()
+                    if custom in obsolete or custom == old_default:
+                        row.eticheta_custom = None
+            session.commit()
+
+
 def migrate_etichete_part05() -> None:
     migrate_etichete_for_part("part_05")
 
@@ -203,6 +237,56 @@ def migrate_etichete_part09_part12() -> None:
     migrate_etichete_for_part("part_12")
 
 
+def migrate_part06_part11_gender_columns() -> None:
+    """Coloane masculin/feminin pentru Părțile VI și XI."""
+    _add_column("activitati_informare", "participanti_masculin", "INTEGER DEFAULT 0")
+    _add_column("activitati_informare", "participanti_feminin", "INTEGER DEFAULT 0")
+    _add_column("activitati_culturale", "participanti_masculin", "INTEGER DEFAULT 0")
+    _add_column("activitati_culturale", "participanti_feminin", "INTEGER DEFAULT 0")
+
+    if "activitati_informare" in inspect(_engine()).get_table_names():
+        with _engine().connect() as conn:
+            conn.execute(
+                text(
+                    "UPDATE activitati_informare SET participanti_masculin = numar_participanti "
+                    "WHERE participanti_masculin = 0 AND participanti_feminin = 0 "
+                    "AND numar_participanti > 0"
+                )
+            )
+            conn.commit()
+
+    if "activitati_culturale" in inspect(_engine()).get_table_names():
+        with _engine().connect() as conn:
+            conn.execute(
+                text(
+                    "UPDATE activitati_culturale SET participanti_masculin = total_participanti "
+                    "WHERE participanti_masculin = 0 AND participanti_feminin = 0 "
+                    "AND total_participanti > 0"
+                )
+            )
+            conn.commit()
+
+
+def migrate_etichete_part06_part11() -> None:
+    migrate_etichete_for_part("part_06")
+    migrate_etichete_for_part("part_11")
+
+
+def migrate_part09_prescolari_elevi() -> None:
+    """Preșcolari și elevi în Participanți — Partea IX (conform registrului fizic)."""
+    _add_column("instruiri", "prescolari", "INTEGER DEFAULT 0")
+    _add_column("instruiri", "elevi", "INTEGER DEFAULT 0")
+
+
+def migrate_etichete_part09_v5() -> None:
+    migrate_etichete_for_part("part_09")
+
+
+def migrate_etichete_part09_v6() -> None:
+    """Reîmprospătează etichetele Părții IX (F/M, grupuri Copii/Maturi)."""
+    sync_etichete_defaults("part_09", reset_obsolete_custom=True)
+
+
 def migrate_text_presets() -> None:
     from database.seed_defaults import seed_text_presets
 
@@ -213,12 +297,12 @@ def migrate_text_presets() -> None:
 _INDEXED_TABLES: list[tuple[str, bool]] = [
     ("evidenta_utilizatori", False),
     ("evidenta_utilizatori_copii_adulti", True),
-    ("documente_inregistrate", False),
-    ("documente_continut_czu", False),
+    ("documente_inregistrate", True),
+    ("documente_continut_czu", True),
     ("cercetari_bibliografice", False),
     ("activitati_informare", True),
     ("documente_electronice", False),
-    ("instruiri", False),
+    ("instruiri", True),
     ("activitati_culturale", True),
     ("activitati_online", True),
 ]
@@ -245,7 +329,105 @@ def migrate_indexes() -> None:
             )
 
 
-SCHEMA_VERSION = 3
+def migrate_part09_copii_adulti() -> None:
+    """Partea IX — tab-uri Copii/Adulți cu coloane distincte (conform registrului fizic)."""
+    _add_column("instruiri", "categorie_varsta", "TEXT DEFAULT 'copii'")
+    for col in (
+        "studenti",
+        "intelectuali",
+        "pensionari",
+        "someri",
+        "muncitori",
+        "alte_categorii",
+        "tineri_17_34",
+        "adulti_35_64",
+        "varstnici_65_plus",
+    ):
+        _add_column("instruiri", col, "INTEGER DEFAULT 0")
+
+    if "instruiri" not in inspect(_engine()).get_table_names():
+        return
+
+    with _engine().connect() as conn:
+        conn.execute(
+            text(
+                "UPDATE instruiri SET categorie_varsta = 'copii' "
+                "WHERE categorie_varsta IS NULL OR categorie_varsta = '' "
+                "OR prescolari > 0 OR elevi > 0 OR copii_pana_16 > 0"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE instruiri SET categorie_varsta = 'adulti' "
+                "WHERE (categorie_varsta IS NULL OR categorie_varsta = '') "
+                "AND (adulti > 0 OR participanti_masculin > 0 OR participanti_feminin > 0) "
+                "AND prescolari = 0 AND elevi = 0"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE instruiri SET categorie_varsta = 'copii' "
+                "WHERE categorie_varsta IS NULL OR categorie_varsta = ''"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE instruiri SET studenti = 0, intelectuali = 0, pensionari = 0, "
+                "someri = 0, muncitori = 0, alte_categorii = 0, "
+                "tineri_17_34 = 0, adulti_35_64 = 0, varstnici_65_plus = 0 "
+                "WHERE categorie_varsta = 'copii'"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE instruiri SET prescolari = 0, elevi = 0 "
+                "WHERE categorie_varsta = 'adulti'"
+            )
+        )
+        conn.commit()
+
+
+def migrate_etichete_part09_v7() -> None:
+    migrate_etichete_for_part("part_09")
+    sync_etichete_defaults("part_09", reset_obsolete_custom=True)
+
+
+def migrate_part09_forma_bifaje() -> None:
+    """Bifă formală / non-formală / informală + ore academice (registru fizic)."""
+    for col in ("forma_formala", "forma_non_formala", "forma_informala"):
+        _add_column("instruiri", col, "INTEGER DEFAULT 0")
+
+    if "instruiri" not in inspect(_engine()).get_table_names():
+        return
+
+    with _engine().connect() as conn:
+        conn.execute(
+            text(
+                "UPDATE instruiri SET forma_formala = 1 "
+                "WHERE ore_formala > 0 AND forma_formala = 0"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE instruiri SET forma_non_formala = 1 "
+                "WHERE ore_non_formala > 0 AND forma_non_formala = 0"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE instruiri SET forma_informala = 1 "
+                "WHERE ore_informala > 0 AND forma_informala = 0"
+            )
+        )
+        conn.commit()
+
+
+def migrate_etichete_part09_v8() -> None:
+    migrate_etichete_for_part("part_09")
+    sync_etichete_defaults("part_09", reset_obsolete_custom=True)
+
+
+SCHEMA_VERSION = 9
 
 
 def migrate_schema_version() -> None:
@@ -265,6 +447,20 @@ def migrate_schema_version() -> None:
             migrate_part09_part12_gender_columns()
             migrate_etichete_part09_part12()
             migrate_text_presets()
+        if ver < 4:
+            migrate_part06_part11_gender_columns()
+            migrate_etichete_part06_part11()
+        if ver < 5:
+            migrate_part09_prescolari_elevi()
+            migrate_etichete_part09_v5()
+        if ver < 6:
+            migrate_etichete_part09_v6()
+        if ver < 8:
+            migrate_part09_copii_adulti()
+            migrate_etichete_part09_v7()
+        if ver < 9:
+            migrate_part09_forma_bifaje()
+            migrate_etichete_part09_v8()
         migrate_indexes()
         set_setting("schema_version", str(SCHEMA_VERSION))
 
@@ -276,5 +472,14 @@ def run_migrations() -> None:
     migrate_etichete_part06()
     migrate_part09_part12_gender_columns()
     migrate_etichete_part09_part12()
+    migrate_part06_part11_gender_columns()
+    migrate_etichete_part06_part11()
+    migrate_part09_prescolari_elevi()
+    migrate_etichete_part09_v5()
+    migrate_etichete_part09_v6()
+    migrate_part09_copii_adulti()
+    migrate_etichete_part09_v7()
+    migrate_part09_forma_bifaje()
+    migrate_etichete_part09_v8()
     migrate_text_presets()
     migrate_schema_version()

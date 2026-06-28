@@ -109,5 +109,33 @@ def test_register_table_undo_preset_cell(qtbot, qapp):
     model.setData(index, "Atelier", Qt.ItemDataRole.EditRole)
     table._push_undo(0, 0, "Lectură", "Atelier")
     table.undo_last()
-    assert model.data(index, Qt.ItemDataRole.DisplayRole) == "Lectură"
+    assert table.store.get_data_rows()[0]["activitate"] == "Lectură"
     assert widget.value() == "Lectură"
+
+
+def test_add_total_row_keeps_preset_widgets(qtbot, qapp):
+    from ui.widgets.register_table_view import RegisterTableView
+    from ui.widgets.table.column_def import ColumnDef
+
+    cols = [
+        ColumnDef("data", "date"),
+        ColumnDef("tema_instruirii", "preset_text"),
+        ColumnDef("total_participanti", "int"),
+    ]
+    table = RegisterTableView()
+    qtbot.addWidget(table)
+    table.setup(cols, part_id="part_09")
+    table.load_rows([{"data": "05.06", "tema_instruirii": "Test", "total_participanti": 3}])
+    table.show()
+    qapp.processEvents()
+
+    tema_col = 1
+    assert table.indexWidget(table.model().index(0, tema_col)) is not None
+
+    table.add_total_row("Total", {"total_participanti": 3})
+    table.add_total_row("Total de la început", {"total_participanti": 3})
+    qapp.processEvents()
+
+    widget = table.indexWidget(table.model().index(0, tema_col))
+    assert widget is not None
+    assert widget.value() == "Test"

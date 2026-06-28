@@ -62,13 +62,16 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._build_status_bar()
         self._autosave = AutosaveManager(self)
-        self.refresh_sidebar_badges(self._home_page.year())
+        self.refresh_sidebar_badges(self._home_page.year)
 
         if load_first_part:
             self.show_home()
 
     def show_home(self) -> None:
         """Panou Acasă — vedere de ansamblu la pornire."""
+        old_page = self._content_stack.currentWidget()
+        if old_page is not self._home_page:
+            self._autosave.save_leaving_page(old_page)
         self._home_page.refresh()
         self._content_stack.setCurrentWidget(self._home_page)
         self._part_list.blockSignals(True)
@@ -331,16 +334,41 @@ class MainWindow(QMainWindow):
     def clear_save_error(self) -> None:
         self._save_error_banner.setVisible(False)
 
+    @staticmethod
+    def _resolve_page_year(page) -> int | None:
+        if page is None:
+            return None
+        spin = getattr(page, "_year", None)
+        if spin is not None and hasattr(spin, "value"):
+            return int(spin.value())
+        year = getattr(page, "year", None)
+        if callable(year):
+            year = year()
+        return year if isinstance(year, int) else None
+
+    @staticmethod
+    def _resolve_page_month(page) -> int | None:
+        if not getattr(page, "_has_month_bar", False):
+            return None
+        month = getattr(page, "month", None)
+        if callable(month):
+            month = month()
+        return month if isinstance(month, int) else None
+
+    @staticmethod
+    def _page_year(page) -> int:
+        from datetime import date
+
+        return MainWindow._resolve_page_year(page) or date.today().year
+
     def persist_session_from_page(self, page) -> None:
         part_id = self._part_id_for_page(page)
         if part_id is None:
             return
-        year = getattr(page, "year", None)
-        month = getattr(page, "month", None) if getattr(page, "_has_month_bar", False) else None
         save_session(
             part_id=part_id,
-            year=year if isinstance(year, int) else None,
-            month=month if isinstance(month, int) else None,
+            year=self._resolve_page_year(page),
+            month=self._resolve_page_month(page),
         )
 
     def _part_id_for_page(self, page) -> str | None:
@@ -422,48 +450,67 @@ class MainWindow(QMainWindow):
         CoverPageDialog(self).exec()
 
     def _open_excluded_days(self) -> None:
-        from datetime import date
-
+        from core.date_engine import purge_excluded_days_from_registers
         from ui.excluded_days_dialog import ExcludedDaysDialog
 
         page = self._content_stack.currentWidget()
-        year = getattr(page, "year", None) or date.today().year
-        if ExcludedDaysDialog(self, default_year=year).exec():
+        year = self._page_year(page)
+        month = self._resolve_page_month(page)
+        dlg = ExcludedDaysDialog(self, default_year=year, default_month=month)
+        if dlg.exec():
+            saved_year = dlg.saved_year() or year
+            purge_excluded_days_from_registers(saved_year)
+            self._refresh_parts_after_excluded_days(saved_year)
             self.statusBar().showMessage(
-                "Zilele nelucrătoare au fost salvate. Regenerați lunile afectate dacă e nevoie.",
+                "Zilele nelucrătoare au fost salvate. Registrul a fost actualizat.",
                 8000,
             )
 
-    def _open_incomplete_months(self) -> None:
-        from datetime import date
+    def _refresh_parts_after_excluded_days(self, year: int) -> None:
+        skipped_dirty: list[str] = []
+        for part_id in list(self._loaded_parts):
+            page = self._part_pages.get(part_id)
+            if page is None:
+                continue
+            if hasattr(page, "has_unsaved_changes") and page.has_unsaved_changes():
+                skipped_dirty.append(part_id)
+                continue
+            if hasattr(page, "_invalidate_caches"):
+                page._invalidate_caches()
+            page_year = self._resolve_page_year(page)
+            if page_year == year and hasattr(page, "_load_current"):
+                page._load_current()
+        current = self._content_stack.currentWidget()
+        if (
+            current is not None
+            and hasattr(current, "_load_current")
+            and not (
+                hasattr(current, "has_unsaved_changes") and current.has_unsaved_changes()
+            )
+        ):
+            current._load_current()
+        if hasattr(self, "_home_page"):
+            self._home_page.refresh()
+        if skipped_dirty:
+            self.statusBar().showMessage(
+                "Zilele nelucrătoare au fost salvate. Părțile cu modificări nesalvate "
+                "nu au fost reîncărcate — salvați sau reveniți după salvare.",
+                12000,
+            )
 
+    def _open_incomplete_months(self) -> None:
         page = self._content_stack.currentWidget()
-        register_final = self._register_final_page
-        if register_final is not None and page is register_final:
-            year = register_final._year.value()
-        else:
-            year = getattr(page, "year", None) or date.today().year
-        IncompleteMonthsDialog(self, default_year=year).exec()
+        IncompleteMonthsDialog(self, default_year=self._page_year(page)).exec()
 
     def _open_year_end_wizard(self) -> None:
-        from datetime import date
-
         page = self._content_stack.currentWidget()
-        year = getattr(page, "year", None) or date.today().year
-        YearEndWizard(self, default_year=year).exec()
+        YearEndWizard(self, default_year=self._page_year(page)).exec()
 
     def _open_overview(self) -> None:
-        from datetime import date
-
         from ui.register_overview_dialog import RegisterOverviewDialog
 
         page = self._content_stack.currentWidget()
-        register_final = self._register_final_page
-        if register_final is not None and page is register_final:
-            year = register_final._year.value()
-        else:
-            year = getattr(page, "year", None) or date.today().year
-        RegisterOverviewDialog(self, default_year=year).exec()
+        RegisterOverviewDialog(self, default_year=self._page_year(page)).exec()
 
     def _get_or_load_register_final(self):
         if self._register_final_page is None:
@@ -481,12 +528,14 @@ class MainWindow(QMainWindow):
     def _show_register_final(self) -> None:
         page = self._content_stack.currentWidget()
         register_final = self._get_or_load_register_final()
-        year = getattr(page, "year", None) if page is not register_final else None
-        if year:
+        year = self._resolve_page_year(page)
+        if year is not None:
             register_final._year.setValue(year)
         self._part_list.blockSignals(True)
         self._part_list.clearSelection()
         self._part_list.blockSignals(False)
+        if page is not register_final:
+            self._autosave.save_leaving_page(page)
         register_final.refresh()
         self._content_stack.setCurrentWidget(register_final)
         if hasattr(self, "_btn_home"):
@@ -499,6 +548,7 @@ class MainWindow(QMainWindow):
     def navigate_to_part(
         self, part_id: str, month: int | None = None, category: str | None = None
     ) -> None:
+        old_page = self._content_stack.currentWidget()
         for row in range(self._part_list.count()):
             item = self._part_list.item(row)
             if item and item.data(Qt.ItemDataRole.UserRole) == part_id:
@@ -509,12 +559,16 @@ class MainWindow(QMainWindow):
         page = self._get_or_load_part(part_id)
         if page is None:
             return
+        if old_page is not page:
+            self._autosave.save_leaving_page(old_page)
         self._content_stack.setCurrentWidget(page)
         if hasattr(self, "_btn_home"):
             self._btn_home.setChecked(False)
         if hasattr(page, "navigate_to"):
             page.navigate_to(month=month, category=category)
-        self._autosave.on_page_changed()
+        elif hasattr(page, "_load_current"):
+            page._load_current(fast=True)
+        self.persist_session_from_page(page)
 
     def _build_ui(self) -> None:
         central = QWidget()
@@ -632,14 +686,18 @@ class MainWindow(QMainWindow):
         if item is None:
             return
         part_id = item.data(Qt.ItemDataRole.UserRole)
+        old_page = self._content_stack.currentWidget()
         page = self._get_or_load_part(part_id)
         if page is not None:
+            if old_page is not page:
+                self._autosave.save_leaving_page(old_page)
             self._content_stack.setCurrentWidget(page)
             if hasattr(self, "_btn_home"):
                 self._btn_home.setChecked(False)
+            if hasattr(page, "_load_current"):
+                page._load_current(fast=True)
             self.statusBar().showMessage(item.toolTip())
             self.persist_session_from_page(page)
-            self._autosave.on_page_changed()
 
     def _get_or_load_part(self, part_id: str) -> QWidget | None:
         if part_id not in self._loaded_parts:
