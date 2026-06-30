@@ -1,0 +1,155 @@
+╔════════════════════════════════════════════════════════════════╗
+║         REGISTRU DIGITAL BIBLIOTECĂ - QUICK START              ║
+║                                                                ║
+║  A professional digital register for library management        ║
+╚════════════════════════════════════════════════════════════════╝
+
+STEP 1: INSTALL
+═════════════════════════════════════════════════════════════════
+1. Double-click: RegistruDigital_Setup_1.7.0.exe
+2. Follow the installation wizard
+3. Click "Finish" when done
+
+That's it! No configuration needed during installation.
+
+
+STEP 2: LAUNCH
+═════════════════════════════════════════════════════════════════
+• Look for the desktop shortcut after installation
+• Or find it in Start Menu > Registru Digital
+• Double-click to launch
+
+
+STEP 3: FIRST RUN SETUP
+═════════════════════════════════════════════════════════════════
+On your first launch:
+1. A setup wizard will appear
+2. Enter your library information (name, location, etc.)
+3. Add basic configuration
+4. Click "Start" and you're ready to go!
+
+
+MAIN FEATURES
+═════════════════════════════════════════════════════════════════
+✓ Manage library users (children and adults)
+✓ Track registered materials and documents
+✓ Record user activities
+✓ Generate reports and statistics
+✓ Export data to Excel, PDF, or Word
+✓ Automatic daily backups
+✓ User-friendly interface
+
+
+GETTING HELP
+═════════════════════════════════════════════════════════════════
+Inside the application:
+  • Click Help menu for documentation
+  • View the User Guide (Ghid Bibliotecar PDF)
+  • Check the About section for version info
+
+
+COMMON TASKS
+═════════════════════════════════════════════════════════════════
+
+📱 Add a Library User:
+   1. Click "Users" section
+   2. Click "Add New User"
+   3. Fill in information
+   4. Save
+
+📖 Register a Document:
+   1. Click "Documents" section
+   2. Click "Register New"
+   3. Enter details
+   4. Save
+
+📊 Export Records:
+   1. Click "Export" menu
+   2. Choose format (Excel, PDF, Word)
+   3. Select data range
+   4. Save to your computer
+
+💾 Backup Your Data:
+   1. Click "Tools" menu
+   2. Click "Backup"
+   3. Data is automatically backed up daily
+   4. You can also restore previous backups
+
+
+KEYBOARD SHORTCUTS
+═════════════════════════════════════════════════════════════════
+Ctrl+S        Save
+Ctrl+Z        Undo
+Ctrl+Y        Redo
+Ctrl+F        Find
+Ctrl+E        Export
+F1            Help
+
+
+DATA LOCATION
+═════════════════════════════════════════════════════════════════
+Your library data is stored at:
+C:\Users\[YourUsername]\AppData\Local\Registru Digital Bibliotecă
+
+Backups are automatically created and stored there too.
+
+
+SYSTEM REQUIREMENTS
+═════════════════════════════════════════════════════════════════
+• Windows 7 or newer (Windows 10/11 recommended)
+• 100 MB free disk space
+• Screen resolution 1024x768 or higher
+
+
+TROUBLESHOOTING
+═════════════════════════════════════════════════════════════════
+
+❌ Application won't start?
+   → Try restarting your computer
+   → Check available disk space (need 100+ MB free)
+   → Windows may need a security update
+
+❌ Can't save data?
+   → Check if disk has enough space
+   → Make sure Windows isn't showing a warning dialog
+   → Try saving in a different location
+
+❌ Lost my data?
+   → Don't panic! Check the Backups menu
+   → Your automatic backup should be there
+   → Restore from Tools > Restore Backup
+
+
+UNINSTALLING
+═════════════════════════════════════════════════════════════════
+If you need to remove the application:
+1. Windows Settings > Apps > Registru Digital > Uninstall
+   OR
+2. Control Panel > Programs > Uninstall a program
+
+Your data will NOT be automatically deleted.
+
+
+IMPORTANT NOTES
+═════════════════════════════════════════════════════════════════
+✓ Internet is NOT required - app works fully offline
+✓ Your data stays on YOUR computer (no cloud by default)
+✓ Regular backups are created automatically
+✓ You can export data anytime you want
+✓ All features are included - no additional licenses needed
+
+
+SUPPORT
+═════════════════════════════════════════════════════════════════
+For help or questions:
+1. Check the User Guide in the Help menu
+2. Look for help in the Application Help section
+3. Contact your system administrator
+4. Check application logs: Tools > View Logs
+
+
+ENJOY USING REGISTRU DIGITAL!
+═════════════════════════════════════════════════════════════════
+
+Version: 1.7.0
+For the latest information, visit your library's IT department.

@@ -1,0 +1,45 @@
+REGISTRU DIGITAL BIBLIOTECĂ - Installation Guide
+
+What is Registru Digital?
+------------------------
+Registru Digital Bibliotecă is a professional digital register designed specifically for libraries.
+It helps track and manage:
+  • Library users (adults and children)
+  • Registered documents and materials
+  • User activities and attendance
+  • Bibliographic research
+  • Information activities
+  • Electronic documents
+  • Training sessions
+  • Cultural activities
+  • Online activities
+  • Volunteer hours
+  • Partnerships
+
+System Requirements
+-------------------
+• Windows 7 or newer (Windows 10/11 recommended)
+• 100 MB free disk space
+• Screen resolution: 1024x768 or higher
+
+Features
+--------
+✓ Easy-to-use interface
+✓ Automatic data backup
+✓ Export to Excel, PDF, and Word
+✓ Multi-language support
+✓ Data integrity checks
+✓ Secure data storage
+
+Installation
+------------
+This installer will set up Registru Digital completely - just follow the steps.
+A desktop shortcut will be created for easy access.
+
+License
+-------
+This software is provided as-is for library management purposes.
+
+Ready to Install?
+-----------------
+Click "Next" to continue with the installation.
