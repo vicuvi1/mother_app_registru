@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QGuiApplication, QKeyEvent, QKeySequence, QShortcut
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QEvent, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QGuiApplication, QKeyEvent, QKeySequence
+from PyQt5.QtWidgets import QShortcut
+from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QHeaderView,
@@ -89,7 +90,7 @@ class RegisterTableView(QTableView):
         if obj is self.viewport():
             et = event.type()
             if et == QEvent.Type.MouseButtonRelease:
-                pos = event.position().toPoint()
+                pos = event.pos()
                 index = self.indexAt(pos)
                 if not index.isValid():
                     return False

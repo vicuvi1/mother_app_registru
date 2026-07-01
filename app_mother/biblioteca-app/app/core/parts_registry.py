@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PyQt6.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget
 
 PART_ENTRIES: list[dict] = [
     {"roman": "I", "part_id": "part_01", "title": "Evidența utilizatorilor", "short": "Utilizatori", "mode": "daily", "has_copii_adulti": False},

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import (
+from PyQt5.QtCore import (
     QAbstractAnimation,
     QEasingCurve,
     QEvent,
@@ -10,8 +10,9 @@ from PyQt6.QtCore import (
     Qt,
     QTimer,
 )
-from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import (
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtWidgets import QShortcut
+from PyQt5.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QLabel,

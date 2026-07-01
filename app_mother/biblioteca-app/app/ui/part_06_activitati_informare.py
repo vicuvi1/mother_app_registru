@@ -1,4 +1,5 @@
 """Partea VI — Activități de informare (structură conform registrului fizic)."""
+from __future__ import annotations
 
 from database.models import ActivitatiInformare
 from ui.part_base import PartPageBase

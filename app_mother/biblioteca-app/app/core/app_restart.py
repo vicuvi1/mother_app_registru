@@ -16,8 +16,8 @@ def _restart_command() -> tuple[str, list[str]]:
 
 def restart_application() -> None:
     """Pornește o nouă instanță și închide procesul curent."""
-    from PyQt6.QtCore import QProcess
-    from PyQt6.QtWidgets import QApplication
+    from PyQt5.QtCore import QProcess
+    from PyQt5.QtWidgets import QApplication
 
     app = QApplication.instance()
     if app is None:

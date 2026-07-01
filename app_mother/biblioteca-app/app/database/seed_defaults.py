@@ -1,4 +1,5 @@
 """Placeholder-uri default: personal, etichete coloane, range-uri inițiale."""
+from __future__ import annotations
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

@@ -1,7 +1,8 @@
 """Layout cu wrap pentru tag-uri / chip-uri."""
+from __future__ import annotations
 
-from PyQt6.QtCore import QPoint, QRect, QSize, Qt
-from PyQt6.QtWidgets import QLayout, QLayoutItem, QSizePolicy, QWidget
+from PyQt5.QtCore import QPoint, QRect, QSize, Qt
+from PyQt5.QtWidgets import QLayout, QLayoutItem, QSizePolicy, QWidget
 
 
 class FlowLayout(QLayout):

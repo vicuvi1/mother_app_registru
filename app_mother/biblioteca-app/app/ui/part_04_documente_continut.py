@@ -1,4 +1,5 @@
 """Partea IV — Evidența documentelor (conținut CZU)."""
+from __future__ import annotations
 
 from database.models import DocumenteContinutCZU
 from ui.part_base import PartPageBase

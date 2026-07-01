@@ -1,11 +1,12 @@
 """Punct de pornire — inițializează DB și UI."""
+from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QFont, QGuiApplication, QIcon
-from PyQt6.QtWidgets import QApplication
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QFont, QGuiApplication, QIcon
+from PyQt5.QtWidgets import QApplication
 
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))

@@ -1,8 +1,14 @@
-# Instalator simplu — Registru Digital Bibliotecă
+# Instalator simplu — Registru Digital Bibliotecă (build Windows 7/8/10/11)
 
 Un instalator **cu un singur click** pentru utilizatorii non-tehnici. Persoana care
 primește aplicația nu are nevoie de Python, de linia de comandă sau de vreo cunoștință
 tehnică — dă dublu-click pe un `.exe`, așteaptă câteva minute și aplicația pornește.
+
+> **Compatibilitate:** această variantă (ramura `pyqt5-win7`) folosește **PyQt5** și
+> **Python 3.8**, deci rulează pe **Windows 7 SP1, 8, 8.1, 10 și 11** (64-bit). Pe
+> Windows 7/8 instalatorul instalează automat și componentele **Visual C++ 2015–2019**
+> necesare (poate apărea o cerere UAC). Ramura `main` folosește PyQt6 + Python 3.12 și
+> rulează doar pe Windows 10/11.
 
 Spre deosebire de pipeline-ul PyInstaller + Inno Setup din folderul `installer/`
 (care necesită să instalezi Inno Setup și un build de 5–15 min ce produce un `.exe` de
@@ -29,7 +35,7 @@ la internet **doar la prima instalare**.
 ### Ce se instalează și unde
 ```
 %LOCALAPPDATA%\RegistruDigital\
-├── python\        Python 3.12 izolat + bibliotecile (PyQt6, SQLAlchemy, openpyxl, ...)
+├── python\        Python 3.8 izolat + bibliotecile (PyQt5, SQLAlchemy, openpyxl, ...)
 ├── app\           codul aplicației
 │   └── data\      baza de date + backup-uri (datele tale)
 └── uninstall.ps1  dezinstalator

@@ -1,4 +1,5 @@
 """Calcul zile lucrătoare, validare format DD.MM."""
+from __future__ import annotations
 
 import calendar
 import re

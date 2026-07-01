@@ -1,8 +1,9 @@
 """Selector An + Lună pentru paginile de Parte."""
+from __future__ import annotations
 
 from datetime import date
 
-from PyQt6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QWidget
+from PyQt5.QtWidgets import QComboBox, QFrame, QHBoxLayout, QLabel, QWidget
 
 from core.constants_manager import LUNI_RO
 

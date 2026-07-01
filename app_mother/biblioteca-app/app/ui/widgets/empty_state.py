@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 
 class TableEmptyState(QWidget):

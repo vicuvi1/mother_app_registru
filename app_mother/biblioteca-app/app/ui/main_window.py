@@ -1,11 +1,13 @@
 """Fereastră principală — meniu lateral cu cele 12 Părți active."""
+from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence, QResizeEvent
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QCloseEvent, QDesktopServices, QKeySequence, QResizeEvent
+from PyQt5.QtWidgets import QAction
+from PyQt5.QtWidgets import (
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -725,7 +727,7 @@ class MainWindow(QMainWindow):
             self._autosave.set_interval(get_autosave_interval())
             from pathlib import Path
 
-            from PyQt6.QtWidgets import QApplication
+            from PyQt5.QtWidgets import QApplication
 
             app_root = Path(__file__).resolve().parent.parent
             app = QApplication.instance()

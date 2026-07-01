@@ -1,4 +1,5 @@
 """Partea I — Evidența utilizatorilor."""
+from __future__ import annotations
 
 from database.models import EvidentaUtilizatori
 from ui.part_base import PartPageBase

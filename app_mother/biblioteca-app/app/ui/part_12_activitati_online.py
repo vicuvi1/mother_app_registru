@@ -1,4 +1,5 @@
 """Partea XII — Activități culturale ONLINE."""
+from __future__ import annotations
 
 from database.models import ActivitatiOnline
 from ui.part_base import PartPageBase

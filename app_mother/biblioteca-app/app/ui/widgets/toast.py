@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 class ToastHost(QWidget):

@@ -1,4 +1,5 @@
 """Definiție coloană tabel registru."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 

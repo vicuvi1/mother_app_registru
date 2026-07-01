@@ -1,4 +1,5 @@
 """Export Excel cu openpyxl — pagini stivuite, grilă completă, anteturi de grup, numerotare la print."""
+from __future__ import annotations
 
 from pathlib import Path
 

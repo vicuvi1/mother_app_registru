@@ -1,8 +1,9 @@
 """Antet tabel cu grupuri de coloane."""
+from __future__ import annotations
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
-from PyQt6.QtWidgets import QHeaderView
+from PyQt5.QtCore import QRect, QSize, Qt
+from PyQt5.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PyQt5.QtWidgets import QHeaderView
 
 HEADER_BG = QColor("#eef2f7")
 GROUP_BG = QColor("#dbe3ee")

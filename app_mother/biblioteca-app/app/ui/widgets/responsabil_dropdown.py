@@ -1,7 +1,8 @@
 """Dropdown reutilizabil pentru Responsabil / Formator / Coordonator."""
+from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QComboBox
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QComboBox
 
 from core.constants_manager import ensure_personal_in_list, get_personal_names
 

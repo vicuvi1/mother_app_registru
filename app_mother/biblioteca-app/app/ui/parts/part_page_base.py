@@ -1,6 +1,7 @@
 """Pagină de bază pentru Părțile registrului — compune mixin-urile."""
+from __future__ import annotations
 
-from PyQt6.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget
 
 from ui.parts.mixins.cache_mixin import PartCacheMixin
 from ui.parts.mixins.data_mixin import PartDataMixin

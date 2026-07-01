@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QRect, Qt
-from PyQt6.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionButton
+from PyQt5.QtCore import QEvent, QRect, Qt
+from PyQt5.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionButton
 
 
 class CheckBoxDelegate(QStyledItemDelegate):
@@ -37,7 +37,7 @@ class CheckBoxDelegate(QStyledItemDelegate):
             return False
         if event.button() != Qt.MouseButton.LeftButton:
             return False
-        if not self._checkbox_rect(option).contains(event.position().toPoint()):
+        if not self._checkbox_rect(option).contains(event.pos()):
             return False
 
         current = bool(model.data(index, Qt.ItemDataRole.EditRole))

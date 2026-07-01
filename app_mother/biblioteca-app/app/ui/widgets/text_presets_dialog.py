@@ -1,6 +1,7 @@
 """Dialog configurare liste text rapide (o dată, apoi select din celulă)."""
+from __future__ import annotations
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QLabel,

@@ -1,4 +1,5 @@
 """Stare tur ghidat prima utilizare."""
+from __future__ import annotations
 
 from database.db_manager import get_setting, set_setting
 

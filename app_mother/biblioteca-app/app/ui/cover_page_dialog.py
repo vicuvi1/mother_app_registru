@@ -1,6 +1,7 @@
 """Editor pentru pagina de titlu (coperta registrului)."""
+from __future__ import annotations
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,

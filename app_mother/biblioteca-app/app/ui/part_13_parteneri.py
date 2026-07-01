@@ -1,4 +1,5 @@
 """Partea XIII — Parteneri ai bibliotecii."""
+from __future__ import annotations
 
 from database.models import Parteneri
 from ui.part_base import PartPageBase

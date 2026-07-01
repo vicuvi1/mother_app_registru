@@ -1,4 +1,5 @@
 """Partea V — Cercetări bibliografice (structură conform registrului fizic)."""
+from __future__ import annotations
 
 from database.models import CercetariBibliografice
 from ui.part_base import PartPageBase

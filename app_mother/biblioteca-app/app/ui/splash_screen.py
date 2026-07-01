@@ -1,7 +1,8 @@
 """Ecran de pornire animat — afișat în timpul inițializării aplicației."""
+from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QProgressBar, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QApplication, QLabel, QMainWindow, QProgressBar, QVBoxLayout, QWidget
 
 
 class SplashScreen(QWidget):

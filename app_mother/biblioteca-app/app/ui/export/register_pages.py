@@ -102,7 +102,7 @@ def collect_full_register_pages(
 
 def collect_full_register_pages_with_dialog(parent, main_window, year: int) -> list[dict]:
     """Colectează paginile registrului complet cu dialog de progres."""
-    from PyQt6.QtWidgets import QApplication, QProgressDialog
+    from PyQt5.QtWidgets import QApplication, QProgressDialog
 
     progress = QProgressDialog("Se pregătesc paginile pentru export…", "Anulează", 0, 100, parent)
     progress.setWindowTitle("Export registru complet")

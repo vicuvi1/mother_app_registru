@@ -5,9 +5,9 @@ from __future__ import annotations
 import calendar
 from datetime import date
 
-from PyQt6.QtCore import QDate, QLocale, Qt
-from PyQt6.QtGui import QColor, QFont, QTextCharFormat
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QDate, QLocale, Qt
+from PyQt5.QtGui import QColor, QFont, QTextCharFormat
+from PyQt5.QtWidgets import (
     QCalendarWidget,
     QDialog,
     QDialogButtonBox,

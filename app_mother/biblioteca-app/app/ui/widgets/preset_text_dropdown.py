@@ -1,6 +1,7 @@
 """Dropdown cu valori predefinite pentru câmpuri text — click și selectezi."""
+from __future__ import annotations
 
-from PyQt6.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QComboBox
 
 from core.constants_manager import ensure_text_preset, get_text_presets
 

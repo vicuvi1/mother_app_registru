@@ -1,4 +1,5 @@
 """Generare automată cu range-uri și validare sume (reguli A/B/C)."""
+from __future__ import annotations
 
 import random
 from typing import Any

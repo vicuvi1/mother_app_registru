@@ -1,4 +1,6 @@
 """Scheme SQLite (SQLAlchemy) pentru toate Părțile I–VII, IX, XI–XIV."""
+from __future__ import annotations
+from typing import Optional
 
 from datetime import datetime, timezone
 
@@ -46,14 +48,14 @@ class EtichetaCustom(Base):
     parte: Mapped[str] = mapped_column(String, nullable=False)
     camp: Mapped[str] = mapped_column(String, nullable=False)
     eticheta_default: Mapped[str] = mapped_column(String, nullable=False)
-    eticheta_custom: Mapped[str | None] = mapped_column(String, nullable=True)
+    eticheta_custom: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class AppSetting(Base):
     __tablename__ = "app_settings"
 
     cheie: Mapped[str] = mapped_column(String, primary_key=True)
-    valoare: Mapped[str | None] = mapped_column(String, nullable=True)
+    valoare: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
 
 class TextPreset(Base):
@@ -256,25 +258,25 @@ class CercetariBibliografice(Base):
 
     data_primirii_cererii: Mapped[str] = mapped_column(String, nullable=False)
     total_referinte: Mapped[int] = mapped_column(Integer, default=0)
-    date_despre_solicitant: Mapped[str | None] = mapped_column(String, nullable=True)
-    statut_socio_profesional: Mapped[str | None] = mapped_column(String, nullable=True)
-    referinta: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cercetare_bibliografica: Mapped[str | None] = mapped_column(String, nullable=True)
-    consultatie: Mapped[str | None] = mapped_column(String, nullable=True)
-    referinta_tematica: Mapped[str | None] = mapped_column(String, nullable=True)
-    referinta_de_concretizare: Mapped[str | None] = mapped_column(String, nullable=True)
-    referinta_de_adresa: Mapped[str | None] = mapped_column(String, nullable=True)
-    referinta_factologie: Mapped[str | None] = mapped_column(String, nullable=True)
-    limite_cronologice: Mapped[str | None] = mapped_column(String, nullable=True)
+    date_despre_solicitant: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    statut_socio_profesional: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    referinta: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cercetare_bibliografica: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    consultatie: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    referinta_tematica: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    referinta_de_concretizare: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    referinta_de_adresa: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    referinta_factologie: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    limite_cronologice: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     surse_consultatie: Mapped[int] = mapped_column(Integer, default=0)
     numar_descrieri_bibliografice: Mapped[int] = mapped_column(Integer, default=0)
     surse_recomandate: Mapped[int] = mapped_column(Integer, default=0)
-    data_finalizarii_cererii: Mapped[str | None] = mapped_column(String, nullable=True)
-    responsabil: Mapped[str | None] = mapped_column(String, nullable=True)
+    data_finalizarii_cererii: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    responsabil: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # Câmpuri vechi — păstrate pentru migrare date
-    tema: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tip_referinta_bibliografica: Mapped[str | None] = mapped_column(String, nullable=True)
-    tip_referinta_grup: Mapped[str | None] = mapped_column(String, nullable=True)
+    tema: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tip_referinta_bibliografica: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tip_referinta_grup: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
@@ -297,16 +299,16 @@ class ActivitatiInformare(Base):
     categorie_varsta: Mapped[str] = mapped_column(String, nullable=False)
 
     data: Mapped[str] = mapped_column(String, nullable=False)
-    grup_tinta_subiect: Mapped[str | None] = mapped_column(String, nullable=True)
-    activitate_individuala: Mapped[str | None] = mapped_column(String, nullable=True)
-    activitate_grup: Mapped[str | None] = mapped_column(String, nullable=True)
-    activitate_public_larg: Mapped[str | None] = mapped_column(String, nullable=True)
+    grup_tinta_subiect: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    activitate_individuala: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    activitate_grup: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    activitate_public_larg: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     numar_participanti: Mapped[int] = mapped_column(Integer, default=0)
     participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
     participanti_feminin: Mapped[int] = mapped_column(Integer, default=0)
     documente_consultate: Mapped[int] = mapped_column(Integer, default=0)
-    responsabil: Mapped[str | None] = mapped_column(String, nullable=True)
-    gen_activitate: Mapped[str | None] = mapped_column(String, nullable=True)  # vechi — migrare
+    responsabil: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    gen_activitate: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # vechi — migrare
 
     is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
@@ -376,8 +378,8 @@ class Instruiri(Base):
     forma_informala: Mapped[bool] = mapped_column(Boolean, default=False)
     ore_informala: Mapped[int] = mapped_column(Integer, default=0)
 
-    tema_instruirii: Mapped[str | None] = mapped_column(Text, nullable=True)
-    formator: Mapped[str | None] = mapped_column(String, nullable=True)
+    tema_instruirii: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    formator: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     total_participanti: Mapped[int] = mapped_column(Integer, default=0)
 
     # Copii
@@ -424,11 +426,11 @@ class ActivitatiCulturale(Base):
     luna: Mapped[int] = mapped_column(Integer, nullable=False)
     categorie_varsta: Mapped[str] = mapped_column(String, nullable=False)
 
-    data: Mapped[str | None] = mapped_column(String, nullable=True)
+    data: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     total_activitati: Mapped[int] = mapped_column(Integer, default=0)
     din_care_expozitii: Mapped[int] = mapped_column(Integer, default=0)
-    tipul_activitatii: Mapped[str | None] = mapped_column(String, nullable=True)
-    denumirea_activitatii: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tipul_activitatii: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    denumirea_activitatii: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     total_participanti: Mapped[int] = mapped_column(Integer, default=0)
     participanti_masculin: Mapped[int] = mapped_column(Integer, default=0)
     participanti_feminin: Mapped[int] = mapped_column(Integer, default=0)
@@ -454,9 +456,9 @@ class ActivitatiOnline(Base):
     categorie_varsta: Mapped[str] = mapped_column(String, nullable=False)
 
     data: Mapped[str] = mapped_column(String, nullable=False)
-    denumirea_activitatii: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tipul_activitatii: Mapped[str | None] = mapped_column(String, nullable=True)
-    platforma: Mapped[str | None] = mapped_column(String, nullable=True)
+    denumirea_activitatii: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tipul_activitatii: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    platforma: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     vizualizari: Mapped[int] = mapped_column(Integer, default=0)
     impact: Mapped[int] = mapped_column(Integer, default=0)
     participanti_total: Mapped[int] = mapped_column(Integer, default=0)
@@ -485,11 +487,11 @@ class Parteneri(Base):
     scope_local: Mapped[bool] = mapped_column(Boolean, default=False)
     scope_national: Mapped[bool] = mapped_column(Boolean, default=False)
     scope_international: Mapped[bool] = mapped_column(Boolean, default=False)
-    date_contact: Mapped[str | None] = mapped_column(String, nullable=True)
-    tip_contract: Mapped[str | None] = mapped_column(String, nullable=True)
-    data_semnarii: Mapped[str | None] = mapped_column(String, nullable=True)
-    termen_realizare: Mapped[str | None] = mapped_column(String, nullable=True)
-    modalitati_realizare: Mapped[str | None] = mapped_column(Text, nullable=True)
+    date_contact: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tip_contract: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    data_semnarii: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    termen_realizare: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    modalitati_realizare: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     participanti_total: Mapped[int] = mapped_column(Integer, default=0)
     participanti_adulti: Mapped[int] = mapped_column(Integer, default=0)
     participanti_copii: Mapped[int] = mapped_column(Integer, default=0)
@@ -511,12 +513,12 @@ class Voluntariat(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     nume_prenume: Mapped[str] = mapped_column(String, nullable=False)
-    nr_contract: Mapped[str | None] = mapped_column(String, nullable=True)
-    data_inceperii: Mapped[str | None] = mapped_column(String, nullable=True)
-    data_incheierii: Mapped[str | None] = mapped_column(String, nullable=True)
+    nr_contract: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    data_inceperii: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    data_incheierii: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     numar_ore: Mapped[int] = mapped_column(Integer, default=0)
-    activitati_realizate: Mapped[str | None] = mapped_column(Text, nullable=True)
-    coordonator: Mapped[str | None] = mapped_column(String, nullable=True)
+    activitati_realizate: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    coordonator: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(

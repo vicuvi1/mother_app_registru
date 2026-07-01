@@ -1,6 +1,7 @@
 """Salvare periodică și la schimbare de pagină."""
+from __future__ import annotations
 
-from PyQt6.QtCore import QObject, QTimer
+from PyQt5.QtCore import QObject, QTimer
 
 from database.db_manager import get_setting, set_setting
 

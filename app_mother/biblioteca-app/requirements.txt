@@ -17,8 +17,9 @@
 #   build_installer.bat    # portabil + instalator Inno Setup
 
 # --- Runtime (aplicație desktop) ---
+# PyQt5 — compatibilă Windows 7/8/10/11 (Python 3.8+)
 
-PyQt6>=6.6,<7
+PyQt5>=5.15,<6
 SQLAlchemy>=2.0,<3
 openpyxl>=3.1          # export / import Excel
 python-docx>=1.1       # export Word (.docx)

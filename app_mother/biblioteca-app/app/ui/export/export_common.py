@@ -1,4 +1,5 @@
 """Texte și formatare comune pentru export."""
+from __future__ import annotations
 
 from ui.export.export_utils import escape_html, escape_reportlab
 

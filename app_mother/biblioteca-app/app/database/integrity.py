@@ -6,7 +6,7 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from PyQt6.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QMessageBox
 
 from database.backup import list_backups, restore_backup
 from database.db_manager import DB_PATH

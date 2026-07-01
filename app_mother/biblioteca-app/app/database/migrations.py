@@ -1,4 +1,5 @@
 """Migrări schema SQLite (coloane noi fără pierdere date)."""
+from __future__ import annotations
 
 from sqlalchemy import inspect, text
 

@@ -1,4 +1,5 @@
 """Partea II — Evidența utilizatorilor (Copii / Adulți)."""
+from __future__ import annotations
 
 from core.part02_cross_sync import (
     PART02_ACTIVITATI,

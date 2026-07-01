@@ -1,11 +1,12 @@
 """Overview registru complet: selectează/adaugă/elimină pagini, previzualizează și exportă final."""
+from __future__ import annotations
 
 from datetime import date
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextDocument
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QTextDocument
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,

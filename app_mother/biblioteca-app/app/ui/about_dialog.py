@@ -1,7 +1,8 @@
 """Dialog Despre aplicație."""
+from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QLabel, QVBoxLayout
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialog, QLabel, QVBoxLayout
 
 from core.constants_manager import APP_AUTHOR, APP_CREDIT
 from core.version import APP_VERSION, BUILD_DATE

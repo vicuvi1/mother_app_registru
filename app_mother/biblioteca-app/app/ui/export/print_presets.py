@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from PyQt6.QtGui import QPageLayout, QPageSize, QTextDocument
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import QWidget
+from PyQt5.QtGui import QPageLayout, QPageSize, QTextDocument
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import QWidget
 
 from core.export_presets import get_print_orientation
 from ui.export.export_html import build_pages_html

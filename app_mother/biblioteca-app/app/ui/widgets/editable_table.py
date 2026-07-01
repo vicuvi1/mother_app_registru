@@ -1,9 +1,10 @@
 """Tabel reutilizabil cu celule editabile, totaluri auto și highlight generat."""
+from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal, QEvent, QTimer
-from PyQt6.QtGui import (
+from PyQt5.QtCore import QRect, QSize, Qt, pyqtSignal, QEvent, QTimer
+from PyQt5.QtGui import (
     QBrush,
     QColor,
     QFont,
@@ -11,12 +12,12 @@ from PyQt6.QtGui import (
     QKeySequence,
     QPainter,
     QPen,
-    QShortcut,
 )
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QApplication,
     QCheckBox,
     QInputDialog,
+    QShortcut,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
@@ -236,7 +237,7 @@ class EditableTable(QTableWidget):
         if obj is self.viewport():
             et = event.type()
             if et == QEvent.Type.MouseButtonRelease:
-                pos = event.position().toPoint()
+                pos = event.pos()
                 index = self.indexAt(pos)
                 if not index.isValid():
                     return False

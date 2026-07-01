@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt5.QtGui import QBrush, QColor
 
 from ui.widgets.table.column_def import ColumnDef
 from ui.widgets.table.data_store import TableDataStore
@@ -178,7 +178,7 @@ class RegisterTableModel(QAbstractTableModel):
             ):
                 return QBrush(AUTO_COLOR)
         if role == Qt.ItemDataRole.FontRole and col_def.col_type == "date":
-            from PyQt6.QtGui import QFont
+            from PyQt5.QtGui import QFont
 
             font = QFont()
             font.setBold(True)

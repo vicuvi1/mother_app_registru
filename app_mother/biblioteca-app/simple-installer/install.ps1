@@ -35,10 +35,13 @@ $ProgressPreference     = 'SilentlyContinue'   # accelereaza mult descarcarile i
 
 $AppName       = 'Registru Digital Biblioteca'
 $ShortcutName  = 'Registru Digital'
-$PyVersion     = '3.12.7'
+# Python 3.8 = ultima versiune compatibila cu Windows 7. Aplicatia foloseste PyQt5,
+# deci acest instalator ruleaza pe Windows 7 SP1 / 8 / 8.1 / 10 / 11.
+$PyVersion     = '3.8.10'
 $PyEmbedUrl    = "https://www.python.org/ftp/python/$PyVersion/python-$PyVersion-embed-amd64.zip"
-$GetPipUrl     = 'https://bootstrap.pypa.io/get-pip.py'
-$RepoZipUrl    = 'https://github.com/vicuvi1/mother_app_registru/archive/refs/heads/main.zip'
+$GetPipUrl     = 'https://bootstrap.pypa.io/pip/3.8/get-pip.py'
+$VcRedistUrl   = 'https://aka.ms/vs/16/release/vc_redist.x64.exe'   # VC++ 2015-2019 (compatibil Win7 SP1)
+$RepoZipUrl    = 'https://github.com/vicuvi1/mother_app_registru/archive/refs/heads/pyqt5-win7.zip'
 
 # Fisierele aplicatiei sunt incluse (bundle) direct in acest instalator, sub forma de
 # arhiva ZIP codificata base64. Linia de mai jos este inlocuita automat de build-setup-exe.ps1.
@@ -78,7 +81,7 @@ Write-Head "Instalare $AppName"
 Write-Host "  Aplicatia se va instala in:" -ForegroundColor White
 Write-Host "  $InstallRoot" -ForegroundColor White
 Write-Host ''
-Write-Host '  Nu sunt necesare drepturi de administrator.' -ForegroundColor Gray
+Write-Host '  Compatibil: Windows 7 SP1, 8, 8.1, 10 si 11 (64-bit).' -ForegroundColor Gray
 Write-Host '  Prima instalare dureaza cateva minute (se descarca ~60 MB).' -ForegroundColor Gray
 
 $WorkTmp = Join-Path ([System.IO.Path]::GetTempPath()) ("RegistruSetup_" + [System.Guid]::NewGuid().ToString('N'))
@@ -136,6 +139,23 @@ try {
         if ($LASTEXITCODE -ne 0) { Fail 'Instalarea pip a esuat.' }
     } else {
         Write-Step 2 $TOTAL 'Python izolat exista deja - se reutilizeaza.'
+    }
+
+    # -----------------------------------------------------------------------
+    # 2b. Componente Visual C++ / UCRT - necesare Qt pe Windows 7/8
+    #     (pe Windows 10/11 sunt deja incluse in sistem, deci sarim peste)
+    # -----------------------------------------------------------------------
+    if ([Environment]::OSVersion.Version.Major -lt 10) {
+        Write-Info 'Windows 7/8 detectat - se verifica componentele Visual C++ (poate aparea o cerere UAC)...'
+        try {
+            $vc = Join-Path $WorkTmp 'vc_redist.x64.exe'
+            Invoke-WebRequest -Uri $VcRedistUrl -OutFile $vc -UseBasicParsing
+            Start-Process -FilePath $vc -ArgumentList '/install', '/quiet', '/norestart' -Wait
+            Write-Info 'Componente Visual C++ verificate.'
+        } catch {
+            Write-Info 'Nu s-au putut instala automat componentele Visual C++ - aplicatia poate necesita'
+            Write-Info 'instalarea manuala a "Visual C++ 2015-2019 Redistributable (x64)".'
+        }
     }
 
     # -----------------------------------------------------------------------

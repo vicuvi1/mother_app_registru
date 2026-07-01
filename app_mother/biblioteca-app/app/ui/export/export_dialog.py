@@ -1,9 +1,10 @@
 """Dialog alegere format + scope export."""
+from __future__ import annotations
 
 from datetime import date
 
 from core.constants_manager import DEFAULT_EXPORT_FORMAT
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDialog,

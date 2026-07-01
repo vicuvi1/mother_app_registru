@@ -1,4 +1,5 @@
 """Partea XI — Activități culturale și științifice (structură conform registrului fizic)."""
+from __future__ import annotations
 
 from database.models import ActivitatiCulturale
 from ui.part_base import PartPageBase

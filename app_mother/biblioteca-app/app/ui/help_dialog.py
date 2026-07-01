@@ -1,7 +1,8 @@
 """Dialog scurtături tastatură."""
+from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QLabel, QVBoxLayout
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialog, QLabel, QVBoxLayout
 
 from core.autosave import get_autosave_interval
 

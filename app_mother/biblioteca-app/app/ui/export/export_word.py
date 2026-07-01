@@ -1,4 +1,5 @@
 """Export Word cu python-docx — pagini landscape, tabel pe toată lățimea paginii."""
+from __future__ import annotations
 
 from pathlib import Path
 

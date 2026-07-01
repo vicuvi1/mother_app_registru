@@ -1,4 +1,5 @@
 """Partea III — Evidența documentelor înregistrate."""
+from __future__ import annotations
 
 from core.part_sync import (
     PART03_DIN_CARE,

@@ -1,6 +1,7 @@
 """Ecran inițial: Personal, range-uri default, date bibliotecă."""
+from __future__ import annotations
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,

@@ -1,4 +1,5 @@
 """Export PDF cu reportlab — pagini numerotate, grilă completă, anteturi de grup."""
+from __future__ import annotations
 
 from pathlib import Path
 

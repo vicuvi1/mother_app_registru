@@ -1,4 +1,5 @@
 """Partea VII — Documente electronice online (pe luni)."""
+from __future__ import annotations
 
 from database.models import DocumenteElectronice
 from ui.part_base import PartPageBase

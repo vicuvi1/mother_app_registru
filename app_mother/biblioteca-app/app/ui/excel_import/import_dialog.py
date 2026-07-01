@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,

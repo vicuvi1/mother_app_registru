@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QStyledItemDelegate
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QStyledItemDelegate
 
 from ui.widgets.responsabil_dropdown import ResponsabilDropdown
 

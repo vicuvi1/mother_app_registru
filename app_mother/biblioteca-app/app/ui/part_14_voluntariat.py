@@ -1,4 +1,5 @@
 """Partea XIV — Activități de voluntariat."""
+from __future__ import annotations
 
 from database.models import Voluntariat
 from ui.part_base import PartPageBase

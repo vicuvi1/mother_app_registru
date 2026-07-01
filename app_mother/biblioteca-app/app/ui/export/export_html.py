@@ -1,4 +1,5 @@
 """Construire HTML pentru print (tabel cu grilă, anteturi de grup, pagini numerotate)."""
+from __future__ import annotations
 
 from ui.export.export_common import (
     REGISTER_TITLE,

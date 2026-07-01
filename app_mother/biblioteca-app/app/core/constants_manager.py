@@ -1,4 +1,5 @@
 """Gestionare personal, etichete custom, range-uri și setări."""
+from __future__ import annotations
 
 from sqlalchemy import delete, select
 

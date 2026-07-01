@@ -1,8 +1,9 @@
 """Celulă text: click stânga = listă, click dreapta = scriere direct în celulă."""
+from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
+from PyQt5.QtWidgets import (
     QApplication,
     QFrame,
     QLabel,
