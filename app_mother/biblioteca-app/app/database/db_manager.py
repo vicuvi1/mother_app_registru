@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from database.models import AppSetting, Base
@@ -89,9 +90,14 @@ def mark_setup_completed() -> None:
 
 
 def get_setting(cheie: str, default: str | None = None) -> str | None:
-    with get_session() as session:
-        setting = session.get(AppSetting, cheie)
-        return setting.valoare if setting else default
+    # Poate fi apelat inainte ca tabelele sa existe (ex. tema UI la prima pornire,
+    # inainte de init_database, pe o baza de date noua) -> intoarce default in loc sa crape.
+    try:
+        with get_session() as session:
+            setting = session.get(AppSetting, cheie)
+            return setting.valoare if setting else default
+    except OperationalError:
+        return default
 
 
 def set_setting(cheie: str, valoare: str) -> None:
