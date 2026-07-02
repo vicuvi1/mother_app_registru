@@ -37,6 +37,11 @@ try {
     Copy-Item (Join-Path $appRoot 'app') $stageApp -Recurse -Force
     $stageData = Join-Path $stageApp 'data'
     if (Test-Path $stageData) { Remove-Item $stageData -Recurse -Force }
+    # elimina cache-ul Python (__pycache__ / *.pyc) - nu trebuie inclus in pachet
+    Get-ChildItem $stageApp -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem $stageApp -Recurse -File -Filter '*.pyc' -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
 
     foreach ($f in @('requirements-runtime.txt', 'requirements.txt')) {
         $rf = Join-Path $appRoot $f

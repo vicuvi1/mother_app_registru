@@ -5,7 +5,7 @@
       1. Creeaza folderul aplicatiei in %LOCALAPPDATA%\RegistruDigital (fara drepturi de administrator)
       2. Descarca un Python "embeddable" izolat (nu atinge Python-ul din sistem)
       3. Descarca aplicatia din GitHub (sau o copiaza dintr-o sursa locala cu -AppSource)
-      4. Instaleaza automat toate dependentele (PyQt6, SQLAlchemy, openpyxl, python-docx, reportlab)
+      4. Instaleaza automat toate dependentele (PyQt5, SQLAlchemy, openpyxl, python-docx, reportlab)
       5. Creeaza o scurtatura pe Desktop si in Meniul Start
       6. Porneste aplicatia
 
@@ -203,12 +203,12 @@ try {
     # -----------------------------------------------------------------------
     # 4. Instalare dependente
     # -----------------------------------------------------------------------
-    Write-Step 4 $TOTAL 'Instalare dependente (PyQt6, export Excel/Word/PDF)...'
+    Write-Step 4 $TOTAL 'Instalare dependente (PyQt5, export Excel/Word/PDF)...'
     Write-Info 'Aceasta este partea care dureaza cel mai mult, va rugam asteptati...'
     $reqFile = Join-Path $InstallRoot 'requirements-runtime.txt'
     if (-not (Test-Path $reqFile)) {
         # Plasa de siguranta daca fisierul lipseste din sursa
-        @('PyQt6>=6.6,<7','SQLAlchemy>=2.0,<3','openpyxl>=3.1','python-docx>=1.1','reportlab>=4.0') |
+        @('PyQt5>=5.15,<6','SQLAlchemy>=2.0,<3','openpyxl>=3.1','python-docx>=1.1','reportlab>=4.0') |
             Set-Content -Path $reqFile -Encoding ASCII
     }
     & $pyExe -m pip install --no-warn-script-location -r $reqFile
@@ -224,35 +224,58 @@ try {
 
     if (-not $NoShortcut) {
         Write-Step 5 $TOTAL 'Creare scurtaturi...'
-        $ws = New-Object -ComObject WScript.Shell
+        # Scurtaturile nu sunt critice: daca ceva esueaza aici, aplicatia este deja
+        # instalata, deci prindem eroarea si continuam (nu inchidem instalatorul).
+        try {
+            $ws = New-Object -ComObject WScript.Shell
 
-        function New-Lnk($path, $target, $arguments, $workdir, $icon, $desc) {
-            $lnk = $ws.CreateShortcut($path)
-            $lnk.TargetPath       = $target
-            $lnk.Arguments        = $arguments
-            $lnk.WorkingDirectory = $workdir
-            $lnk.IconLocation     = $icon
-            $lnk.Description       = $desc
-            $lnk.Save()
-        }
+            function New-Lnk($path, $target, $arguments, $workdir, $icon, $desc) {
+                $lnk = $ws.CreateShortcut($path)
+                $lnk.TargetPath       = $target
+                $lnk.Arguments        = $arguments
+                $lnk.WorkingDirectory = $workdir
+                if ($icon) { $lnk.IconLocation = $icon }
+                $lnk.Description       = $desc
+                $lnk.Save()
+            }
 
-        $desktop  = [Environment]::GetFolderPath('Desktop')
-        $programs = [Environment]::GetFolderPath('Programs')
-        $startDir = Join-Path $programs $ShortcutName
-        New-Item -ItemType Directory -Force -Path $startDir | Out-Null
+            $desktop  = [Environment]::GetFolderPath('Desktop')
+            $programs = [Environment]::GetFolderPath('Programs')
+            $startDir = Join-Path $programs $ShortcutName
+            New-Item -ItemType Directory -Force -Path $startDir | Out-Null
 
-        $appArgs = ('"{0}"' -f $mainPy)
-        New-Lnk (Join-Path $desktop  "$ShortcutName.lnk") $pywExe $appArgs $InstallRoot $iconPath $AppName
-        New-Lnk (Join-Path $startDir "$ShortcutName.lnk") $pywExe $appArgs $InstallRoot $iconPath $AppName
+            $appArgs = ('"{0}"' -f $mainPy)
+            New-Lnk (Join-Path $desktop  "$ShortcutName.lnk") $pywExe $appArgs $InstallRoot $iconPath $AppName
+            New-Lnk (Join-Path $startDir "$ShortcutName.lnk") $pywExe $appArgs $InstallRoot $iconPath $AppName
 
-        # Dezinstalator
-        $uninSrc = Join-Path $PSScriptRoot 'uninstall.ps1'
-        $uninDst = Join-Path $InstallRoot 'uninstall.ps1'
-        if (Test-Path $uninSrc) { Copy-Item $uninSrc $uninDst -Force }
-        if (Test-Path $uninDst) {
-            $psExe   = Join-Path $PSHOME 'powershell.exe'
+            # Dezinstalator: scris direct in folderul aplicatiei. NU folosim $PSScriptRoot,
+            # care este gol intr-un .exe compilat cu ps2exe (cauza inchiderii bruste anterioare).
+            $uninDst = Join-Path $InstallRoot 'uninstall.ps1'
+            Set-Content -Path $uninDst -Encoding UTF8 -Value @'
+$root = Join-Path $env:LOCALAPPDATA 'RegistruDigital'
+$name = 'Registru Digital'
+Write-Host 'Dezinstalare Registru Digital Biblioteca...' -ForegroundColor Cyan
+$a = Read-Host 'Sigur doriti sa dezinstalati aplicatia? (D/N)'
+if ($a -notmatch '^[DdYy]') { Write-Host 'Anulat.'; Start-Sleep 1; exit }
+$desk = [Environment]::GetFolderPath('Desktop')
+$prog = [Environment]::GetFolderPath('Programs')
+Remove-Item (Join-Path $desk "$name.lnk") -Force -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $prog $name) -Recurse -Force -ErrorAction SilentlyContinue
+Get-Process pythonw, python -ErrorAction SilentlyContinue |
+    Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) } |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep 1
+try { Remove-Item $root -Recurse -Force -ErrorAction Stop; Write-Host 'Dezinstalare finalizata.' -ForegroundColor Green }
+catch { Write-Host 'Inchideti aplicatia si stergeti manual folderul:' -ForegroundColor Yellow; Write-Host "  $root" }
+Start-Sleep 2
+'@
+            $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            if ($PSHOME -and (Test-Path (Join-Path $PSHOME 'powershell.exe'))) { $psExe = Join-Path $PSHOME 'powershell.exe' }
             $uninArg = ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $uninDst)
             New-Lnk (Join-Path $startDir "Dezinstalare $ShortcutName.lnk") $psExe $uninArg $InstallRoot $iconPath "Dezinstalare $AppName"
+        } catch {
+            Write-Info ("Scurtaturile nu au putut fi create complet: " + $_.Exception.Message)
+            Write-Info 'Aplicatia este totusi instalata si poate fi pornita.'
         }
     } else {
         Write-Step 5 $TOTAL 'Scurtaturi omise (-NoShortcut).'
@@ -278,6 +301,20 @@ try {
     } else {
         Pause-End 'Apasati Enter pentru a inchide'
     }
+}
+catch {
+    # Prinde ORICE eroare neasteptata ca fereastra sa nu se inchida brusc, ci sa afiseze cauza.
+    Write-Host ''
+    Write-Host '------------------------------------------------------------' -ForegroundColor Red
+    Write-Host '  Instalarea nu s-a putut finaliza.' -ForegroundColor Red
+    Write-Host ("  " + $_.Exception.Message) -ForegroundColor Red
+    if ($_.InvocationInfo) { Write-Host ("  (" + $_.InvocationInfo.PositionMessage + ")") -ForegroundColor DarkGray }
+    Write-Host '------------------------------------------------------------' -ForegroundColor Red
+    Write-Host ''
+    Write-Host 'Trimiteti acest mesaj pentru asistenta.' -ForegroundColor Yellow
+    Write-Host ''
+    Pause-End 'Apasati Enter pentru a inchide'
+    exit 1
 }
 finally {
     if (Test-Path $WorkTmp) { Remove-Item $WorkTmp -Recurse -Force -ErrorAction SilentlyContinue }
