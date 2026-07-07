@@ -5,42 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Registru Digital — versiune web</title>
   <style>
-    :root { --bg:#f4f6fb; --panel:#fff; --line:#d7deea; --accent:#2563eb;
-            --accent-d:#1d4ed8; --text:#1e293b; --muted:#64748b; --sidebar:#0f172a; }
-    * { box-sizing: border-box; }
-    body { margin:0; font:14px/1.4 "Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--text); }
-    button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:7px 12px;
-             cursor:pointer; font-size:13px; }
-    button:hover { background:var(--accent-d); }
-    button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
-    select, input { border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px; background:#fff; }
+    :root { --bg:#eef1f7; --panel:#fff; --line:#dbe1ec; --accent:#2563eb; --accent-d:#1d4ed8;
+            --text:#1e293b; --muted:#64748b; --sidebar:#0f172a; --sidebar2:#1e293b;
+            --ok:#16a34a; --warn:#d97706; --today:#fef9c3; --auto:#dbeafe; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:14px/1.45 "Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--text); }
+    button { background:var(--accent); color:#fff; border:0; border-radius:7px; padding:7px 12px; cursor:pointer; font-size:13px; }
+    button:hover { background:var(--accent-d); } button:disabled { opacity:.5; cursor:default; }
+    button.ghost { background:#fff; color:var(--text); border:1px solid var(--line); }
+    button.ghost:hover { background:#f1f5f9; }
+    button.ok { background:var(--ok); } button.ok:hover { filter:brightness(.94); }
+    select, input { border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px; background:#fff; color:var(--text); }
     .status { font-size:12px; color:var(--muted); }
     .pill { font-size:11px; padding:2px 8px; border-radius:999px; background:#e2e8f0; color:#334155; }
     .pill.live { background:#dcfce7; color:#166534; }
     .hidden { display:none !important; }
+    a { color:var(--accent); }
 
     /* Auth */
-    #auth { max-width:360px; margin:8vh auto; background:var(--panel); border:1px solid var(--line);
-            border-radius:12px; padding:24px; box-shadow:0 8px 30px rgba(0,0,0,.06); }
+    #auth { max-width:370px; margin:9vh auto; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:26px; box-shadow:0 10px 40px rgba(2,6,23,.08); }
     #auth h2 { margin:0 0 4px; } #auth p { margin:0 0 18px; color:var(--muted); font-size:13px; }
     #auth label { display:block; font-size:12px; margin:10px 0 4px; color:var(--muted); }
-    #auth input { width:100%; } #auth button { width:100%; margin-top:16px; padding:9px; }
+    #auth input { width:100%; } #auth button { width:100%; margin-top:16px; padding:10px; }
     .err { color:#b91c1c; font-size:12px; margin-top:10px; min-height:16px; }
 
     /* Layout */
     #app { display:flex; min-height:100vh; }
-    aside { width:210px; background:var(--sidebar); color:#cbd5e1; flex-shrink:0; padding:10px 0; }
-    aside .brand { color:#fff; font-weight:600; padding:10px 16px 14px; font-size:15px; }
-    aside button.nav { display:block; width:100%; text-align:left; background:transparent; color:#cbd5e1;
-            border:0; border-radius:0; padding:8px 16px; font-size:13px; }
-    aside button.nav:hover { background:#1e293b; color:#fff; }
+    aside { width:230px; background:var(--sidebar); color:#cbd5e1; flex-shrink:0; display:flex; flex-direction:column; }
+    aside .brand { color:#fff; font-weight:700; padding:16px 16px 4px; font-size:16px; display:flex; align-items:center; gap:8px; }
+    aside .brandsub { color:#94a3b8; font-size:11px; padding:0 16px 12px; line-height:1.35; }
+    aside .navcap { color:#64748b; font-size:10px; letter-spacing:.08em; text-transform:uppercase; padding:10px 16px 4px; }
+    aside nav { overflow-y:auto; flex:1; }
+    aside button.nav { display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:transparent; color:#cbd5e1; border:0; border-radius:0; padding:8px 16px; font-size:13px; }
+    aside button.nav:hover { background:var(--sidebar2); color:#fff; }
     aside button.nav.active { background:var(--accent); color:#fff; }
-    aside .navsep { border-top:1px solid #1e293b; margin:8px 0; }
+    aside button.nav .b { margin-left:auto; font-size:12px; }
+    aside .navsep { border-top:1px solid var(--sidebar2); margin:8px 12px; }
+    aside .foot { padding:12px 16px; font-size:11px; color:#64748b; border-top:1px solid var(--sidebar2); }
     main { flex:1; min-width:0; display:flex; flex-direction:column; }
-    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px;
-             display:flex; align-items:center; gap:10px; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
-    header h1 { font-size:15px; margin:0; margin-right:auto; }
-    .wrap { padding:16px; overflow:auto; }
+
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 18px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    header .badge { width:40px; height:40px; border-radius:9px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; }
+    header h1 { font-size:16px; margin:0; } header .sub { font-size:11px; color:var(--muted); }
+    header .sp { margin-left:auto; }
+    .toolbar { background:var(--panel); border-bottom:1px solid var(--line); padding:8px 18px; display:flex; gap:7px; flex-wrap:wrap; align-items:center; }
+    .hintbar { padding:6px 18px; font-size:11px; color:var(--muted); background:#f8fafc; border-bottom:1px solid var(--line); }
+    .tabs { display:flex; gap:4px; padding:8px 18px 0; flex-wrap:wrap; background:var(--panel); }
+    .tabs button { background:#f1f5f9; color:var(--text); border:1px solid var(--line); border-bottom:0; border-radius:7px 7px 0 0; padding:6px 12px; font-size:12px; }
+    .tabs button.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .cattabs { display:flex; gap:6px; padding:10px 18px 0; background:var(--panel); }
+    .cattabs button { background:#fff; border:1px solid var(--line); color:var(--text); border-radius:7px; padding:6px 16px; font-size:13px; font-weight:600; }
+    .cattabs button.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+    .wrap { padding:16px 18px; overflow:auto; flex:1; }
 
     /* Table */
     .tablebox { overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; }
@@ -48,69 +64,86 @@
     th, td { border:1px solid var(--line); padding:0; text-align:center; white-space:nowrap; }
     th { background:#eef2f7; font-size:11px; font-weight:600; padding:6px 8px; }
     td .txtcell { padding:8px; }
-    td input.num { width:64px; }
-    td input.txt { width:150px; } td input.txt.wide { width:230px; }
-    td input.date { width:130px; }
-    td input { border:0; padding:8px 4px; text-align:center; background:transparent; }
+    td input.num { width:60px; } td input.txt { width:150px; } td input.txt.wide { width:230px; } td input.date { width:74px; font-weight:600; }
+    td input { border:0; padding:8px 4px; text-align:center; background:transparent; color:var(--text); font:inherit; }
     td input:focus { outline:2px solid var(--accent); outline-offset:-2px; background:#fff; }
     td input.dirty { background:#fef9c3; }
     td input.calc { background:#eef2f7; color:#475569; font-weight:600; }
     td input.oor { background:#fee2e2 !important; color:#b91c1c; }
     tbody tr:nth-child(even) td { background:#fafbfe; }
-    /* Rânduri de total */
+    tbody tr.today td { background:var(--today); }
     tfoot td { font-weight:600; }
-    tfoot .totalrow { background:#e2e8f0; }
-    tfoot .cumrow { background:#dbeafe; }
+    tfoot .totalrow { background:#e2e8f0; } tfoot .cumrow { background:#dbeafe; }
     td.totlbl { font-weight:700; text-align:left; padding:6px 10px; background:#cbd5e1; white-space:nowrap; }
     button.del { background:transparent; color:#b91c1c; border:0; font-weight:700; padding:6px 10px; }
     button.del:hover { background:#fee2e2; }
 
-    .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111827;
-             color:#fff; padding:8px 16px; border-radius:8px; font-size:13px; opacity:0; transition:.2s; z-index:20; }
-    .toast.show { opacity:.95; }
+    /* Dashboard */
+    .cards { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+    @media(max-width:860px){ .cards{ grid-template-columns:1fr; } }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; }
+    .card h3 { margin:0 0 12px; font-size:15px; }
+    .progress { height:22px; background:#e2e8f0; border-radius:999px; overflow:hidden; position:relative; }
+    .progress > div { height:100%; background:var(--accent); }
+    .progress span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; }
+    .kpis { display:flex; gap:18px; margin:12px 0; font-size:13px; }
+    .kpis b { font-size:20px; display:block; }
+    .todo { max-height:280px; overflow:auto; border:1px solid var(--line); border-radius:8px; }
+    .todo div { padding:8px 12px; border-bottom:1px solid var(--line); font-size:13px; }
+    .todo div:last-child { border-bottom:0; }
+
+    /* Modal */
+    .modal { position:fixed; inset:0; background:rgba(2,6,23,.45); display:flex; align-items:center; justify-content:center; z-index:30; }
+    .modal .box { background:var(--panel); border-radius:12px; padding:22px; width:min(560px,92vw); max-height:88vh; overflow:auto; box-shadow:0 20px 60px rgba(2,6,23,.3); }
+    .modal h3 { margin:0 0 14px; }
+    .modal label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+    .modal input { width:100%; }
+    .modal .row { display:flex; gap:10px; align-items:center; }
+    .modal .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+
+    .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111827; color:#fff; padding:9px 18px; border-radius:8px; font-size:13px; opacity:0; transition:.2s; z-index:40; }
+    .toast.show { opacity:.96; }
   </style>
 </head>
 <body>
-  <!-- Autentificare -->
   <div id="auth">
-    <h2>Registru Digital</h2>
+    <h2>📚 Registru Digital</h2>
     <p>Autentificare bibliotecar</p>
-    <label>Email</label>
-    <input id="email" type="email" autocomplete="username" />
-    <label>Parolă</label>
-    <input id="password" type="password" autocomplete="current-password" />
+    <label>Email</label><input id="email" type="email" autocomplete="username" />
+    <label>Parolă</label><input id="password" type="password" autocomplete="current-password" />
     <button id="loginBtn">Autentificare</button>
     <div class="err" id="authErr"></div>
   </div>
 
-  <!-- Aplicația -->
   <div id="app" class="hidden">
     <aside>
-      <div class="brand">📚 Registru Digital</div>
-      <div id="nav"></div>
+      <div class="brand">📚 <span>Registru Digital</span></div>
+      <div class="brandsub" id="brandsub"></div>
+      <div class="navcap">Părți active</div>
+      <nav id="nav"></nav>
+      <div class="foot" id="who2"></div>
     </aside>
     <main>
       <header>
-        <h1 id="title">—</h1>
+        <div class="badge" id="hbadge">—</div>
+        <div><h1 id="title">—</h1><div class="sub" id="subtitle"></div></div>
+        <span class="sp"></span>
         <label class="status" id="anWrap">An <select id="an"></select></label>
-        <label class="status" id="lunaWrap">Luna <select id="luna"></select></label>
-        <label class="status" id="catWrap">Categorie
-          <select id="cat"><option value="copii">Copii</option><option value="adulti">Adulți</option></select>
-        </label>
-        <button id="addRow" class="ghost">+ Rând</button>
-        <button id="exportBtn" class="ghost" title="Export Excel (vizualizarea curentă)">⬇ Excel</button>
-        <button id="pdfBtn" class="ghost" title="Export PDF (vizualizarea curentă)">⬇ PDF</button>
-        <button id="wordBtn" class="ghost" title="Export Word (vizualizarea curentă)">⬇ Word</button>
-        <button id="backup" class="ghost" title="Copie locală completă (Excel + SQLite)">⬇ Backup local</button>
         <span id="live" class="pill">offline</span>
         <span class="status" id="backupInfo"></span>
+        <button id="settingsBtn" class="ghost" title="Setări">⚙</button>
         <span class="status" id="who"></span>
         <button id="logout" class="ghost">Ieșire</button>
       </header>
+      <div class="toolbar" id="toolbar"></div>
+      <div class="tabs hidden" id="tabs"></div>
+      <div class="cattabs hidden" id="cattabs"></div>
+      <div class="hintbar hidden" id="hintbar">Click pe celulă + tastați · Enter = rândul următor · Galben = azi · Bleu = calculat automat</div>
       <div class="wrap"><div id="content"></div></div>
     </main>
   </div>
 
+  <div id="settings" class="modal hidden"></div>
   <datalist id="staffList"></datalist>
   <div class="toast" id="toast"></div>
 
