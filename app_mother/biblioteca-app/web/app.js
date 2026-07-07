@@ -13,7 +13,8 @@
   if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) $("authErr").textContent = "Lipsește config.js.";
   const sb = window.supabase.createClient(window.SUPABASE_URL || "", window.SUPABASE_ANON_KEY || "");
 
-  const state = { part: null, an: 2026, luna: 7, cat: "copii", rows: [], staff: [], prior: null,
+  const NOW = new Date();
+  const state = { part: null, an: NOW.getFullYear(), luna: NOW.getMonth() + 1, cat: "copii", rows: [], staff: [], prior: null,
     aux: {}, presets: {}, labels: {}, ranges: {}, settings: {}, badges: {} };
   let channel = null;
 
@@ -50,8 +51,8 @@
 
   function initSelectors() {
     if ($("an").options.length) return;
-    for (let y = 2023; y <= 2027; y++) $("an").add(new Option(y, y, false, y === state.an));
-    $("an").onchange = () => { state.an = +$("an").value; state.part === HOME ? renderHome() : (!special() && loadData()); };
+    for (let y = state.an - 3; y <= state.an + 1; y++) $("an").add(new Option(y, y, false, y === state.an));
+    $("an").onchange = () => { state.an = +$("an").value; if (state.part === HOME) renderHome(); else if (state.part === FINAL) renderFinal(); else if (!special()) { loadData(); updateChrome(); } };
   }
   const special = () => state.part === STAFF || state.part === IMPORT || state.part === HOME || state.part === FINAL;
 
@@ -361,12 +362,11 @@
     const [cls, txt] = map[s] || map.ok;
     el.className = "pill " + cls; el.textContent = txt;
   }
-  // Salvare cu reîncercare (blip de rețea) + blocare optimistă pe updated_at.
-  async function saveUpdate(table, payload, id, prevUpdated) {
+  // Salvare cu reîncercare la blip de rețea (last-write-wins; realtime menține
+  // vizualizarea proaspătă). Fără blocare pe updated_at ca să nu apară „nu salvează".
+  async function saveUpdate(table, payload, id) {
     for (let attempt = 0; ; attempt++) {
-      let q = sb.from(table).update(payload).eq("id", id);
-      if (prevUpdated !== undefined && prevUpdated !== null) q = q.eq("updated_at", prevUpdated);
-      const res = await q.select().maybeSingle();
+      const res = await sb.from(table).update(payload).eq("id", id).select().maybeSingle();
       if (!res.error) return res;
       if (attempt >= 2) return res;
       setSaveState("err");
@@ -377,7 +377,7 @@
   async function saveCell(e) {
     const el = e.target, id = +el.dataset.id, col = el.dataset.col, type = el.dataset.type;
     const row = state.rows.find((r) => r.id === id); if (!row) return;
-    const oldVal = row[col], prevUpdated = row.updated_at;
+    const oldVal = row[col];
     if (type === "int") row[col] = toInt(el.value);
     else if (type === "bool") row[col] = el.checked;
     else row[col] = el.value === "" ? (el.dataset.req ? "" : null) : el.value;
@@ -394,10 +394,10 @@
     }
     const payload = {}; affected.forEach((k) => (payload[k] = row[k]));
     setSaveState("saving");
-    const res = await saveUpdate(state.part.key, payload, id, prevUpdated);
+    const res = await saveUpdate(state.part.key, payload, id);
     if (res.error) { setSaveState("err"); toast("Eroare salvare: " + res.error.message); return; }
-    if (!res.data) { setSaveState("ok"); toast("Rând modificat de alt utilizator — se reîncarcă"); await loadData(); return; }
-    row.updated_at = res.data.updated_at; setSaveState("ok");
+    if (res.data) row.updated_at = res.data.updated_at;
+    setSaveState("ok");
     if (oldVal !== row[col]) pushUndo({ kind: "cell", key: state.part.key, id, col, type, old: oldVal });
     // sincronizare inversă II → IX/XI
     const cdef = effCols().find((c) => c[0] === col);
