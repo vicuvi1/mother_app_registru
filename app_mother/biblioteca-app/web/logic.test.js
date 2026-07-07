@@ -1,0 +1,32 @@
+// Teste pentru logic.js — rulează cu: node logic.test.js
+const L = require("./logic.js");
+let fails = 0;
+const eq = (a, b, msg) => {
+  if (JSON.stringify(a) !== JSON.stringify(b)) { console.error("FAIL:", msg, "\n  got:", JSON.stringify(a), "\n  exp:", JSON.stringify(b)); fails++; }
+  else console.log("ok  -", msg);
+};
+
+// weekdays: iulie 2026 (1 iul = miercuri) → 23 zile lucrătoare, prima 01.07
+eq(L.weekdays(2026, 7).length, 23, "iulie 2026 = 23 zile lucrătoare");
+eq(L.weekdays(2026, 7).slice(0, 4), ["01.07", "02.07", "03.07", "06.07"], "iulie 2026 sare weekendul");
+
+// rebalanceCZU
+eq(L.rebalanceCZU([10, 20, 30], 30), [5, 10, 15], "rebalance 60→30 proporțional");
+eq(L.rebalanceCZU([1, 1, 1], 30), [1, 1, 1], "fără rebalance sub total");
+eq(L.rebalanceCZU([0, 0, 0], 0), [0, 0, 0], "rebalance total 0");
+
+// genderSplit
+eq(L.genderSplit(7), { f: 3, m: 4 }, "gen 7 → F3 M4 (impar la masculin)");
+eq(L.genderSplit(0), { f: 0, m: 0 }, "gen 0");
+
+// copiiSplit
+eq(L.copiiSplit(2, 3, 0, "elevi"), { prescolari: 2, elevi: 3, copii_pana_16: 5 }, "copii: edit elevi → total");
+eq(L.copiiSplit(2, 0, 5, "copii_pana_16"), { prescolari: 2, elevi: 3, copii_pana_16: 5 }, "copii: edit total → elevi");
+eq(L.copiiSplit(4, 3, 5, "prescolari"), { prescolari: 4, elevi: 1, copii_pana_16: 5 }, "copii: edit preșcolari cu total>0");
+
+// sumCols
+eq(L.sumCols([["a", "A", "int"], ["b", "B", "bool", { ct: true }], ["t", "T", "text"]],
+  [{ a: 2, b: true, t: "x" }, { a: 3, b: false, t: "" }]), { a: 5, b: 1 }, "sumCols: int sumă, bool ct = nr bifate");
+
+if (fails) { console.error("\n" + fails + " test(e) eșuate"); process.exit(1); }
+console.log("\nTOATE TESTELE AU TRECUT");

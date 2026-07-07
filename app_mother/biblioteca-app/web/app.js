@@ -30,11 +30,7 @@
   const effCols = () => partCols(state.part, state.cat);
   const isPart = () => state.part && state.part.key && state.part.key.indexOf("__") !== 0;
 
-  function weekdays(year, month) {
-    const out = [], d = new Date(year, month - 1, 1);
-    while (d.getMonth() === month - 1) { const wd = d.getDay(); if (wd >= 1 && wd <= 5) out.push(ddmm(d.getDate(), month)); d.setDate(d.getDate() + 1); }
-    return out;
-  }
+  const weekdays = (y, m) => window.RegistruLogic.weekdays(y, m);
   function todayStr() { const d = new Date(); return { d: ddmm(d.getDate(), d.getMonth() + 1), y: d.getFullYear(), m: d.getMonth() + 1 }; }
 
   // ---- Autentificare --------------------------------------------------------
@@ -303,11 +299,7 @@
     const i = all.indexOf(inp); if (i >= 0 && i < all.length - 1) all[i + 1].focus(); else inp.blur();
   }
 
-  function computeAcc(cols, rows) {
-    const acc = {};
-    cols.forEach(([k, l, t, o]) => { if (t === "int") acc[k] = rows.reduce((s, r) => s + (+r[k] || 0), 0); else if (t === "bool" && o && o.ct) acc[k] = rows.reduce((s, r) => s + (r[k] ? 1 : 0), 0); });
-    return acc;
-  }
+  const computeAcc = (cols, rows) => window.RegistruLogic.sumCols(cols, rows);
   function footerRow(label2, acc, cols, cls) {
     return "<tr>" + cols.map((c, i) => i === 0 ? `<td class="totlbl">${esc(label2)}</td>` : `<td class="${cls}">${acc[c[0]] == null ? "" : acc[c[0]]}</td>`).join("") + `<td class="${cls}"></td></tr>`;
   }
@@ -324,13 +316,11 @@
   // ---- Reguli intra-rând ----------------------------------------------------
   function deriveRow(part, row, col) {
     const cols = effCols(), affected = new Set([col]);
-    if (part.key === "evidenta_utilizatori") {
-      const P = +row.prescolari || 0, E = +row.elevi || 0, C = +row.copii_pana_16 || 0;
-      if (col === "elevi") { row.copii_pana_16 = P + E; affected.add("copii_pana_16"); }
-      else if (col === "copii_pana_16") { row.elevi = Math.max(0, C - P); affected.add("elevi"); }
-      else if (col === "prescolari") { if (C > 0) { row.elevi = Math.max(0, C - P); affected.add("elevi"); } else { row.copii_pana_16 = P + E; affected.add("copii_pana_16"); } }
+    if (part.key === "evidenta_utilizatori" && ["elevi", "copii_pana_16", "prescolari"].indexOf(col) >= 0) {
+      const r2 = window.RegistruLogic.copiiSplit(row.prescolari, row.elevi, row.copii_pana_16, col);
+      ["prescolari", "elevi", "copii_pana_16"].forEach((k) => { if ((+row[k] || 0) !== r2[k]) { row[k] = r2[k]; affected.add(k); } });
     }
-    if (part.split && col === part.split.total) { const t = +row[part.split.total] || 0; if (t > 0) { const f = Math.floor(t / 2); row[part.split.f] = f; row[part.split.m] = t - f; affected.add(part.split.f); affected.add(part.split.m); } }
+    if (part.split && col === part.split.total) { const t = +row[part.split.total] || 0; if (t > 0) { const g = window.RegistruLogic.genderSplit(t); row[part.split.f] = g.f; row[part.split.m] = g.m; affected.add(part.split.f); affected.add(part.split.m); } }
     const oldTotal = part.key === "documente_inregistrate" ? (+row.total_imprumuturi || 0) : null;
     cols.forEach(([k, l, t, o]) => { if (o && o.sum) { const s = o.sum.reduce((a, x) => a + (+row[x] || 0), 0); if ((+row[k] || 0) !== s) { row[k] = s; affected.add(k); } } });
     if (part.key === "documente_inregistrate" && affected.has("total_imprumuturi")) {
@@ -346,13 +336,8 @@
     return affected;
   }
   function rebalanceCZU(row, total, keys) {
-    const cur = keys.map((k) => +row[k] || 0), sum = cur.reduce((a, b) => a + b, 0);
-    if (sum <= total || total <= 0) return;
-    const exact = cur.map((v) => (v * total) / sum), fl = exact.map((v) => Math.floor(v));
-    let rem = total - fl.reduce((a, b) => a + b, 0);
-    const order = keys.map((k, i) => i).sort((a, b) => (exact[b] - fl[b]) - (exact[a] - fl[a]));
-    for (let i = 0; i < rem; i++) fl[order[i % order.length]]++;
-    keys.forEach((k, i) => (row[k] = fl[i]));
+    const out = window.RegistruLogic.rebalanceCZU(keys.map((k) => +row[k] || 0), total);
+    keys.forEach((k, i) => (row[k] = out[i]));
   }
   // Constrângeri între câmpuri (evidențiere roșie, ca în desktop)
   function validateRow(part, row) {
