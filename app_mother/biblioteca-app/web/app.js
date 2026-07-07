@@ -17,8 +17,12 @@
   }
   const sb = window.supabase.createClient(window.SUPABASE_URL || "", window.SUPABASE_ANON_KEY || "");
 
-  const state = { part: null, an: 2026, luna: 7, cat: "copii", rows: [], staff: [], prior: null };
+  const state = { part: null, an: 2026, luna: 7, cat: "copii", rows: [], staff: [], prior: null, aux: {} };
   let channel = null;
+
+  // Chei folosite de sincronizarea între părți
+  const P3_DIN = ["consultare_pe_loc", "imprumut_pe_loc", "imprumut_la_domiciliu", "imprumut_inter_bibliotecar"];
+  const P2_INTR = ["imprumut_carti", "sedinte_calculatoare", "activitati_culturale_stiintifice", "instruiri", "alte_scopuri_excursii"];
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -92,6 +96,7 @@
     const { data, error } = await q;
     if (error) { toast("Eroare: " + error.message); return; }
     state.rows = data || [];
+    await syncIn(p);
     // Prior months (pentru „Total de la început")
     state.prior = null;
     if (p.cumulative) {
@@ -101,6 +106,50 @@
       state.prior = computeAcc(effCols(), pd || []);
     }
     renderGrid();
+  }
+
+  // ---- Sincronizare între părți (forward) -----------------------------------
+  // IV.total_imprumuturi ← III (pe dată+categorie); II.instruiri ← IX, II.activitati ← XI.
+  // Se scriu valorile derivate în DB (self-heal) ca backup-ul/exportul să fie corecte.
+  async function syncIn(p) {
+    state.aux = {};
+    try {
+      if (p.key === "documente_continut_czu") {
+        const { data } = await sb.from("documente_inregistrate").select("*")
+          .eq("an", state.an).eq("luna", state.luna).eq("categorie_varsta", state.cat);
+        const map = {};
+        (data || []).forEach((r) => {
+          const t = (+r.total_imprumuturi || 0) || P3_DIN.reduce((a, k) => a + (+r[k] || 0), 0);
+          if (r.data) map[r.data] = t;
+        });
+        state.aux.p3 = map;
+        const czuKeys = effCols().find((c) => c[0] === "total_imprumuturi")[3].sum;
+        for (const r of state.rows) {
+          const czu = czuKeys.reduce((a, k) => a + (+r[k] || 0), 0);
+          const total = (map[r.data] || 0) > 0 ? map[r.data] : czu;
+          if ((+r.total_imprumuturi || 0) !== total) {
+            r.total_imprumuturi = total;
+            await sb.from(p.key).update({ total_imprumuturi: total }).eq("id", r.id);
+          }
+        }
+      } else if (p.key === "evidenta_utilizatori_copii_adulti") {
+        const q = (tbl) => sb.from(tbl).select("data,total_participanti")
+          .eq("an", state.an).eq("luna", state.luna).eq("categorie_varsta", state.cat);
+        const [ix, xi] = await Promise.all([q("instruiri"), q("activitati_culturale")]);
+        const ixMap = {}, xiMap = {};
+        (ix.data || []).forEach((r) => { if (r.data) ixMap[r.data] = (ixMap[r.data] || 0) + (+r.total_participanti || 0); });
+        (xi.data || []).forEach((r) => { if (r.data) xiMap[r.data] = (xiMap[r.data] || 0) + (+r.total_participanti || 0); });
+        for (const r of state.rows) {
+          const upd = {};
+          const ins = ixMap[r.data] || 0, act = xiMap[r.data] || 0;
+          if ((+r.instruiri || 0) !== ins) { r.instruiri = ins; upd.instruiri = ins; }
+          if ((+r.activitati_culturale_stiintifice || 0) !== act) { r.activitati_culturale_stiintifice = act; upd.activitati_culturale_stiintifice = act; }
+          const it = P2_INTR.reduce((a, k) => a + (+r[k] || 0), 0);
+          if ((+r.intrari_total_zi || 0) !== it) { r.intrari_total_zi = it; upd.intrari_total_zi = it; }
+          if (Object.keys(upd).length) await sb.from(p.key).update(upd).eq("id", r.id);
+        }
+      }
+    } catch (e) { /* sincronizarea nu blochează afișarea */ }
   }
 
   // ---- Antet grupat ---------------------------------------------------------
@@ -220,6 +269,11 @@
         const cur = +row[f] || 0;
         if (cur === 0 || cur === oldTotal) { if (row[f] !== nt) { row[f] = nt; affected.add(f); } }
       });
+    }
+    // Partea IV: dacă Partea III are total pentru acea dată, el are prioritate față de Σ CZU
+    if (part.key === "documente_continut_czu" && state.aux && state.aux.p3) {
+      const p3 = state.aux.p3[row.data] || 0;
+      if (p3 > 0 && (+row.total_imprumuturi || 0) !== p3) { row.total_imprumuturi = p3; affected.add("total_imprumuturi"); }
     }
     return affected;
   }

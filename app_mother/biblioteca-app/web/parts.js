@@ -45,8 +45,9 @@
         ["intrari_total_zi", "Intrări/zi", "int", { ro: true, sum: ["imprumut_carti", "sedinte_calculatoare", "activitati_culturale_stiintifice", "instruiri", "alte_scopuri_excursii"] }],
         ["imprumut_carti", "Împrumut cărți", "int", { g: GDIN }],
         ["sedinte_calculatoare", "Ședințe calc.", "int", { g: GDIN }],
-        ["activitati_culturale_stiintifice", "Act. cult./șt.", "int", { g: GDIN }],
-        ["instruiri", "Instruiri", "int", { g: GDIN }],
+        // Sincronizate din Partea XI / IX (read-only aici)
+        ["activitati_culturale_stiintifice", "Act. cult./șt.", "int", { g: GDIN, ro: true }],
+        ["instruiri", "Instruiri", "int", { g: GDIN, ro: true }],
         ["alte_scopuri_excursii", "Alte scopuri", "int", { g: GDIN }],
         ["vizite_virtuale_total", "Total", "int", { ro: true, g: "Vizite virtuale", sum: ["vizite_virtuale_pagina_web", "vizite_virtuale_blog"] }],
         ["vizite_virtuale_pagina_web", "Pagină web", "int", { g: "Vizite virtuale" }],
