@@ -754,16 +754,21 @@
         </div>
         <div class="card"><h3>Backup</h3>
           <p class="status" id="homeBk">—</p>
-          <button id="homeBackup" style="width:100%;margin-bottom:8px">⬇ Salvează copie acum</button>
-          <p class="status">Copia locală (Excel + SQLite) se descarcă pe acest calculator.</p>
+          <p class="status" id="homeCloudBk">—</p>
+          <button id="homeBackup" style="width:100%;margin-bottom:8px">⬇ Salvează copie (local + cloud)</button>
+          <button class="ghost" id="homeCloudRestore" style="width:100%;margin-bottom:8px">☁ Restaurează din cloud…</button>
+          <p class="status">Local = Excel + SQLite pe acest PC. Cloud = copie off-device în Supabase.</p>
           <h3 style="margin-top:16px">Document</h3>
           <button class="ghost" id="homeCover" style="width:100%;margin-bottom:8px">📄 Pagina de titlu (copertă)…</button>
-          <button class="ghost" id="homeSettings" style="width:100%">⚙ Setări (nume, backup automat)…</button>
+          <button class="ghost" id="homeSettings" style="width:100%">⚙ Setări (nume, temă, backup automat)…</button>
         </div>
       </div>`;
     const h = window.RegistruBackup.hoursSinceBackup();
-    $("homeBk").textContent = h === null ? "Nu există încă copii de rezervă." : h > 24 ? `Ultimul backup acum ${Math.floor(h / 24)} zi(le).` : "Backup local recent ✔";
+    $("homeBk").textContent = h === null ? "Local: nicio copie încă." : h > 24 ? `Local: acum ${Math.floor(h / 24)} zi(le).` : "Local: recent ✔";
+    const hc = window.RegistruBackup.hoursSinceCloudBackup();
+    $("homeCloudBk").textContent = hc === null ? "Cloud: nicio copie încă." : hc > 24 ? `Cloud: acum ${Math.floor(hc / 24)} zi(le).` : "Cloud: recent ✔";
     $("homeBackup").onclick = doBackup; $("homeSettings").onclick = openSettings;
+    $("homeCloudRestore").onclick = openCloudRestore;
     $("homeContinue").onclick = continueLastSession; $("homeYearEnd").onclick = openYearEnd;
     $("homeReport").onclick = openIncompleteReport; $("homeCover").onclick = openCover;
     $("content").querySelectorAll(".todo div[data-i]").forEach((d) => (d.onclick = () => { const s = state.incomplete[+d.dataset.i]; navigateTo(s.key, state.an, s.month, s.cat || "copii"); }));
@@ -899,11 +904,35 @@
     w.document.close();
   }
   function refreshBackupInfo() { const h = window.RegistruBackup.hoursSinceBackup(), info = $("backupInfo"); info.textContent = h === null ? "fără backup" : h > 24 ? `backup acum ${Math.floor(h / 24)}z` : "backup recent ✔"; }
-  async function doBackup() { await window.RegistruBackup.runBackup(sb, { note: (m) => ($("backupInfo").textContent = m) }); refreshBackupInfo(); if (state.part === HOME) renderHome(); }
+  async function doBackup() {
+    await window.RegistruBackup.runBackup(sb, { note: (m) => ($("backupInfo").textContent = m) });
+    await window.RegistruBackup.cloudBackup(sb, (m) => ($("backupInfo").textContent = m));
+    refreshBackupInfo(); if (state.part === HOME) renderHome();
+  }
   async function maybeAutoBackup() {
     const days = toInt(state.settings.backup_days || "0"); if (!days) return;
-    const h = window.RegistruBackup.hoursSinceBackup(); if (h !== null && h < days * 24) return;
-    toast("Backup automat…"); await doBackup();
+    const h = window.RegistruBackup.hoursSinceCloudBackup(); if (h !== null && h < days * 24) return;
+    await window.RegistruBackup.cloudBackup(sb, (m) => ($("backupInfo").textContent = m)); // off-device, silent
+    refreshBackupInfo();
+  }
+  async function openCloudRestore() {
+    $("settings").innerHTML = `<div class="box"><h3>☁ Restaurează din cloud</h3><p class="status">Se încarcă lista…</p></div>`;
+    $("settings").classList.remove("hidden");
+    const list = await window.RegistruBackup.listCloudBackups(sb);
+    const items = list.map((f) => `<div class="pp-item" data-n="${esc(f.name)}">${esc(f.name)}</div>`).join("") || "<div class='pp-empty'>Nicio copie în cloud.</div>";
+    $("settings").innerHTML = `<div class="box"><h3>☁ Restaurează din cloud</h3>
+      <p class="status">⚠ Restaurarea ADAUGĂ rândurile din copie peste datele curente.</p>
+      <div style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px">${items}</div>
+      <pre id="restLog" style="margin-top:10px;background:#0f172a;color:#cbd5e1;padding:10px;border-radius:8px;max-height:160px;overflow:auto;font-size:12px;white-space:pre-wrap;display:none"></pre>
+      <div class="actions"><button class="ghost" id="cr_close">Închide</button></div></div>`;
+    $("cr_close").onclick = () => $("settings").classList.add("hidden");
+    $("settings").querySelectorAll(".pp-item[data-n]").forEach((d) => (d.onclick = async () => {
+      if (!confirm("Restaurați „" + d.dataset.n + "”? Rândurile se adaugă peste cele existente.")) return;
+      const log = $("restLog"); log.style.display = "block"; log.textContent = "";
+      const put = (m) => { log.textContent += m + "\n"; log.scrollTop = log.scrollHeight; };
+      try { const obj = await window.RegistruBackup.downloadCloud(sb, d.dataset.n); await window.RegistruImport.restoreJson(sb, obj, put); await loadStaff(); }
+      catch (e) { put("✗ " + e.message); }
+    }));
   }
 
   // ---- Etichete + realtime --------------------------------------------------

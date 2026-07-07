@@ -446,3 +446,16 @@ begin
     end;
   end loop;
 end $$;
+
+-- ============================================================================
+-- Storage — bucket privat „backups" pentru copii de rezervă în cloud (off-device)
+-- ============================================================================
+insert into storage.buckets (id, name, public) values ('backups', 'backups', false)
+  on conflict (id) do nothing;
+
+do $$
+begin
+  begin create policy "backups_auth_read" on storage.objects for select to authenticated using (bucket_id = 'backups'); exception when duplicate_object then null; end;
+  begin create policy "backups_auth_insert" on storage.objects for insert to authenticated with check (bucket_id = 'backups'); exception when duplicate_object then null; end;
+  begin create policy "backups_auth_delete" on storage.objects for delete to authenticated using (bucket_id = 'backups'); exception when duplicate_object then null; end;
+end $$;

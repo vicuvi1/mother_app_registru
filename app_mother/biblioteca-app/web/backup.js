@@ -153,5 +153,33 @@
     } catch (e) { return null; }
   }
 
-  window.RegistruBackup = { runBackup, hoursSinceBackup, ALL_TABLES };
+  // ---- Backup în cloud (Supabase Storage, off-device) -----------------------
+  async function cloudBackup(sb, note) {
+    note = note || (() => {});
+    try {
+      note("Backup cloud: se colectează datele…");
+      const data = await fetchAll(sb);
+      const json = JSON.stringify({ created: new Date().toISOString(), tables: data });
+      const name = `registru_${stamp()}.json`;
+      const { error } = await sb.storage.from("backups").upload(name, new Blob([json], { type: "application/json" }), { upsert: false });
+      if (error) { note("Backup cloud eșuat: " + error.message); return { error }; }
+      try { localStorage.setItem("lastCloudBackup", new Date().toISOString()); } catch (e) {}
+      note("Backup cloud salvat ✔ (" + name + ")");
+      return { name };
+    } catch (e) { note("Backup cloud eșuat: " + e.message); return { error: e }; }
+  }
+  function hoursSinceCloudBackup() {
+    try { const last = localStorage.getItem("lastCloudBackup"); if (!last) return null; return (Date.now() - new Date(last).getTime()) / 3.6e6; } catch (e) { return null; }
+  }
+  async function listCloudBackups(sb) {
+    const { data } = await sb.storage.from("backups").list("", { limit: 100, sortBy: { column: "name", order: "desc" } });
+    return (data || []).filter((f) => f.name.endsWith(".json"));
+  }
+  async function downloadCloud(sb, name) {
+    const { data, error } = await sb.storage.from("backups").download(name);
+    if (error) throw new Error(error.message);
+    return JSON.parse(await data.text());
+  }
+
+  window.RegistruBackup = { runBackup, hoursSinceBackup, cloudBackup, hoursSinceCloudBackup, listCloudBackups, downloadCloud, ALL_TABLES };
 })();

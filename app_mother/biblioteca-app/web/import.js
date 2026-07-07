@@ -96,5 +96,17 @@
     log(`Gata. Total importat: ${total} rânduri.`);
   }
 
-  window.RegistruImport = { migrateSqlite, importExcel };
+  // ---- Restaurare din snapshot JSON (backup cloud/local) --------------------
+  async function restoreJson(sb, obj, log) {
+    const tables = (obj && obj.tables) || {};
+    let total = 0;
+    for (const t of ALL_TABLES) {
+      const rows = tables[t]; if (!rows || !rows.length) continue;
+      const r = await insertRows(sb, t, rows, log);
+      total += r.inserted || 0;
+    }
+    log(`Gata. Total restaurat: ${total} rânduri.`);
+  }
+
+  window.RegistruImport = { migrateSqlite, importExcel, restoreJson };
 })();
