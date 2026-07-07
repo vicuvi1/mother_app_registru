@@ -141,14 +141,14 @@
     const btns = [];
     if (p.period === "zi") { btns.push(["genDays", "🗓 Generează zilele", "ghost"], ["exclDays", "🚫 Zile libere", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"], ["addRow", "+ Zi", "ghost"]); }
     else if (p.period === "luna") { btns.push(["genDays", "🗓 Creează luna", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
-    else if (p.period === "lista") { btns.push(["addRow", "+ Rând", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
+    else if (p.period === "lista") { btns.push(["addRow", "+ Rând", "ghost"], ["dupRow", "⧉ Duplică rând", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
     else { btns.push(["addRow", "+ Rând", "ghost"]); }
     if (p.period !== "crud") btns.push(["ranges", "⚖ Range-uri", "ghost"]);
     if (p.cols.some((c) => c[2] === "text" || c[2] === "txt")) btns.push(["presets", "📝 Liste text", "ghost"]);
     btns.push(["sp", "", ""], ["exportXls", "⬇ Excel", "ghost"], ["exportPdf", "⬇ PDF", "ghost"], ["exportDoc", "⬇ Word", "ghost"], ["printBtn", "🖶 Printează", "ghost"]);
     tb.innerHTML = btns.map(([id, l, c]) => id === "sp" ? '<span style="flex:1"></span>' : `<button id="${id}" class="${c}">${l}</button>`).join("");
     const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
-    bind("genDays", autoGenerate); bind("exclDays", openExcluded); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges); bind("presets", openPresetLists);
+    bind("genDays", autoGenerate); bind("exclDays", openExcluded); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges); bind("presets", openPresetLists); bind("dupRow", duplicateRow);
     bind("exportXls", exportCurrent);
     bind("exportPdf", () => window.RegistruExport.exportPDF(p, state.rows, exCtx()));
     bind("exportDoc", () => window.RegistruExport.exportWord(p, state.rows, exCtx()));
@@ -174,6 +174,7 @@
       const { data: pd } = await pq; state.prior = computeAcc(effCols(), pd || []);
     }
     renderGrid();
+    saveSession();
   }
   async function loadMeta(p) {
     state.presets = {}; state.labels = {}; state.ranges = {};
@@ -320,6 +321,7 @@
   async function saveCell(e) {
     const el = e.target, id = +el.dataset.id, col = el.dataset.col, type = el.dataset.type;
     const row = state.rows.find((r) => r.id === id); if (!row) return;
+    const oldVal = row[col];
     if (type === "int") row[col] = toInt(el.value);
     else if (type === "bool") row[col] = el.checked;
     else row[col] = el.value === "" ? (el.dataset.req ? "" : null) : el.value;
@@ -327,6 +329,7 @@
     const payload = {}; affected.forEach((k) => (payload[k] = row[k]));
     const { error } = await sb.from(state.part.key).update(payload).eq("id", id);
     if (error) { toast("Eroare salvare: " + error.message); return; }
+    if (oldVal !== row[col]) pushUndo({ id, col, type, old: oldVal });
     // sincronizare inversă II → IX/XI
     const cdef = effCols().find((c) => c[0] === col);
     if (state.part.key === "evidenta_utilizatori_copii_adulti" && cdef && cdef[3] && cdef[3].rev) await reverseSync(col, row.data, +row[col] || 0);
@@ -827,7 +830,76 @@
       .subscribe((st) => { const ok = st === "SUBSCRIBED"; $("live").textContent = ok ? "live" : "offline"; $("live").classList.toggle("live", ok); });
   }
 
+  // ---- Undo (Ctrl+Z) --------------------------------------------------------
+  const undoStack = [];
+  function pushUndo(e) { undoStack.push(e); if (undoStack.length > 25) undoStack.shift(); }
+  async function undo() {
+    const e = undoStack.pop(); if (!e) { toast("Nimic de anulat"); return; }
+    const row = state.rows.find((r) => r.id === e.id); if (!row) { toast("Rândul nu mai există"); return; }
+    row[e.col] = e.old;
+    const affected = deriveRow(state.part, row, e.col);
+    const payload = {}; affected.forEach((k) => (payload[k] = row[k]));
+    const { error } = await sb.from(state.part.key).update(payload).eq("id", e.id);
+    if (error) { toast("Eroare: " + error.message); return; }
+    affected.forEach((k) => { const inp = $("content").querySelector(`tbody input[data-id="${e.id}"][data-col="${k}"]`); if (inp) { if (inp.type === "checkbox") inp.checked = !!row[k]; else inp.value = row[k] == null ? "" : row[k]; markOOR(inp); } });
+    applyRowValidation(e.id); renderFooter(); toast("Anulat (Ctrl+Z)");
+  }
+
+  // ---- Duplică rând (events / Ctrl+D) ---------------------------------------
+  async function duplicateRow() {
+    if (state.part.period !== "lista") { toast("Duplicarea e disponibilă pe părțile cu evenimente"); return; }
+    const el = document.activeElement; let src;
+    if (el && el.matches && el.matches("#content tbody input")) src = state.rows.find((r) => r.id === +el.dataset.id);
+    if (!src) src = state.rows[state.rows.length - 1];
+    if (!src) { toast("Niciun rând de duplicat"); return; }
+    const o = {}; Object.keys(src).forEach((k) => { if (!["id", "created_at", "updated_at"].includes(k)) o[k] = src[k]; });
+    const { error } = await sb.from(state.part.key).insert(o); if (error) { toast("Eroare: " + error.message); return; }
+    toast("Rând duplicat"); await loadData();
+  }
+
+  // ---- Găsește în tabel (Ctrl+F) --------------------------------------------
+  let findMatches = [], findIdx = -1;
+  function openFind() {
+    if (!isPart()) return;
+    let bar = $("findBar");
+    if (!bar) {
+      bar = document.createElement("div"); bar.id = "findBar"; bar.className = "findbar";
+      bar.innerHTML = `<input id="findInp" placeholder="Găsește în tabel…"><button id="findPrev" class="ghost">◀</button><button id="findNext" class="ghost">▶</button><span id="findCount" class="status"></span><button id="findClose" class="ghost">✕</button>`;
+      document.body.appendChild(bar);
+      $("findInp").addEventListener("input", () => runFind($("findInp").value));
+      $("findInp").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); findStep(e.shiftKey ? -1 : 1); } else if (e.key === "Escape") closeFind(); });
+      $("findNext").onclick = () => findStep(1); $("findPrev").onclick = () => findStep(-1); $("findClose").onclick = closeFind;
+    }
+    bar.style.display = "flex"; $("findInp").focus(); $("findInp").select();
+  }
+  function runFind(q) {
+    findMatches = []; findIdx = -1;
+    if (q) { const ql = q.toLowerCase(); $("content").querySelectorAll("tbody input").forEach((inp) => { if (inp.type !== "checkbox" && String(inp.value || "").toLowerCase().includes(ql)) findMatches.push(inp); }); }
+    $("findCount").textContent = findMatches.length ? `${findMatches.length} rezultate` : "0";
+    if (findMatches.length) findStep(1);
+  }
+  function findStep(d) {
+    if (!findMatches.length) return;
+    findIdx = (findIdx + d + findMatches.length) % findMatches.length;
+    const inp = findMatches[findIdx]; inp.scrollIntoView({ block: "center", inline: "center" }); inp.focus(); if (inp.select) inp.select();
+    $("findCount").textContent = `${findIdx + 1}/${findMatches.length}`;
+  }
+  function closeFind() { const b = $("findBar"); if (b) b.style.display = "none"; }
+
   // ---- Legături -------------------------------------------------------------
+  document.addEventListener("keydown", (e) => {
+    if ($("app").classList.contains("hidden")) return;
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === "f") { e.preventDefault(); openFind(); }
+    else if (k === "z") { e.preventDefault(); undo(); }
+    else if (k === "s") { e.preventDefault(); toast("Salvat automat ✔"); }
+    else if (k === "e") { if (isPart()) { e.preventDefault(); exportCurrent(); } }
+    else if (k === "d") { if (isPart() && state.part.period === "lista") { e.preventDefault(); duplicateRow(); } }
+    else if (e.shiftKey && k === "m") { if (isPart() && state.part.period !== "crud") { e.preventDefault(); copyLastMonth(); } }
+    else if (e.key === "ArrowLeft") { if (isPart() && state.part.period !== "crud" && state.luna > 1) { e.preventDefault(); state.luna--; loadData(); updateChrome(); } }
+    else if (e.key === "ArrowRight") { if (isPart() && state.part.period !== "crud" && state.luna < 12) { e.preventDefault(); state.luna++; loadData(); updateChrome(); } }
+  });
   $("loginBtn").onclick = login;
   $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
   $("settingsBtn").onclick = openSettings;
