@@ -424,3 +424,25 @@ begin
          for all to authenticated using (true) with check (true);', t);
   end loop;
 end $$;
+
+-- ============================================================================
+-- Realtime — publică toate tabelele pentru sincronizare live (multi-user)
+-- Necesar ca modificările altor utilizatori să apară automat.
+-- ============================================================================
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'personal','range_config','etichete_custom','app_settings','text_presets',
+    'evidenta_utilizatori','evidenta_utilizatori_copii_adulti','documente_inregistrate',
+    'documente_continut_czu','cercetari_bibliografice','activitati_informare',
+    'documente_electronice','instruiri','activitati_culturale','activitati_online',
+    'parteneri','voluntariat'
+  ]
+  loop
+    begin
+      execute format('alter publication supabase_realtime add table %I;', t);
+    exception when duplicate_object then null; when others then null;
+    end;
+  end loop;
+end $$;

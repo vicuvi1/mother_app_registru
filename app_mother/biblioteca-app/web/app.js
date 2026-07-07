@@ -361,17 +361,39 @@
 
   function markOOR(inp) { const mx = inp.dataset.max; if (mx == null) return; const v = +inp.value || 0; inp.classList.toggle("oor", v > +mx || v < +(inp.dataset.min || 0)); }
 
+  function setSaveState(s) {
+    const el = $("saveState"); if (!el) return;
+    const map = { saving: ["save-saving", "⏳ se salvează…"], ok: ["save-ok", "✔ salvat"], err: ["save-err", "⚠ eroare — reîncerc"], dirty: ["save-dirty", "• nesalvat"] };
+    const [cls, txt] = map[s] || map.ok;
+    el.className = "pill " + cls; el.textContent = txt;
+  }
+  // Salvare cu reîncercare (blip de rețea) + blocare optimistă pe updated_at.
+  async function saveUpdate(table, payload, id, prevUpdated) {
+    for (let attempt = 0; ; attempt++) {
+      let q = sb.from(table).update(payload).eq("id", id);
+      if (prevUpdated !== undefined && prevUpdated !== null) q = q.eq("updated_at", prevUpdated);
+      const res = await q.select().maybeSingle();
+      if (!res.error) return res;
+      if (attempt >= 2) return res;
+      setSaveState("err");
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
+  }
+
   async function saveCell(e) {
     const el = e.target, id = +el.dataset.id, col = el.dataset.col, type = el.dataset.type;
     const row = state.rows.find((r) => r.id === id); if (!row) return;
-    const oldVal = row[col];
+    const oldVal = row[col], prevUpdated = row.updated_at;
     if (type === "int") row[col] = toInt(el.value);
     else if (type === "bool") row[col] = el.checked;
     else row[col] = el.value === "" ? (el.dataset.req ? "" : null) : el.value;
     const affected = deriveRow(state.part, row, col);
     const payload = {}; affected.forEach((k) => (payload[k] = row[k]));
-    const { error } = await sb.from(state.part.key).update(payload).eq("id", id);
-    if (error) { toast("Eroare salvare: " + error.message); return; }
+    setSaveState("saving");
+    const res = await saveUpdate(state.part.key, payload, id, prevUpdated);
+    if (res.error) { setSaveState("err"); toast("Eroare salvare: " + res.error.message); return; }
+    if (!res.data) { setSaveState("ok"); toast("Rând modificat de alt utilizator — se reîncarcă"); await loadData(); return; }
+    row.updated_at = res.data.updated_at; setSaveState("ok");
     if (oldVal !== row[col]) pushUndo({ id, col, type, old: oldVal });
     // sincronizare inversă II → IX/XI
     const cdef = effCols().find((c) => c[0] === col);
@@ -890,10 +912,27 @@
     const { error } = await sb.from("etichete_custom").upsert({ parte: state.part.pid, camp, eticheta_default: col[1], eticheta_custom: nv }, { onConflict: "parte,camp" });
     if (error) { toast("Eroare: " + error.message); return; } state.labels[camp] = nv; renderGrid();
   }
+  function editingRowId() { const a = document.activeElement; return (a && a.matches && a.matches("#content tbody input")) ? +a.dataset.id : null; }
+  function patchRowInputs(row) {
+    effCols().forEach(([k]) => { const inp = $("content").querySelector(`tbody input[data-id="${row.id}"][data-col="${k}"]`); if (inp) { if (inp.type === "checkbox") inp.checked = !!row[k]; else if (document.activeElement !== inp) inp.value = row[k] == null ? "" : row[k]; markOOR(inp); } });
+    applyRowValidation(row.id);
+  }
   function subscribe(table) {
     if (channel) sb.removeChannel(channel);
-    channel = sb.channel("rt-" + table).on("postgres_changes", { event: "*", schema: "public", table }, () => { if (state.part === STAFF) loadStaff().then(renderStaff); else if (isPart()) loadData(); })
-      .subscribe((st) => { const ok = st === "SUBSCRIBED"; $("live").textContent = ok ? "live" : "offline"; $("live").classList.toggle("live", ok); });
+    channel = sb.channel("rt-" + table).on("postgres_changes", { event: "*", schema: "public", table }, (payload) => {
+      if (state.part === STAFF) { loadStaff().then(renderStaff); return; }
+      if (!isPart() || state.part.key !== table) return;
+      const editId = editingRowId();
+      if (payload.eventType === "UPDATE" && payload.new) {
+        const nw = payload.new;
+        const inScope = (state.part.period === "crud" || (nw.an === state.an && nw.luna === state.luna)) && (!state.part.categorie || nw.categorie_varsta === state.cat);
+        if (inScope) {
+          const idx = state.rows.findIndex((r) => r.id === nw.id);
+          if (idx >= 0) { if (nw.id === editId) return; state.rows[idx] = nw; patchRowInputs(nw); renderFooter(); return; }
+        }
+      }
+      if (editId === null) loadData(); // INSERT/DELETE sau în afara vizualizării → reîncarcă doar dacă nu se editează
+    }).subscribe((st) => { const ok = st === "SUBSCRIBED"; $("live").textContent = ok ? "live" : "offline"; $("live").classList.toggle("live", ok); });
   }
 
   // ---- Undo (Ctrl+Z) --------------------------------------------------------
