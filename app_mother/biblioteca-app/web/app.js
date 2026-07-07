@@ -514,17 +514,106 @@
     };
   }
 
+  // ---- Sesiune (Continuă unde am rămas) -------------------------------------
+  const IGNORE_CONTENT = new Set(["id", "an", "luna", "categorie_varsta", "is_auto_generated", "created_at", "updated_at", "data"]);
+  function rowHasContent(r) {
+    for (const k of Object.keys(r)) {
+      if (IGNORE_CONTENT.has(k)) continue;
+      const v = r[k];
+      if (v === true) return true;
+      if (typeof v === "number" && v !== 0) return true;
+      if (typeof v === "string" && v.trim() !== "") return true;
+    }
+    return false;
+  }
+  async function loadSession() {
+    const { data } = await sb.from("app_settings").select("valoare").eq("cheie", "session_state").maybeSingle();
+    try { return JSON.parse((data && data.valoare) || "{}"); } catch (e) { return {}; }
+  }
+  async function saveSession() {
+    if (!isPart()) return;
+    const s = { part: state.part.key, year: state.an, month: state.luna, cat: state.cat };
+    sb.from("app_settings").upsert({ cheie: "session_state", valoare: JSON.stringify(s) }, { onConflict: "cheie" }).then(() => {}, () => {});
+  }
+  function navigateTo(partKey, year, month, cat) {
+    if (year) { state.an = year; $("an").value = String(year); }
+    if (month) state.luna = month;
+    if (cat) state.cat = cat;
+    selectPart(partKey);
+  }
+  async function continueLastSession() {
+    const s = await loadSession();
+    const key = PARTS.some((p) => p.key === s.part) ? s.part : PARTS[0].key;
+    navigateTo(key, s.year || state.an, s.month || state.luna, s.cat || "copii");
+  }
+
+  // ---- Pagina de titlu (copertă) --------------------------------------------
+  const COVER_DEF = { institutie_1: "Ministerul Culturii al Republicii Moldova", institutie_2: "Consiliul Biblioteconomic Național", titlu: "Registru de evidență a activității", biblioteca: "", localitate: "", an: "" };
+  async function getCover() {
+    const { data } = await sb.from("app_settings").select("cheie,valoare").like("cheie", "cover_%");
+    const s = {}; (data || []).forEach((r) => (s[r.cheie.slice(6)] = r.valoare));
+    const nm = state.settings.library_name || "", loc = state.settings.library_loc || "", out = {};
+    Object.keys(COVER_DEF).forEach((k) => { out[k] = (s[k] != null && s[k] !== "") ? s[k] : (k === "biblioteca" && nm ? nm : k === "localitate" && loc ? loc : COVER_DEF[k]); });
+    return out;
+  }
+  async function openCover() {
+    const c = await getCover(), f = (k, l) => `<label>${l}</label><input id="cov_${k}" value="${esc(c[k])}">`;
+    $("settings").innerHTML = `<div class="box"><h3>📄 Pagina de titlu (copertă)</h3>
+      ${f("institutie_1", "Instituția (rând 1)")}${f("institutie_2", "Instituția (rând 2)")}${f("titlu", "Titlu")}${f("biblioteca", "Biblioteca")}${f("localitate", "Localitate")}${f("an", "An (gol = anul selectat)")}
+      <div class="actions"><button class="ghost" id="cov_cancel">Renunță</button><button class="ok" id="cov_save">Salvează</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    $("cov_cancel").onclick = () => $("settings").classList.add("hidden");
+    $("cov_save").onclick = async () => {
+      const up = Object.keys(COVER_DEF).map((k) => ({ cheie: "cover_" + k, valoare: $("cov_" + k).value.trim() }));
+      await sb.from("app_settings").upsert(up, { onConflict: "cheie" });
+      $("settings").classList.add("hidden"); toast("Copertă salvată");
+    };
+  }
+
   // ---- Dashboard ------------------------------------------------------------
   async function computeBadges() {
+    state.incomplete = [];
     for (const p of PARTS) {
-      let q = sb.from(p.key).select(p.period === "crud" ? "id" : "luna,categorie_varsta");
-      if (p.period !== "crud") q = q.eq("an", state.an);
+      let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
       const { data } = await q; const rows = data || [];
       if (p.period === "crud") { state.badges[p.key] = rows.length ? "ok" : "empty"; continue; }
-      const need = p.categorie ? 24 : 12, seen = new Set();
-      rows.forEach((r) => seen.add(p.categorie ? `${r.luna}|${r.categorie_varsta}` : String(r.luna)));
-      state.badges[p.key] = seen.size === 0 ? "empty" : seen.size >= need ? "ok" : "warn";
+      const cats = p.categorie ? ["adulti", "copii"] : [null];
+      let inc = 0, total = 0;
+      for (const cat of cats) for (let m = 1; m <= 12; m++) {
+        total++;
+        const sr = rows.filter((r) => r.luna === m && (!p.categorie || r.categorie_varsta === cat));
+        let reason = null;
+        if (!sr.length) reason = "fără rânduri";
+        else if (!sr.some(rowHasContent)) reason = "toate valorile 0";
+        if (reason) { inc++; state.incomplete.push({ key: p.key, nr: p.nr, title: p.title, month: m, cat, reason }); }
+      }
+      state.badges[p.key] = inc === 0 ? "ok" : inc >= total ? "empty" : "warn";
     }
+  }
+  function openIncompleteReport() {
+    const items = state.incomplete.map((s, i) => `<div data-i="${i}" style="cursor:pointer">Partea ${s.nr}. ${esc(s.title)} — ${LUNI[s.month - 1]} ${state.an}${s.cat ? " (" + s.cat + ")" : ""} <span style="color:var(--muted)">(${s.reason})</span></div>`).join("") || "<div>Toate perioadele au date 🎉</div>";
+    $("settings").innerHTML = `<div class="box"><h3>Luni fără date — ${state.an}</h3><p class="status">${state.incomplete.length} perioade. Click pe o linie pentru a merge acolo.</p><div class="todo">${items}</div><div class="actions"><button class="ghost" id="ir_close">Închide</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    $("ir_close").onclick = () => $("settings").classList.add("hidden");
+    $("settings").querySelectorAll(".todo div[data-i]").forEach((d) => (d.onclick = () => { const s = state.incomplete[+d.dataset.i]; $("settings").classList.add("hidden"); navigateTo(s.key, state.an, s.month, s.cat || "copii"); }));
+  }
+  function openYearEnd() {
+    $("settings").innerHTML = `<div class="box"><h3>📅 Asistent închidere an — ${state.an}</h3>
+      <p class="status">${state.incomplete.length} perioade de verificat.</p>
+      <label class="row" style="margin:6px 0"><input type="checkbox" style="width:auto;margin-right:8px">Am verificat lunile fără date / cu zerouri</label>
+      <label class="row" style="margin:6px 0"><input type="checkbox" style="width:auto;margin-right:8px">Pagina de titlu (copertă) este completă</label>
+      <label class="row" style="margin:6px 0"><input type="checkbox" style="width:auto;margin-right:8px">Am creat o copie de rezervă (backup)</label>
+      <label class="row" style="margin:6px 0"><input type="checkbox" style="width:auto;margin-right:8px">Am exportat registrul pentru arhivă</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="ghost" id="ye_report">Raport luni…</button><button class="ghost" id="ye_cover">Copertă…</button>
+        <button class="ghost" id="ye_backup">Backup acum</button><button class="ok" id="ye_final">Registru final…</button></div>
+      <div class="actions"><button class="ghost" id="ye_close">Închide</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    $("ye_close").onclick = () => $("settings").classList.add("hidden");
+    $("ye_report").onclick = openIncompleteReport;
+    $("ye_cover").onclick = openCover;
+    $("ye_backup").onclick = doBackup;
+    $("ye_final").onclick = () => { $("settings").classList.add("hidden"); selectPart("__final"); };
   }
   async function renderHome() {
     updateChrome();
@@ -534,29 +623,41 @@
     const warn = PARTS.filter((p) => state.badges[p.key] === "warn").length;
     const empty = PARTS.filter((p) => state.badges[p.key] === "empty").length;
     const pct = Math.round((done / PARTS.length) * 100);
-    const nm = state.settings.library_name || "Biblioteca", loc = state.settings.library_loc || "";
-    const todo = PARTS.filter((p) => state.badges[p.key] !== "ok").map((p) => `<div>Partea ${p.nr}. ${esc(p.title)} — <b>${state.badges[p.key] === "empty" ? "neîncepută" : "parțială"}</b></div>`).join("") || `<div>Toate părțile sunt complete 🎉</div>`;
+    const nm = state.settings.library_name || "Biblioteca dvs.", loc = state.settings.library_loc || "";
+    const sess = await loadSession();
+    const sp = PARTS.find((p) => p.key === sess.part);
+    const sessHint = sp ? `Ultima sesiune: Partea ${sp.nr}${sess.month ? ", " + LUNI[sess.month - 1] : ""}${sess.year ? " " + sess.year : ""}` : "Nicio sesiune anterioară";
+    const todo = state.incomplete.slice(0, 10).map((s, i) => `<div data-i="${i}" style="cursor:pointer">Partea ${s.nr}. ${esc(s.title)} — ${LUNI[s.month - 1]} ${state.an}${s.cat ? " (" + s.cat + ")" : ""} <span style="color:var(--muted)">(${s.reason})</span></div>`).join("") + (state.incomplete.length > 10 ? `<div style="color:var(--muted)">… și încă ${state.incomplete.length - 10} perioade</div>` : "") || `<div>Toate părțile sunt complete 🎉</div>`;
     $("content").innerHTML = `
-      <div style="margin-bottom:14px"><h2 style="margin:0">Bun venit</h2>
-        <div style="font-size:16px;color:var(--accent);font-weight:600">${esc(nm)}</div>
-        <div class="status">${esc(loc)} · anul ${state.an}</div></div>
+      <div class="card" style="margin-bottom:16px"><h2 style="margin:0 0 2px">Bun venit</h2>
+        <div style="font-size:17px;color:var(--accent);font-weight:600">${esc(nm)}</div>
+        <div class="status">${esc(loc)}${loc ? " · " : ""}anul ${state.an}</div></div>
       <div class="cards">
         <div class="card"><h3>Progres registru ${state.an}</h3>
           <div class="progress"><div style="width:${pct}%"></div><span>${pct}% părți complete</span></div>
           <div class="kpis"><div><b style="color:var(--ok)">${done}</b>complete</div><div><b style="color:var(--warn)">${warn}</b>cu atenție</div><div><b>${empty}</b>neîncepute</div></div>
-          <h3 style="margin-top:16px">De completat</h3><div class="todo">${todo}</div>
+          <p class="status" id="sessHint" style="margin:12px 0 6px">${esc(sessHint)}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="homeContinue">Continuă unde am rămas</button><button class="ghost" id="homeYearEnd">Asistent închidere an…</button></div>
+          <h3 style="margin-top:16px">De completat (prioritar)</h3>
+          <p class="status">${state.incomplete.length} perioade fără date complete în ${state.an}.</p>
+          <div class="todo">${todo}</div>
+          <div style="margin-top:8px"><button class="ghost" id="homeReport">Raport complet luni fără date…</button></div>
         </div>
         <div class="card"><h3>Backup</h3>
           <p class="status" id="homeBk">—</p>
           <button id="homeBackup" style="width:100%;margin-bottom:8px">⬇ Salvează copie acum</button>
-          <p class="status">Copia locală (Excel + SQLite) rămâne pe acest calculator.</p>
-          <h3 style="margin-top:16px">Setări</h3>
-          <button class="ghost" id="homeSettings" style="width:100%">⚙ Nume bibliotecă, backup automat…</button>
+          <p class="status">Copia locală (Excel + SQLite) se descarcă pe acest calculator.</p>
+          <h3 style="margin-top:16px">Document</h3>
+          <button class="ghost" id="homeCover" style="width:100%;margin-bottom:8px">📄 Pagina de titlu (copertă)…</button>
+          <button class="ghost" id="homeSettings" style="width:100%">⚙ Setări (nume, backup automat)…</button>
         </div>
       </div>`;
     const h = window.RegistruBackup.hoursSinceBackup();
     $("homeBk").textContent = h === null ? "Nu există încă copii de rezervă." : h > 24 ? `Ultimul backup acum ${Math.floor(h / 24)} zi(le).` : "Backup local recent ✔";
     $("homeBackup").onclick = doBackup; $("homeSettings").onclick = openSettings;
+    $("homeContinue").onclick = continueLastSession; $("homeYearEnd").onclick = openYearEnd;
+    $("homeReport").onclick = openIncompleteReport; $("homeCover").onclick = openCover;
+    $("content").querySelectorAll(".todo div[data-i]").forEach((d) => (d.onclick = () => { const s = state.incomplete[+d.dataset.i]; navigateTo(s.key, state.an, s.month, s.cat || "copii"); }));
   }
 
   // ---- Registru final (document compilat pe an) -----------------------------
