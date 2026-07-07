@@ -480,12 +480,13 @@
     if (!state.rows.length) { toast("Generați întâi rândurile"); return; }
     if (!confirm("Completați rândurile cu valori aleatorii de test? Suprascrie valorile numerice existente.")) return;
     const cols = effCols().filter((c) => c[2] === "int" && !(c[3] && c[3].ro));
-    for (const row of state.rows) {
+    const ups = state.rows.map((row) => {
       cols.forEach(([k]) => { const rg = colRange(p, k); row[k] = rg.min + Math.floor(Math.random() * (rg.max - rg.min + 1)); });
       cols.forEach(([k]) => deriveRow(p, row, k));
       const payload = {}; effCols().forEach(([k]) => (payload[k] = row[k]));
-      await sb.from(p.key).update(payload).eq("id", row.id);
-    }
+      return sb.from(p.key).update(payload).eq("id", row.id);
+    });
+    await Promise.all(ups);
     toast("Valori generate"); await loadData();
   }
   async function copyLastMonth() {
@@ -499,13 +500,14 @@
       const map = {};
       if (p.period === "zi") data.forEach((r) => { if (r[p.dateField]) map[String(r[p.dateField]).slice(0, 2)] = r; });
       else map._ = data[0];
-      let n = 0;
+      const ups = [];
       for (const r of state.rows) {
         const src = map[p.period === "zi" ? String(r[p.dateField]).slice(0, 2) : "_"]; if (!src) continue;
         const upd = {}; valCols.forEach((k) => (upd[k] = src[k]));
-        await sb.from(p.key).update(upd).eq("id", r.id); n++;
+        ups.push(sb.from(p.key).update(upd).eq("id", r.id));
       }
-      toast(`${n} rânduri actualizate din luna trecută`); await loadData();
+      await Promise.all(ups);
+      toast(`${ups.length} rânduri actualizate din luna trecută`); await loadData();
     } else {
       const rows = data.map((r) => { const o = {}; Object.keys(r).forEach((k) => { if (!["id", "created_at", "updated_at"].includes(k)) o[k] = r[k]; }); o.an = state.an; o.luna = state.luna; if (p.dateField && /^\d{2}\.\d{2}$/.test(o[p.dateField] || "")) o[p.dateField] = o[p.dateField].slice(0, 3) + pad2(state.luna); return o; });
       const { error } = await sb.from(p.key).insert(rows); if (error) { toast("Eroare: " + error.message); return; }
@@ -564,15 +566,19 @@
         const { data } = await sb.from("documente_inregistrate").select("*").eq("an", state.an).eq("luna", state.luna).eq("categorie_varsta", state.cat);
         const map = {}; (data || []).forEach((r) => { const t = (+r.total_imprumuturi || 0) || P3_DIN.reduce((a, k) => a + (+r[k] || 0), 0); if (r.data) map[r.data] = t; });
         state.aux.p3 = map; const czuKeys = effCols().find((c) => c[0] === "total_imprumuturi")[3].sum;
-        for (const r of state.rows) { const czu = czuKeys.reduce((a, k) => a + (+r[k] || 0), 0); const total = (map[r.data] || 0) > 0 ? map[r.data] : czu; if ((+r.total_imprumuturi || 0) !== total) { r.total_imprumuturi = total; await sb.from(p.key).update({ total_imprumuturi: total }).eq("id", r.id); } }
+        const ups = [];
+        for (const r of state.rows) { const czu = czuKeys.reduce((a, k) => a + (+r[k] || 0), 0); const total = (map[r.data] || 0) > 0 ? map[r.data] : czu; if ((+r.total_imprumuturi || 0) !== total) { r.total_imprumuturi = total; ups.push(sb.from(p.key).update({ total_imprumuturi: total }).eq("id", r.id)); } }
+        await Promise.all(ups);
       } else if (p.key === "evidenta_utilizatori_copii_adulti") {
         const q = (t) => sb.from(t).select("data,total_participanti").eq("an", state.an).eq("luna", state.luna).eq("categorie_varsta", state.cat);
         const [ix, xi] = await Promise.all([q("instruiri"), q("activitati_culturale")]);
         const im = {}, xm = {}; (ix.data || []).forEach((r) => { if (r.data) im[r.data] = (im[r.data] || 0) + (+r.total_participanti || 0); }); (xi.data || []).forEach((r) => { if (r.data) xm[r.data] = (xm[r.data] || 0) + (+r.total_participanti || 0); });
+        const ups = [];
         for (const r of state.rows) { const u = {}; const ins = im[r.data] || 0, act = xm[r.data] || 0;
           if ((+r.instruiri || 0) !== ins) { r.instruiri = ins; u.instruiri = ins; } if ((+r.activitati_culturale_stiintifice || 0) !== act) { r.activitati_culturale_stiintifice = act; u.activitati_culturale_stiintifice = act; }
           const it = P2_INTR.reduce((a, k) => a + (+r[k] || 0), 0); if ((+r.intrari_total_zi || 0) !== it) { r.intrari_total_zi = it; u.intrari_total_zi = it; }
-          if (Object.keys(u).length) await sb.from(p.key).update(u).eq("id", r.id); }
+          if (Object.keys(u).length) ups.push(sb.from(p.key).update(u).eq("id", r.id)); }
+        await Promise.all(ups);
       }
     } catch (e) { /* nu bloca */ }
   }
@@ -682,9 +688,11 @@
   // ---- Dashboard ------------------------------------------------------------
   async function computeBadges() {
     state.incomplete = [];
-    for (const p of PARTS) {
+    const results = await Promise.all(PARTS.map(async (p) => {
       let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
-      const { data } = await q; const rows = data || [];
+      const { data } = await q; return { p, rows: data || [] };
+    }));
+    for (const { p, rows } of results) {
       if (p.period === "crud") { state.badges[p.key] = rows.length ? "ok" : "empty"; continue; }
       const cats = p.categorie ? ["adulti", "copii"] : [null];
       let inc = 0, total = 0;
