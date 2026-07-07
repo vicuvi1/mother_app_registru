@@ -1,2 +1,3 @@
-# Secretele de proiect Supabase — nu se urcă în git
-config.js
+# config.js conține DOAR cheia publică (publishable) + URL-ul proiectului —
+# sigur de urcat în git cât timp RLS este activat (supabase/schema.sql).
+# NU adăugați niciodată cheia secretă (sb_secret_... / service_role) în repo.

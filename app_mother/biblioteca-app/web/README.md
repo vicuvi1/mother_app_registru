@@ -42,16 +42,30 @@ sincronizare live între utilizatori. Restul părților și exporturile urmează
 4. **Authentication → Users → Add user**: creați câte un cont pentru fiecare bibliotecar.
 5. **Project Settings → API**: copiați **Project URL** și cheia **anon / public**.
 
-## Rularea paginii
+## Rularea local (pe PC)
 
-1. În folderul `web/`, copiați `config.example.js` în **`config.js`** și puneți `URL` + cheia `anon`.
-2. Deschideți `index.html` în browser (dublu-click). Pentru distribuție, urcați folderul `web/`
-   pe orice găzduire statică gratuită.
-3. Autentificați-vă cu un cont creat la pasul 4. Ca să vedeți sincronizarea live: deschideți
-   pagina în **două ferestre** și editați într-una — cealaltă se actualizează singură.
+`config.js` conține deja URL-ul + cheia publică a proiectului, deci:
 
-> `config.js` este ignorat de git (`.gitignore`). Cheia `anon` este publică prin design —
-> securitatea reală vine din autentificare + politicile RLS din `schema.sql`.
+1. Deschideți `index.html` în browser (dublu-click).
+2. Autentificați-vă cu un cont creat la pasul 4 de mai sus. Pentru a vedea sincronizarea live:
+   deschideți pagina în **două ferestre** și editați într-una — cealaltă se actualizează singură.
+
+> Cheia din `config.js` este cea PUBLICĂ (publishable) — sigură în browser cât timp RLS
+> este activat (`schema.sql`). Cheia secretă (`sb_secret_...`) NU se pune niciodată aici.
+
+## Deploy pe Vercel (deploy automat la fiecare push)
+
+Site static — Vercel doar servește folderul, fără build.
+
+1. [vercel.com](https://vercel.com) → **Add New… → Project** → importați repo-ul GitHub
+   `mother_app_registru`.
+2. **Root Directory** → apăsați *Edit* → alegeți `app_mother/biblioteca-app/web`.
+3. Framework Preset: **Other** (se detectează din `vercel.json`). Fără build command.
+4. **Deploy**. Primiți un URL de forma `https://<proiect>.vercel.app`.
+5. **Settings → Git → Production Branch** → setați `web-supabase` (acolo trăiește codul web).
+
+De acum, fiecare push pe `web-supabase` redeployează automat — nu mai trebuie să publicați manual.
+Deschideți URL-ul Vercel pe orice PC (inclusiv Windows 7 cu Firefox ESR).
 
 ---
 
