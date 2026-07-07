@@ -58,25 +58,33 @@
   const special = () => state.part === STAFF || state.part === IMPORT || state.part === HOME || state.part === FINAL;
 
   // ---- Setări ---------------------------------------------------------------
+  function applyTheme(t) { document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light"); }
   async function loadSettings() {
     const { data } = await sb.from("app_settings").select("*");
     state.settings = {}; (data || []).forEach((r) => (state.settings[r.cheie] = r.valoare));
     const nm = state.settings.library_name || "Biblioteca", loc = state.settings.library_loc || "";
     $("brandsub").textContent = nm + (loc ? " · " + loc : "");
+    applyTheme(state.settings.ui_theme || "light");
   }
   function openSettings() {
-    const s = state.settings;
+    const s = state.settings, dark = s.ui_theme === "dark";
     $("settings").innerHTML = `<div class="box"><h3>⚙ Setări</h3>
       <label>Numele bibliotecii</label><input id="st_name" value="${esc(s.library_name || "")}">
       <label>Localitate</label><input id="st_loc" value="${esc(s.library_loc || "")}">
+      <label>Temă interfață</label><select id="st_theme"><option value="light"${dark ? "" : " selected"}>Deschis</option><option value="dark"${dark ? " selected" : ""}>Întunecat</option></select>
       <label>Backup automat — la câte zile (0 = dezactivat)</label><input id="st_bk" type="number" min="0" value="${esc(s.backup_days || "3")}">
+      <div style="display:flex;gap:8px;margin-top:14px"><button class="ghost" id="st_help">Ajutor (scurtături)</button><button class="ghost" id="st_about">Despre</button></div>
       <div class="actions"><button class="ghost" id="st_cancel">Renunță</button><button class="ok" id="st_save">Salvează</button></div></div>`;
     $("settings").classList.remove("hidden");
-    $("st_cancel").onclick = () => $("settings").classList.add("hidden");
+    applyTheme($("st_theme").value);
+    $("st_theme").onchange = () => applyTheme($("st_theme").value);
+    $("st_cancel").onclick = () => { applyTheme(s.ui_theme || "light"); $("settings").classList.add("hidden"); };
+    $("st_help").onclick = openHelp; $("st_about").onclick = openAbout;
     $("st_save").onclick = async () => {
       const rows = [
         { cheie: "library_name", valoare: $("st_name").value.trim() },
         { cheie: "library_loc", valoare: $("st_loc").value.trim() },
+        { cheie: "ui_theme", valoare: $("st_theme").value },
         { cheie: "backup_days", valoare: String(toInt($("st_bk").value)) },
       ];
       const { error } = await sb.from("app_settings").upsert(rows, { onConflict: "cheie" });
@@ -84,6 +92,23 @@
       await loadSettings(); $("settings").classList.add("hidden");
       if (state.part === HOME) renderHome(); toast("Setări salvate");
     };
+  }
+  function openHelp() {
+    const rows = [["Ctrl+F", "Găsește în tabel"], ["Ctrl+Z", "Anulează ultima editare"], ["Ctrl+C / Ctrl+V", "Copiază / lipește (din Excel)"], ["Ctrl+D", "Duplică rândul (părți evenimente)"], ["Ctrl+Shift+M", "Copiază luna trecută"], ["Ctrl+← / Ctrl+→", "Luna anterioară / următoare"], ["Ctrl+S", "Salvare (automată oricum)"], ["Ctrl+E", "Export Excel"], ["Enter", "Celula de mai jos"], ["Tab", "Celula următoare"], ["F1", "Acest ajutor"]];
+    $("settings").innerHTML = `<div class="box"><h3>⌨ Scurtături tastatură</h3>
+      <table style="width:100%;border-collapse:collapse">${rows.map(([k, d]) => `<tr><td style="padding:5px 8px;font-weight:600;white-space:nowrap">${k}</td><td style="padding:5px 8px;color:var(--muted)">${d}</td></tr>`).join("")}</table>
+      <p class="status" style="margin-top:10px">Galben = ziua de azi · Bleu = calculat automat · Roșu = valoare invalidă</p>
+      <div class="actions"><button class="ok" id="hl_close">Închide</button></div></div>`;
+    $("settings").classList.remove("hidden"); $("hl_close").onclick = () => $("settings").classList.add("hidden");
+  }
+  function openAbout() {
+    $("settings").innerHTML = `<div class="box"><h3>Despre</h3>
+      <p style="font-weight:600">Registru Digital de Evidență a Activității Bibliotecii</p>
+      <p class="status">Versiune web · multi-user (Supabase)</p>
+      <p style="font-size:13px">Aplicație web pentru evidența activității bibliotecilor publice (12 părți ale registrului, export Word/PDF/Excel, backup, sincronizare în timp real).</p>
+      <p class="status">Realizat de Victor Bărbuță · portare web</p>
+      <div class="actions"><button class="ok" id="ab_close">Închide</button></div></div>`;
+    $("settings").classList.remove("hidden"); $("ab_close").onclick = () => $("settings").classList.add("hidden");
   }
 
   // ---- Navigație + badges ---------------------------------------------------
@@ -906,6 +931,7 @@
   // ---- Legături -------------------------------------------------------------
   document.addEventListener("keydown", (e) => {
     if ($("app").classList.contains("hidden")) return;
+    if (e.key === "F1") { e.preventDefault(); openHelp(); return; }
     if (!(e.ctrlKey || e.metaKey)) return;
     const k = e.key.toLowerCase();
     if (k === "f") { e.preventDefault(); openFind(); }
