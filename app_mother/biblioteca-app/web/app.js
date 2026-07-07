@@ -144,10 +144,11 @@
     else if (p.period === "lista") { btns.push(["addRow", "+ Rând", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
     else { btns.push(["addRow", "+ Rând", "ghost"]); }
     if (p.period !== "crud") btns.push(["ranges", "⚖ Range-uri", "ghost"]);
+    if (p.cols.some((c) => c[2] === "text" || c[2] === "txt")) btns.push(["presets", "📝 Liste text", "ghost"]);
     btns.push(["sp", "", ""], ["exportXls", "⬇ Excel", "ghost"], ["exportPdf", "⬇ PDF", "ghost"], ["exportDoc", "⬇ Word", "ghost"], ["printBtn", "🖶 Printează", "ghost"]);
     tb.innerHTML = btns.map(([id, l, c]) => id === "sp" ? '<span style="flex:1"></span>' : `<button id="${id}" class="${c}">${l}</button>`).join("");
     const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
-    bind("genDays", autoGenerate); bind("exclDays", openExcluded); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges);
+    bind("genDays", autoGenerate); bind("exclDays", openExcluded); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges); bind("presets", openPresetLists);
     bind("exportXls", exportCurrent);
     bind("exportPdf", () => window.RegistruExport.exportPDF(p, state.rows, exCtx()));
     bind("exportDoc", () => window.RegistruExport.exportWord(p, state.rows, exCtx()));
@@ -418,6 +419,31 @@
       const { error } = await sb.from("range_config").upsert(up, { onConflict: "parte,coloana" });
       if (error) { toast("Eroare: " + error.message); return; }
       $("settings").classList.add("hidden"); await loadData(); toast("Range-uri salvate");
+    };
+  }
+
+  // ---- Liste text rapide (presets gestionate) -------------------------------
+  function openPresetLists() {
+    const p = state.part, cols = effCols().filter((c) => c[2] === "text" || c[2] === "txt");
+    if (!cols.length) { toast("Nu există câmpuri text cu liste"); return; }
+    const tabs = cols.map((c, i) => `<button class="ptab ${i === 0 ? "active" : ""}" data-i="${i}">${esc(label(c))}</button>`).join("");
+    const areas = cols.map((c, i) => `<textarea class="parea" data-col="${c[0]}" rows="9" placeholder="O valoare pe rând..." style="${i === 0 ? "" : "display:none"}">${esc((state.presets[c[0]] || []).join("\n"))}</textarea>`).join("");
+    $("settings").innerHTML = `<div class="box"><h3>📝 Liste text rapide — Partea ${p.nr}</h3>
+      <p class="status">Introduceți valorile, câte una pe rând. Apoi le alegeți rapid în tabel (scrieți în celulă și apare lista).</p>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">${tabs}</div>${areas}
+      <div class="actions"><button class="ghost" id="pl_cancel">Renunță</button><button class="ok" id="pl_save">Salvează listele</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    const areaEls = [...$("settings").querySelectorAll(".parea")];
+    $("settings").querySelectorAll(".ptab").forEach((b) => (b.onclick = () => { $("settings").querySelectorAll(".ptab").forEach((x) => x.classList.remove("active")); b.classList.add("active"); areaEls.forEach((a, idx) => (a.style.display = idx === +b.dataset.i ? "" : "none")); }));
+    $("pl_cancel").onclick = () => $("settings").classList.add("hidden");
+    $("pl_save").onclick = async () => {
+      for (const a of areaEls) {
+        const col = a.dataset.col, vals = [...new Set(a.value.split("\n").map((s) => s.trim()).filter(Boolean))];
+        await sb.from("text_presets").delete().eq("parte", p.pid).eq("camp", col);
+        if (vals.length) await sb.from("text_presets").insert(vals.map((v) => ({ parte: p.pid, camp: col, valoare: v })));
+        state.presets[col] = vals;
+      }
+      $("settings").classList.add("hidden"); toast("Liste salvate"); if (isPart()) renderGrid();
     };
   }
 
