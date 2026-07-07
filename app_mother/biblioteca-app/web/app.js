@@ -242,6 +242,7 @@
       }
     });
     $("content").querySelectorAll(".del").forEach((b) => (b.onclick = () => deleteRow(+b.dataset.id)));
+    state.rows.forEach((r) => applyRowValidation(r.id));
     renderFooter();
   }
   function moveDown(inp) {
@@ -283,10 +284,35 @@
       const nt = +row.total_imprumuturi || 0;
       ["carti", "limba_romana"].forEach((f) => { const cur = +row[f] || 0; if (cur === 0 || cur === oldTotal) { if (row[f] !== nt) { row[f] = nt; affected.add(f); } } });
     }
-    if (part.key === "documente_continut_czu" && state.aux && state.aux.p3) {
-      const p3 = state.aux.p3[row.data] || 0; if (p3 > 0 && (+row.total_imprumuturi || 0) !== p3) { row.total_imprumuturi = p3; affected.add("total_imprumuturi"); }
+    if (part.key === "documente_continut_czu") {
+      if (state.aux && state.aux.p3) { const p3 = state.aux.p3[row.data] || 0; if (p3 > 0 && (+row.total_imprumuturi || 0) !== p3) { row.total_imprumuturi = p3; affected.add("total_imprumuturi"); } }
+      const czuKeys = part.cols.filter((c) => c[0].indexOf("czu_") === 0).map((c) => c[0]);
+      const t = +row.total_imprumuturi || 0, s = czuKeys.reduce((a, k) => a + (+row[k] || 0), 0);
+      if (t > 0 && s > t) { rebalanceCZU(row, t, czuKeys); czuKeys.forEach((k) => affected.add(k)); toast("CZU rebalansat la totalul din Partea III"); }
     }
     return affected;
+  }
+  function rebalanceCZU(row, total, keys) {
+    const cur = keys.map((k) => +row[k] || 0), sum = cur.reduce((a, b) => a + b, 0);
+    if (sum <= total || total <= 0) return;
+    const exact = cur.map((v) => (v * total) / sum), fl = exact.map((v) => Math.floor(v));
+    let rem = total - fl.reduce((a, b) => a + b, 0);
+    const order = keys.map((k, i) => i).sort((a, b) => (exact[b] - fl[b]) - (exact[a] - fl[a]));
+    for (let i = 0; i < rem; i++) fl[order[i % order.length]]++;
+    keys.forEach((k, i) => (row[k] = fl[i]));
+  }
+  // Constrângeri între câmpuri (evidențiere roșie, ca în desktop)
+  function validateRow(part, row) {
+    const bad = new Set();
+    if (part.key === "evidenta_utilizatori" && (+row.copii_pana_16 || 0) > 0 && (+row.prescolari || 0) > (+row.copii_pana_16 || 0)) bad.add("prescolari");
+    if (part.split) { const t = +row[part.split.total] || 0, m = +row[part.split.m] || 0, f = +row[part.split.f] || 0; if (m + f > t) { bad.add(part.split.m); bad.add(part.split.f); } }
+    if (part.key === "documente_continut_czu") { const t = +row.total_imprumuturi || 0; if (t > 0) { const cz = part.cols.filter((c) => c[0].indexOf("czu_") === 0); if (cz.reduce((a, c) => a + (+row[c[0]] || 0), 0) > t) cz.forEach((c) => bad.add(c[0])); } }
+    return bad;
+  }
+  function applyRowValidation(id) {
+    const row = state.rows.find((r) => r.id === id); if (!row) return;
+    const bad = validateRow(state.part, row);
+    effCols().forEach(([k]) => { const inp = $("content").querySelector(`tbody input[data-id="${id}"][data-col="${k}"]`); if (inp) inp.classList.toggle("badrel", bad.has(k)); });
   }
 
   function markOOR(inp) { const mx = inp.dataset.max; if (mx == null) return; const v = +inp.value || 0; inp.classList.toggle("oor", v > +mx || v < +(inp.dataset.min || 0)); }
@@ -310,6 +336,7 @@
       if (!arr.includes(row[col])) { arr.push(row[col]); const dl = $("pl_" + col); if (dl) dl.insertAdjacentHTML("beforeend", `<option value="${esc(row[col])}">`); sb.from("text_presets").upsert({ parte: state.part.pid, camp: col, valoare: row[col] }, { onConflict: "parte,camp,valoare", ignoreDuplicates: true }).then(() => {}, () => {}); }
     }
     affected.forEach((k) => { if (k === col) return; const inp = $("content").querySelector(`tbody input[data-id="${id}"][data-col="${k}"]`); if (inp) { if (inp.type === "checkbox") inp.checked = !!row[k]; else inp.value = row[k] == null ? "" : row[k]; markOOR(inp); } });
+    applyRowValidation(id);
     renderFooter();
   }
 
@@ -706,7 +733,8 @@
     return rows;
   }
   async function exportFinal(format) {
-    const cover = $("fin_cover").checked, nm = state.settings.library_name || "Biblioteca", loc = state.settings.library_loc || "";
+    const cover = $("fin_cover").checked, c = await getCover();
+    c.an = c.an || String(state.an);
     $("fin_status").textContent = "Se generează…";
     const dataByPart = {};
     for (const p of PARTS) {
@@ -717,7 +745,7 @@
     const secs = finalSections(dataByPart);
     if (!secs.length) { $("fin_status").textContent = "Nu există date pentru anul selectat."; return; }
     if (format === "word") {
-      const coverHtml = cover ? `<div style="text-align:center;page-break-after:always"><p>Ministerul Culturii al Republicii Moldova<br>Consiliul Biblioteconomic Național</p><h1>Registru de evidență a activității</h1><h2>Bibliotecii Publice „${esc(nm)}"</h2><p>${esc(loc)}</p><p style="margin-top:60px;font-size:20px">${state.an}</p></div>` : "";
+      const coverHtml = cover ? `<div style="text-align:center;page-break-after:always"><p>${esc(c.institutie_1)}<br>${esc(c.institutie_2)}</p><h1>${esc(c.titlu)}</h1><h2>${esc(c.biblioteca)}</h2><p>${esc(c.localitate)}</p><p style="margin-top:60px;font-size:20px">${esc(c.an)}</p></div>` : "";
       const body = secs.map((s, i) => {
         const trs = s.rows.map((r) => `<tr>${s.cols.map(([k, l, t]) => `<td>${t === "bool" ? (r[k] ? "✓" : "") : esc(r[k])}</td>`).join("")}</tr>`).join("");
         return `<div style="${i > 0 || cover ? "page-break-before:always" : ""}"><h3>${esc(s.title)}</h3><table>${finalHeadWord(s.cols)}${trs}</table></div>`;
@@ -726,7 +754,7 @@
       download(new Blob(["﻿", html], { type: "application/msword" }), `registru_final_${state.an}.doc`);
     } else {
       const content = [];
-      if (cover) content.push({ text: "Ministerul Culturii al Republicii Moldova\nConsiliul Biblioteconomic Național", alignment: "center", margin: [0, 60, 0, 24] }, { text: "Registru de evidență a activității", fontSize: 18, bold: true, alignment: "center" }, { text: `Bibliotecii Publice „${nm}"`, fontSize: 14, alignment: "center", margin: [0, 6, 0, 6] }, { text: loc, alignment: "center" }, { text: String(state.an), fontSize: 20, alignment: "center", margin: [0, 60, 0, 0], pageBreak: "after" });
+      if (cover) content.push({ text: c.institutie_1 + "\n" + c.institutie_2, alignment: "center", margin: [0, 60, 0, 24] }, { text: c.titlu, fontSize: 18, bold: true, alignment: "center" }, { text: c.biblioteca, fontSize: 14, alignment: "center", margin: [0, 6, 0, 6] }, { text: c.localitate, alignment: "center" }, { text: c.an, fontSize: 20, alignment: "center", margin: [0, 60, 0, 0], pageBreak: "after" });
       secs.forEach((s, i) => {
         const head = finalHeadPDF(s.cols), tbl = head.slice();
         s.rows.forEach((r) => tbl.push(s.cols.map(([k, l, t]) => ({ text: t === "bool" ? (r[k] ? "✓" : "") : (r[k] == null ? "" : String(r[k])), fontSize: 6 }))));
