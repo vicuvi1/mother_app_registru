@@ -3,56 +3,71 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Registru Digital — versiune web (POC)</title>
+  <title>Registru Digital — versiune web</title>
   <style>
     :root { --bg:#f4f6fb; --panel:#fff; --line:#d7deea; --accent:#2563eb;
-            --accent-d:#1d4ed8; --text:#1e293b; --muted:#64748b; --auto:#dbeafe; }
+            --accent-d:#1d4ed8; --text:#1e293b; --muted:#64748b; --sidebar:#0f172a; }
     * { box-sizing: border-box; }
     body { margin:0; font:14px/1.4 "Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--text); }
-    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px;
-             display:flex; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
-    header h1 { font-size:16px; margin:0; margin-right:auto; }
     button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:7px 12px;
              cursor:pointer; font-size:13px; }
     button:hover { background:var(--accent-d); }
     button.ghost { background:transparent; color:var(--accent); border:1px solid var(--line); }
     select, input { border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:13px; background:#fff; }
-    .wrap { padding:16px; }
     .status { font-size:12px; color:var(--muted); }
     .pill { font-size:11px; padding:2px 8px; border-radius:999px; background:#e2e8f0; color:#334155; }
     .pill.live { background:#dcfce7; color:#166534; }
-    /* Auth card */
+    .hidden { display:none !important; }
+
+    /* Auth */
     #auth { max-width:360px; margin:8vh auto; background:var(--panel); border:1px solid var(--line);
             border-radius:12px; padding:24px; box-shadow:0 8px 30px rgba(0,0,0,.06); }
-    #auth h2 { margin:0 0 4px; }
-    #auth p { margin:0 0 18px; color:var(--muted); font-size:13px; }
+    #auth h2 { margin:0 0 4px; } #auth p { margin:0 0 18px; color:var(--muted); font-size:13px; }
     #auth label { display:block; font-size:12px; margin:10px 0 4px; color:var(--muted); }
-    #auth input { width:100%; }
-    #auth button { width:100%; margin-top:16px; padding:9px; }
+    #auth input { width:100%; } #auth button { width:100%; margin-top:16px; padding:9px; }
     .err { color:#b91c1c; font-size:12px; margin-top:10px; min-height:16px; }
+
+    /* Layout */
+    #app { display:flex; min-height:100vh; }
+    aside { width:210px; background:var(--sidebar); color:#cbd5e1; flex-shrink:0; padding:10px 0; }
+    aside .brand { color:#fff; font-weight:600; padding:10px 16px 14px; font-size:15px; }
+    aside button.nav { display:block; width:100%; text-align:left; background:transparent; color:#cbd5e1;
+            border:0; border-radius:0; padding:8px 16px; font-size:13px; }
+    aside button.nav:hover { background:#1e293b; color:#fff; }
+    aside button.nav.active { background:var(--accent); color:#fff; }
+    aside .navsep { border-top:1px solid #1e293b; margin:8px 0; }
+    main { flex:1; min-width:0; display:flex; flex-direction:column; }
+    header { background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px;
+             display:flex; align-items:center; gap:10px; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+    header h1 { font-size:15px; margin:0; margin-right:auto; }
+    .wrap { padding:16px; overflow:auto; }
+
     /* Table */
     .tablebox { overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; }
     table { border-collapse:collapse; width:100%; }
     th, td { border:1px solid var(--line); padding:0; text-align:center; white-space:nowrap; }
     th { background:#eef2f7; font-size:11px; font-weight:600; padding:6px 8px; position:sticky; top:0; }
-    th.rowhdr, td.rowhdr { position:sticky; left:0; background:#eef2f7; z-index:1; min-width:96px; }
-    td input { width:64px; border:0; padding:8px 4px; text-align:center; background:transparent; }
+    td .txtcell { padding:8px; }
+    td input.num { width:64px; }
+    td input.txt { width:150px; } td input.txt.wide { width:230px; }
+    td input.date { width:130px; }
+    td input { border:0; padding:8px 4px; text-align:center; background:transparent; }
     td input:focus { outline:2px solid var(--accent); outline-offset:-2px; background:#fff; }
     td input.dirty { background:#fef9c3; }
     tr:nth-child(even) td { background:#fafbfe; }
-    .hidden { display:none !important; }
+    button.del { background:transparent; color:#b91c1c; border:0; font-weight:700; padding:6px 10px; }
+    button.del:hover { background:#fee2e2; }
+
     .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#111827;
-             color:#fff; padding:8px 16px; border-radius:8px; font-size:13px; opacity:0; transition:.2s; }
+             color:#fff; padding:8px 16px; border-radius:8px; font-size:13px; opacity:0; transition:.2s; z-index:20; }
     .toast.show { opacity:.95; }
   </style>
 </head>
 <body>
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Ecran autentificare                                                 -->
-  <!-- ------------------------------------------------------------------ -->
+  <!-- Autentificare -->
   <div id="auth">
     <h2>Registru Digital</h2>
-    <p>Autentificare bibliotecar (Supabase)</p>
+    <p>Autentificare bibliotecar</p>
     <label>Email</label>
     <input id="email" type="email" autocomplete="username" />
     <label>Parolă</label>
@@ -61,211 +76,41 @@
     <div class="err" id="authErr"></div>
   </div>
 
-  <!-- ------------------------------------------------------------------ -->
-  <!-- Aplicația                                                           -->
-  <!-- ------------------------------------------------------------------ -->
+  <!-- Aplicația -->
   <div id="app" class="hidden">
-    <header>
-      <h1>Partea I — Evidența utilizatorilor</h1>
-      <label class="status">An
-        <select id="an"></select>
-      </label>
-      <label class="status">Luna
-        <select id="luna"></select>
-      </label>
-      <button id="addDay" class="ghost">+ Zi</button>
-      <button id="backup" class="ghost" title="Descarcă o copie locală (Excel + SQLite)">⬇ Backup local</button>
-      <span id="live" class="pill">offline</span>
-      <span class="status" id="backupInfo"></span>
-      <span class="status" id="who"></span>
-      <button id="logout" class="ghost">Ieșire</button>
-    </header>
-    <div class="wrap">
-      <div class="tablebox">
-        <table id="grid"></table>
-      </div>
-      <p class="status" id="hint" style="margin-top:10px;">
-        Modificați o valoare și apăsați Tab/Enter — se salvează automat în Supabase.
-        Deschideți pagina în două ferestre ca să vedeți sincronizarea live.
-      </p>
-    </div>
+    <aside>
+      <div class="brand">📚 Registru Digital</div>
+      <div id="nav"></div>
+    </aside>
+    <main>
+      <header>
+        <h1 id="title">—</h1>
+        <label class="status" id="anWrap">An <select id="an"></select></label>
+        <label class="status" id="lunaWrap">Luna <select id="luna"></select></label>
+        <label class="status" id="catWrap">Categorie
+          <select id="cat"><option value="copii">Copii</option><option value="adulti">Adulți</option></select>
+        </label>
+        <button id="addRow" class="ghost">+ Rând</button>
+        <button id="exportBtn" class="ghost" title="Export Excel (vizualizarea curentă)">⬇ Excel</button>
+        <button id="backup" class="ghost" title="Copie locală completă (Excel + SQLite)">⬇ Backup local</button>
+        <span id="live" class="pill">offline</span>
+        <span class="status" id="backupInfo"></span>
+        <span class="status" id="who"></span>
+        <button id="logout" class="ghost">Ieșire</button>
+      </header>
+      <div class="wrap"><div id="content"></div></div>
+    </main>
   </div>
 
+  <datalist id="staffList"></datalist>
   <div class="toast" id="toast"></div>
 
-  <!-- supabase-js din CDN (funcționează și în Firefox ESR pe Windows 7) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Backup local: SheetJS (Excel) + sql.js (SQLite) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
   <script src="./config.js"></script>
+  <script src="./parts.js"></script>
   <script src="./backup.js"></script>
-  <script>
-  // =====================================================================
-  // Definiția coloanelor Părții I (mapate 1:1 pe tabelul evidenta_utilizatori)
-  // =====================================================================
-  const TABLE = "evidenta_utilizatori";
-  const NUM_COLS = [
-    ["adulti","Adulți"], ["copii_pana_16","Copii ≤16"], ["prescolari","Preșc."],
-    ["elevi","Elevi"], ["studenti","Studenți"], ["intelectuali","Intel."],
-    ["muncitori","Muncit."], ["pensionari","Pens."], ["someri","Șomeri"],
-    ["alte_categorii","Alte"], ["tineri_17_34","17-34"], ["adulti_35_64","35-64"],
-    ["varstnici_65_plus","65+"], ["sex_copii_f","C-F"], ["sex_copii_m","C-M"],
-    ["sex_adulti_f","A-F"], ["sex_adulti_m","A-M"],
-  ];
-  const LUNI = ["Ian","Feb","Mar","Apr","Mai","Iun","Iul","Aug","Sep","Oct","Noi","Dec"];
-
-  // ---- Supabase client -------------------------------------------------
-  if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
-    document.getElementById("authErr").textContent =
-      "Lipsește config.js — copiați config.example.js în config.js și completați cheile.";
-  }
-  const sb = window.supabase.createClient(window.SUPABASE_URL || "", window.SUPABASE_ANON_KEY || "");
-
-  const $ = (id) => document.getElementById(id);
-  let rows = [];            // rândurile încărcate pentru an+luna
-  let channel = null;       // abonament realtime
-
-  function toast(msg) {
-    const t = $("toast"); t.textContent = msg; t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 1400);
-  }
-
-  // ---- Autentificare ---------------------------------------------------
-  async function login() {
-    $("authErr").textContent = "";
-    const { error } = await sb.auth.signInWithPassword({
-      email: $("email").value.trim(), password: $("password").value,
-    });
-    if (error) { $("authErr").textContent = error.message; return; }
-    await onLoggedIn();
-  }
-
-  async function onLoggedIn() {
-    const { data } = await sb.auth.getUser();
-    if (!data.user) return;
-    $("auth").classList.add("hidden");
-    $("app").classList.remove("hidden");
-    $("who").textContent = data.user.email;
-    initSelectors();
-    await loadData();
-    subscribeRealtime();
-    refreshBackupInfo();
-  }
-
-  // ---- Backup local (Excel + SQLite) ----------------------------------
-  function refreshBackupInfo() {
-    const h = window.RegistruBackup.hoursSinceBackup();
-    const info = $("backupInfo"), btn = $("backup");
-    if (h === null) {
-      info.textContent = "fără backup local încă";
-      btn.style.background = "var(--accent)"; btn.style.color = "#fff";
-    } else if (h > 24) {
-      info.textContent = `ultimul backup acum ${Math.floor(h / 24)} zi(le)`;
-      btn.style.background = "var(--accent)"; btn.style.color = "#fff";
-    } else {
-      info.textContent = "backup local recent ✔";
-      btn.style.background = ""; btn.style.color = "";
-    }
-  }
-
-  async function doBackup() {
-    const info = $("backupInfo");
-    await window.RegistruBackup.runBackup(sb, { note: (m) => { info.textContent = m; } });
-    refreshBackupInfo();
-  }
-
-  // ---- Selectoare an / lună -------------------------------------------
-  function initSelectors() {
-    if ($("an").options.length) return;
-    const nowYear = 2026; // an de referință; ajustați după nevoie
-    for (let y = nowYear - 3; y <= nowYear + 1; y++) {
-      $("an").add(new Option(y, y, false, y === nowYear));
-    }
-    LUNI.forEach((m, i) => $("luna").add(new Option(m, i + 1, false, i === 6)));
-    $("an").onchange = loadData;
-    $("luna").onchange = loadData;
-  }
-
-  // ---- Încărcare date --------------------------------------------------
-  async function loadData() {
-    const an = +$("an").value, luna = +$("luna").value;
-    const { data, error } = await sb.from(TABLE).select("*")
-      .eq("an", an).eq("luna", luna).order("data", { ascending: true });
-    if (error) { toast("Eroare: " + error.message); return; }
-    rows = data || [];
-    renderGrid();
-  }
-
-  // ---- Randare tabel ---------------------------------------------------
-  function renderGrid() {
-    const grid = $("grid");
-    let head = "<tr><th class='rowhdr'>Data</th>" +
-      NUM_COLS.map(([k, l]) => `<th title="${k}">${l}</th>`).join("") + "</tr>";
-    let body = rows.map((r) => {
-      const cells = NUM_COLS.map(([k]) =>
-        `<td><input type="number" min="0" value="${r[k] ?? 0}"
-             data-id="${r.id}" data-col="${k}" /></td>`).join("");
-      return `<tr><td class="rowhdr">${r.data}</td>${cells}</tr>`;
-    }).join("");
-    if (!rows.length) {
-      body = `<tr><td class="rowhdr">—</td><td colspan="${NUM_COLS.length}"
-              style="padding:14px;color:var(--muted)">Nicio zi. Apăsați „+ Zi”.</td></tr>`;
-    }
-    grid.innerHTML = head + body;
-    grid.querySelectorAll("input").forEach((inp) => {
-      inp.addEventListener("input", () => inp.classList.add("dirty"));
-      inp.addEventListener("change", saveCell);
-      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") inp.blur(); });
-    });
-  }
-
-  // ---- Salvare celulă (upsert) ----------------------------------------
-  async function saveCell(e) {
-    const inp = e.target;
-    const id = +inp.dataset.id, col = inp.dataset.col;
-    const val = Math.max(0, parseInt(inp.value || "0", 10));
-    const { error } = await sb.from(TABLE).update({ [col]: val }).eq("id", id);
-    if (error) { toast("Eroare salvare: " + error.message); return; }
-    inp.classList.remove("dirty");
-    const row = rows.find((r) => r.id === id); if (row) row[col] = val;
-    toast("Salvat");
-  }
-
-  // ---- Adăugare zi nouă -----------------------------------------------
-  async function addDay() {
-    const an = +$("an").value, luna = +$("luna").value;
-    const zi = prompt("Data (ex: 2026-07-15):",
-      `${an}-${String(luna).padStart(2, "0")}-01`);
-    if (!zi) return;
-    const { error } = await sb.from(TABLE).insert({ an, luna, data: zi });
-    if (error) { toast("Eroare: " + error.message); return; }
-    await loadData();
-  }
-
-  // ---- Realtime (multi-user) ------------------------------------------
-  function subscribeRealtime() {
-    if (channel) sb.removeChannel(channel);
-    channel = sb.channel("part1")
-      .on("postgres_changes",
-          { event: "*", schema: "public", table: TABLE },
-          () => loadData())
-      .subscribe((status) => {
-        const live = $("live");
-        if (status === "SUBSCRIBED") { live.textContent = "live"; live.classList.add("live"); }
-        else { live.textContent = "offline"; live.classList.remove("live"); }
-      });
-  }
-
-  // ---- Legături UI -----------------------------------------------------
-  $("loginBtn").onclick = login;
-  $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
-  $("addDay").onclick = addDay;
-  $("backup").onclick = doBackup;
-  $("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
-
-  // Reluare sesiune dacă utilizatorul e deja logat
-  sb.auth.getSession().then(({ data }) => { if (data.session) onLoggedIn(); });
-  </script>
+  <script src="./app.js"></script>
 </body>
 </html>

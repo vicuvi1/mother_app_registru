@@ -92,11 +92,13 @@ peste 24h. Astfel aveți mereu o copie locală, deținută de bibliotecă, pe l�
 
 - [x] **Faza 0** — schema Supabase + POC Partea I editabilă + realtime multi-user
 - [x] **Backup local** — descărcare Excel + SQLite, cu memento la 24h
-- [ ] **Faza 1** — autentificare cu roluri, listă utilizatori (tabelul `personal`)
-- [ ] **Faza 2** — restul părților editabile (II–VII, IX, XI–XIV) cu totaluri automate
-- [ ] **Faza 3** — validări (range_config), etichete custom, text presets, istoric/audit
-- [ ] **Faza 4** — backend Python (FastAPI) pentru export Word/PDF/Excel, refolosind codul existent
-- [ ] **Faza 5** — migrarea datelor din bazele SQLite existente în Supabase
+- [x] **Faza 1** — toate cele 12 părți editabile (I–VII, IX, XI–XIV), navigație, autosave,
+  realtime, ștergere rânduri, export Excel per parte, gestiune Personal (responsabili)
+- [ ] **Faza 2** — totaluri automate + antete grupate identice cu registrul fizic
+- [ ] **Faza 3** — sincronizarea între părți (ex. Partea III → IV), validări (range_config),
+  etichete custom, text presets, istoric „cine/ce a modificat"
+- [ ] **Faza 4** — backend Python (FastAPI) pentru export **Word/PDF**, refolosind codul existent
+- [ ] **Faza 5** — import Excel + migrarea datelor din bazele SQLite existente în Supabase
 
 ## Note despre concurență (multi-user)
 
