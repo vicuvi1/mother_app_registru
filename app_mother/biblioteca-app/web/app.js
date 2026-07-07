@@ -197,6 +197,14 @@
       const { data, error } = await q;
       if (error) { toast("Eroare: " + error.message); return; }
       state.rows = data || [];
+      // Auto-schelet (ca în desktop): la deschiderea unei luni goale, creează
+      // automat zilele lucrătoare (părți zilnice) sau rândul lunii (parte lunară).
+      if (!state.rows.length && (p.period === "zi" || p.period === "luna")) {
+        const scaffold = [];
+        if (p.period === "luna") { const o = { an: state.an, luna: state.luna }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); }
+        else { const excl = await getExcluded(state.an), exSet = new Set(excl[state.luna] || []); weekdays(state.an, state.luna).filter((d) => !exSet.has(d)).forEach((d) => { const o = { an: state.an, luna: state.luna, [p.dateField]: d }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); }); }
+        if (scaffold.length) { const { error: e2 } = await sb.from(p.key).insert(scaffold); if (!e2) return loadData(); }
+      }
       await syncIn(p); await loadMeta(p);
       state.prior = null;
       if (p.cumulative) {
