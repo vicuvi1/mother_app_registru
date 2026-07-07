@@ -62,9 +62,22 @@ Logica de business e independentă de interfață și se poate refolosi într-un
 `app/ui/export/`) și regulile de sincronizare/calcul (`app/core/`). POC-ul de acum vorbește
 însă direct cu Supabase din browser, fără backend.
 
+## Backup local („local + cloud")
+
+Supabase e copia vie, partajată. Butonul **⬇ Backup local** descarcă pe PC o copie
+completă a tuturor datelor, în două formate:
+
+- **Excel (.xlsx)** — o foaie per parte; ușor de deschis și citit.
+- **SQLite (.sqlite)** — aceeași bază de date pe care o folosește aplicația desktop.
+
+Aplicația arată de cât timp nu s-a mai făcut backup și evidențiază butonul dacă au trecut
+peste 24h. Astfel aveți mereu o copie locală, deținută de bibliotecă, pe lângă cea din cloud.
+(Generarea rulează în browser, prin SheetJS + sql.js din CDN — fără server.)
+
 ## Roadmap
 
 - [x] **Faza 0** — schema Supabase + POC Partea I editabilă + realtime multi-user
+- [x] **Backup local** — descărcare Excel + SQLite, cu memento la 24h
 - [ ] **Faza 1** — autentificare cu roluri, listă utilizatori (tabelul `personal`)
 - [ ] **Faza 2** — restul părților editabile (II–VII, IX, XI–XIV) cu totaluri automate
 - [ ] **Faza 3** — validări (range_config), etichete custom, text presets, istoric/audit

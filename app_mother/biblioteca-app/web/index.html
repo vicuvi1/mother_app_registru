@@ -74,7 +74,9 @@
         <select id="luna"></select>
       </label>
       <button id="addDay" class="ghost">+ Zi</button>
+      <button id="backup" class="ghost" title="Descarcă o copie locală (Excel + SQLite)">⬇ Backup local</button>
       <span id="live" class="pill">offline</span>
+      <span class="status" id="backupInfo"></span>
       <span class="status" id="who"></span>
       <button id="logout" class="ghost">Ieșire</button>
     </header>
@@ -93,7 +95,11 @@
 
   <!-- supabase-js din CDN (funcționează și în Firefox ESR pe Windows 7) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Backup local: SheetJS (Excel) + sql.js (SQLite) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
   <script src="./config.js"></script>
+  <script src="./backup.js"></script>
   <script>
   // =====================================================================
   // Definiția coloanelor Părții I (mapate 1:1 pe tabelul evidenta_utilizatori)
@@ -144,6 +150,29 @@
     initSelectors();
     await loadData();
     subscribeRealtime();
+    refreshBackupInfo();
+  }
+
+  // ---- Backup local (Excel + SQLite) ----------------------------------
+  function refreshBackupInfo() {
+    const h = window.RegistruBackup.hoursSinceBackup();
+    const info = $("backupInfo"), btn = $("backup");
+    if (h === null) {
+      info.textContent = "fără backup local încă";
+      btn.style.background = "var(--accent)"; btn.style.color = "#fff";
+    } else if (h > 24) {
+      info.textContent = `ultimul backup acum ${Math.floor(h / 24)} zi(le)`;
+      btn.style.background = "var(--accent)"; btn.style.color = "#fff";
+    } else {
+      info.textContent = "backup local recent ✔";
+      btn.style.background = ""; btn.style.color = "";
+    }
+  }
+
+  async function doBackup() {
+    const info = $("backupInfo");
+    await window.RegistruBackup.runBackup(sb, { note: (m) => { info.textContent = m; } });
+    refreshBackupInfo();
   }
 
   // ---- Selectoare an / lună -------------------------------------------
@@ -232,6 +261,7 @@
   $("loginBtn").onclick = login;
   $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
   $("addDay").onclick = addDay;
+  $("backup").onclick = doBackup;
   $("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
   // Reluare sesiune dacă utilizatorul e deja logat
