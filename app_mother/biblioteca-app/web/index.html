@@ -92,6 +92,8 @@
         </label>
         <button id="addRow" class="ghost">+ Rând</button>
         <button id="exportBtn" class="ghost" title="Export Excel (vizualizarea curentă)">⬇ Excel</button>
+        <button id="pdfBtn" class="ghost" title="Export PDF (vizualizarea curentă)">⬇ PDF</button>
+        <button id="wordBtn" class="ghost" title="Export Word (vizualizarea curentă)">⬇ Word</button>
         <button id="backup" class="ghost" title="Copie locală completă (Excel + SQLite)">⬇ Backup local</button>
         <span id="live" class="pill">offline</span>
         <span class="status" id="backupInfo"></span>
@@ -108,9 +110,13 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.7/build/pdfmake.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.7/build/vfs_fonts.js"></script>
   <script src="./config.js"></script>
   <script src="./parts.js"></script>
   <script src="./backup.js"></script>
+  <script src="./export.js"></script>
+  <script src="./import.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

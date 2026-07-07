@@ -7,6 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const PARTS = window.REGISTRU_PARTS;
   const STAFF = { key: "__staff" }; // pseudo-parte pentru gestiunea personalului
+  const IMPORT = { key: "__import" }; // pseudo-parte pentru import / migrare
   const LUNI = ["Ian","Feb","Mar","Apr","Mai","Iun","Iul","Aug","Sep","Oct","Noi","Dec"];
 
   if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) {
@@ -66,7 +67,8 @@
     nav.innerHTML =
       PARTS.map((p) => `<button class="nav" data-key="${p.key}">${p.nr}. ${esc(p.title)}</button>`).join("") +
       `<div class="navsep"></div>` +
-      `<button class="nav" data-key="__staff">👤 Personal</button>`;
+      `<button class="nav" data-key="__staff">👤 Personal</button>` +
+      `<button class="nav" data-key="__import">⬆ Import / Migrare</button>`;
     nav.querySelectorAll("button.nav").forEach((b) =>
       (b.onclick = () => selectPart(b.dataset.key)));
   }
@@ -80,20 +82,26 @@
       state.part = STAFF; updateHeader(); markActive(key);
       renderStaff(); subscribe("personal"); return;
     }
+    if (key === "__import") {
+      state.part = IMPORT; updateHeader(); markActive(key);
+      if (channel) { sb.removeChannel(channel); channel = null; }
+      renderImport(); return;
+    }
     state.part = PARTS.find((p) => p.key === key);
     updateHeader(); markActive(key); loadData(); subscribe(state.part.key);
   }
 
   function updateHeader() {
     const p = state.part;
-    const isStaff = p === STAFF;
-    $("title").textContent = isStaff ? "Personal (responsabili)" : `Partea ${p.nr} — ${p.title}`;
-    const showPeriod = !isStaff && p.period !== "crud";
+    const special = p === STAFF || p === IMPORT;
+    $("title").textContent = p === STAFF ? "Personal (responsabili)"
+      : p === IMPORT ? "Import / Migrare date" : `Partea ${p.nr} — ${p.title}`;
+    const showPeriod = !special && p.period !== "crud";
     $("anWrap").style.display = showPeriod ? "" : "none";
     $("lunaWrap").style.display = showPeriod ? "" : "none";
-    $("catWrap").style.display = !isStaff && p.categorie ? "" : "none";
-    $("addRow").style.display = isStaff ? "none" : "";
-    $("exportBtn").style.display = isStaff ? "none" : "";
+    $("catWrap").style.display = !special && p.categorie ? "" : "none";
+    $("addRow").style.display = special ? "none" : "";
+    ["exportBtn", "pdfBtn", "wordBtn"].forEach((id) => ($(id).style.display = special ? "none" : ""));
   }
 
   // ---- Încărcare + randare tabel -------------------------------------------
@@ -236,6 +244,37 @@
     await sb.from("personal").delete().eq("id", id); await loadStaff(); renderStaff();
   }
 
+  // ---- Import / Migrare -----------------------------------------------------
+  function renderImport() {
+    $("content").innerHTML =
+      `<div style="max-width:720px">
+        <h3 style="margin-top:0">Migrare din aplicația desktop (SQLite)</h3>
+        <p class="status">Alegeți fișierul <b>biblioteca.db</b> din aplicația desktop
+          (de obicei în folderul <code>app\\data</code>). Datele se adaugă în Supabase.</p>
+        <input type="file" id="sqliteFile" accept=".db,.sqlite,.sqlite3">
+        <button id="doSqlite">Importă din SQLite</button>
+        <hr style="margin:20px 0;border:0;border-top:1px solid var(--line)">
+        <h3>Import din Excel (backup al acestei aplicații)</h3>
+        <p class="status">Fișier .xlsx exportat prin „Backup local".</p>
+        <input type="file" id="xlsxFile" accept=".xlsx">
+        <button id="doXlsx">Importă din Excel</button>
+        <pre id="importLog" style="margin-top:16px;background:#0f172a;color:#cbd5e1;padding:12px;border-radius:8px;max-height:320px;overflow:auto;font-size:12px;white-space:pre-wrap"></pre>
+        <p class="status">⚠ Importul <b>adaugă</b> rânduri (nu înlocuiește). Rulați o singură dată per fișier ca să evitați duplicate.</p>
+      </div>`;
+    const logEl = $("importLog");
+    const log = (m) => { logEl.textContent += m + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+    const run = async (btnId, fileId, fn) => {
+      const f = $(fileId).files[0];
+      if (!f) { toast("Alegeți un fișier"); return; }
+      logEl.textContent = ""; $(btnId).disabled = true;
+      try { await fn(sb, f, log); await loadStaff(); }
+      catch (e) { log("✗ " + e.message); }
+      finally { $(btnId).disabled = false; }
+    };
+    $("doSqlite").onclick = () => run("doSqlite", "sqliteFile", window.RegistruImport.migrateSqlite);
+    $("doXlsx").onclick = () => run("doXlsx", "xlsxFile", window.RegistruImport.importExcel);
+  }
+
   // ---- Realtime (multi-user) ------------------------------------------------
   function subscribe(table) {
     if (channel) sb.removeChannel(channel);
@@ -268,6 +307,14 @@
   $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
   $("addRow").onclick = addRow;
   $("exportBtn").onclick = exportCurrent;
+  $("pdfBtn").onclick = () => {
+    if (state.part === STAFF || state.part === IMPORT) return;
+    window.RegistruExport.exportPDF(state.part, state.rows, { an: state.an, luna: state.luna, cat: state.cat, toast });
+  };
+  $("wordBtn").onclick = () => {
+    if (state.part === STAFF || state.part === IMPORT) return;
+    window.RegistruExport.exportWord(state.part, state.rows, { an: state.an, luna: state.luna, cat: state.cat });
+  };
   $("backup").onclick = doBackup;
   $("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
