@@ -94,11 +94,17 @@ peste 24h. Astfel aveți mereu o copie locală, deținută de bibliotecă, pe l�
 - [x] **Backup local** — descărcare Excel + SQLite, cu memento la 24h
 - [x] **Faza 1** — toate cele 12 părți editabile (I–VII, IX, XI–XIV), navigație, autosave,
   realtime, ștergere rânduri, export Excel per parte, gestiune Personal (responsabili)
-- [ ] **Faza 2** — totaluri automate + antete grupate identice cu registrul fizic
-- [ ] **Faza 3** — sincronizarea între părți (ex. Partea III → IV), validări (range_config),
-  etichete custom, text presets, istoric „cine/ce a modificat"
-- [ ] **Faza 4** — backend Python (FastAPI) pentru export **Word/PDF**, refolosind codul existent
-- [ ] **Faza 5** — import Excel + migrarea datelor din bazele SQLite existente în Supabase
+- [x] **Faza 2** — totaluri automate (coloane calculate + rânduri „Total" / „Total de la început"),
+  antete grupate + super-grupuri (Partea IX), validare min/max
+- [x] **Faza 3** — sincronizare între părți (III→IV, IX/XI→II), etichete custom (dublu-clic pe antet),
+  text-presets (autocomplete), reguli intra-rând (split copii, oglindă III, split gen)
+- [x] **Faza 4** — export **Word și PDF** în browser (fără backend)
+- [x] **Faza 5** — import Excel + migrare din baza SQLite a aplicației desktop
+
+### Rămâne pentru mai târziu (nice-to-have)
+- Auto-generarea zilelor lucrătoare ale lunii (calendar) în părțile zilnice
+- Sincronizare inversă II→IX/XI (acum e unidirecțională: IX/XI → II, read-only în II)
+- Istoric „cine/ce a modificat" (audit vizibil)
 
 ## Note despre concurență (multi-user)
 

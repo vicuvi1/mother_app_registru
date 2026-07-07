@@ -259,6 +259,12 @@
     return part.cols;
   }
 
+  // part_id ca în desktop (pentru etichete_custom / text_presets compatibile la migrare)
+  const PID = { I: "part_01", II: "part_02", III: "part_03", IV: "part_04", V: "part_05",
+    VI: "part_06", VII: "part_07", IX: "part_09", XI: "part_11", XII: "part_12",
+    XIII: "part_13", XIV: "part_14" };
+  PARTS.forEach((p) => (p.pid = PID[p.nr]));
+
   window.REGISTRU_PARTS = PARTS;
   window.REGISTRU_MAX5 = MAX5;
   window.partCols = partCols;

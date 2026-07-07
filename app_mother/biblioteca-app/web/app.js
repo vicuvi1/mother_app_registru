@@ -17,7 +17,7 @@
   }
   const sb = window.supabase.createClient(window.SUPABASE_URL || "", window.SUPABASE_ANON_KEY || "");
 
-  const state = { part: null, an: 2026, luna: 7, cat: "copii", rows: [], staff: [], prior: null, aux: {} };
+  const state = { part: null, an: 2026, luna: 7, cat: "copii", rows: [], staff: [], prior: null, aux: {}, presets: {}, labels: {} };
   let channel = null;
 
   // Chei folosite de sincronizarea între părți
@@ -97,6 +97,7 @@
     if (error) { toast("Eroare: " + error.message); return; }
     state.rows = data || [];
     await syncIn(p);
+    await loadMeta(p);
     // Prior months (pentru „Total de la început")
     state.prior = null;
     if (p.cumulative) {
@@ -152,6 +153,32 @@
     } catch (e) { /* sincronizarea nu blochează afișarea */ }
   }
 
+  // ---- Etichete custom + text-presets ---------------------------------------
+  async function loadMeta(p) {
+    state.presets = {}; state.labels = {};
+    const [lab, pre] = await Promise.all([
+      sb.from("etichete_custom").select("camp,eticheta_custom").eq("parte", p.pid),
+      sb.from("text_presets").select("camp,valoare").eq("parte", p.pid),
+    ]);
+    (lab.data || []).forEach((r) => { if (r.eticheta_custom) state.labels[r.camp] = r.eticheta_custom; });
+    (pre.data || []).forEach((r) => { (state.presets[r.camp] = state.presets[r.camp] || []).push(r.valoare); });
+  }
+  const label = (c) => state.labels[c[0]] || c[1];
+  function presetDatalists(cols) {
+    return cols.filter((c) => c[2] === "text" || c[2] === "txt").map((c) => {
+      const vals = state.presets[c[0]] || [];
+      return `<datalist id="pl_${c[0]}">${vals.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>`;
+    }).join("");
+  }
+  async function renameCol(camp, col) {
+    const nv = prompt("Etichetă coloană:", state.labels[camp] || col[1]);
+    if (nv == null) return;
+    const { error } = await sb.from("etichete_custom")
+      .upsert({ parte: state.part.pid, camp, eticheta_default: col[1], eticheta_custom: nv }, { onConflict: "parte,camp" });
+    if (error) { toast("Eroare: " + error.message); return; }
+    state.labels[camp] = nv; renderGrid();
+  }
+
   // ---- Antet grupat ---------------------------------------------------------
   function spanRow(cols, keyFn) {
     let html = "", i = 0;
@@ -169,7 +196,7 @@
     let h = "";
     if (hasSG) h += `<tr>${spanRow(cols, (c) => (c[3] && c[3].sg) || null)}<th></th></tr>`;
     if (hasG || hasSG) h += `<tr>${spanRow(cols, (c) => (c[3] && c[3].g) || null)}<th></th></tr>`;
-    h += `<tr>${cols.map((c) => `<th title="${c[0]}">${esc(c[1])}</th>`).join("")}<th></th></tr>`;
+    h += `<tr>${cols.map((c) => `<th data-col="${c[0]}" title="Dublu-clic: redenumire">${esc(label(c))}</th>`).join("")}<th></th></tr>`;
     return h;
   }
 
@@ -186,8 +213,8 @@
     if (t === "bool") return `<input type="checkbox" ${v ? "checked" : ""} ${attr}>`;
     if (t === "date") return `<input class="date" type="date" value="${esc(v)}" ${attr}>`;
     if (t === "staff") return `<input class="txt" type="text" list="staffList" value="${esc(v)}" ${attr}>`;
-    if (t === "txt") return `<input class="txt wide" type="text" value="${esc(v)}" ${attr}>`;
-    return `<input class="txt" type="text" value="${esc(v)}" ${attr}>`;
+    if (t === "txt") return `<input class="txt wide" type="text" list="pl_${k}" value="${esc(v)}" ${attr}>`;
+    return `<input class="txt" type="text" list="pl_${k}" value="${esc(v)}" ${attr}>`;
   }
 
   function renderGrid() {
@@ -197,11 +224,15 @@
       return `<tr>${tds}<td><button class="del" data-id="${r.id}" title="Șterge rândul">✕</button></td></tr>`;
     }).join("");
     const empty = `<tr><td colspan="${cols.length + 1}" style="padding:16px;color:var(--muted)">Niciun rând. Apăsați „+ Rând".</td></tr>`;
-    $("content").innerHTML =
+    $("content").innerHTML = presetDatalists(cols) +
       `<div class="tablebox"><table>
         <thead>${buildHead(cols)}</thead>
         <tbody>${state.rows.length ? body : empty}</tbody>
         <tfoot id="gridFoot"></tfoot></table></div>`;
+    $("content").querySelectorAll("thead tr:last-child th[data-col]").forEach((th) => {
+      th.style.cursor = "pointer";
+      th.ondblclick = () => renameCol(th.dataset.col, cols.find((c) => c[0] === th.dataset.col));
+    });
     $("content").querySelectorAll("tbody input").forEach((inp) => {
       inp.addEventListener("change", saveCell);
       if (inp.type !== "checkbox" && !inp.readOnly) {
@@ -292,6 +323,15 @@
     const { error } = await sb.from(state.part.key).update(payload).eq("id", id);
     if (error) { toast("Eroare salvare: " + error.message); return; }
     el.classList.remove("dirty"); markOOR(el);
+    // salvează valoarea ca preset text (autocomplete data viitoare)
+    if ((type === "text" || type === "txt") && row[col]) {
+      const arr = state.presets[col] || (state.presets[col] = []);
+      if (!arr.includes(row[col])) {
+        arr.push(row[col]);
+        const dl = $("pl_" + col); if (dl) dl.insertAdjacentHTML("beforeend", `<option value="${esc(row[col])}">`);
+        sb.from("text_presets").upsert({ parte: state.part.pid, camp: col, valoare: row[col] }, { onConflict: "parte,camp,valoare", ignoreDuplicates: true }).then(() => {}, () => {});
+      }
+    }
     // reflectă valorile derivate în celelalte celule fără reîncărcare (păstrează focus)
     affected.forEach((k) => {
       if (k === col) return;
