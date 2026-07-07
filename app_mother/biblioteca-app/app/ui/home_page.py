@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -24,7 +24,7 @@ from core.register_audit import IncompleteSlot, find_incomplete_months
 from core.session_state import load_session
 from database.backup import list_backups
 
-ROLE_SLOT = Qt.ItemDataRole.UserRole
+ROLE_SLOT = Qt.UserRole
 
 
 class HomePage(QWidget):

@@ -9,9 +9,9 @@ echo   Registru Digital Biblioteca - Instalare dependente
 echo ============================================================
 echo.
 echo Acest script pregătește PC-ul pentru prima rulare:
-echo   - verifică Python 3.11+
+echo   - verifică Python 3.8+ (pe Windows 7 folositi Python 3.8 pe 32 de biti)
 echo   - creează mediul virtual (folder venv)
-echo   - instalează PyQt6, SQLite/SQLAlchemy, export Word/PDF/Excel
+echo   - instalează PyQt5, SQLite/SQLAlchemy, export Word/PDF/Excel
 echo.
 echo Durează câteva minute la prima instalare (descărcare pachete).
 echo.
@@ -20,14 +20,14 @@ REM --- Găsește Python ---
 set "PY_CMD="
 where python >nul 2>&1
 if %errorlevel%==0 (
-    python -c "import sys; exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
+    python -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)" >nul 2>&1
     if !errorlevel!==0 set "PY_CMD=python"
 )
 
 if not defined PY_CMD (
     where py >nul 2>&1
     if !errorlevel!==0 (
-        for %%V in (3.12 3.13 3.11) do (
+        for %%V in (3.8 3.9 3.10 3.11 3.12) do (
             if not defined PY_CMD (
                 py -%%V -c "import sys" >nul 2>&1
                 if !errorlevel!==0 set "PY_CMD=py -%%V"
@@ -37,9 +37,11 @@ if not defined PY_CMD (
 )
 
 if not defined PY_CMD (
-    echo [EROARE] Python 3.11 sau mai nou nu este instalat.
+    echo [EROARE] Python 3.8 sau mai nou nu este instalat.
     echo.
-    echo Descărcați Python de la: https://www.python.org/downloads/
+    echo Windows 7: descarcati Python 3.8.10 (32-bit) de la:
+    echo   https://www.python.org/downloads/release/python-3810/
+    echo Alte sisteme: https://www.python.org/downloads/
     echo La instalare bifați: "Add python.exe to PATH"
     echo.
     pause

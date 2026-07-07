@@ -1,7 +1,7 @@
 """Ecran de pornire animat — afișat în timpul inițializării aplicației."""
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QProgressBar, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QApplication, QLabel, QMainWindow, QProgressBar, QVBoxLayout, QWidget
 
 
 class SplashScreen(QWidget):
@@ -10,9 +10,9 @@ class SplashScreen(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowFlags(
-            Qt.WindowType.SplashScreen | Qt.WindowType.FramelessWindowHint
+            Qt.SplashScreen | Qt.FramelessWindowHint
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        self.setAttribute(Qt.WA_TranslucentBackground, False)
         self.setFixedSize(480, 320)
         self.setObjectName("splashScreen")
         self.setStyleSheet(
@@ -55,17 +55,17 @@ class SplashScreen(QWidget):
 
         logo = QLabel("📚")
         logo.setObjectName("splashLogo")
-        logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo.setAlignment(Qt.AlignCenter)
         layout.addWidget(logo)
 
         title = QLabel("Registru Digital")
         title.setObjectName("splashTitle")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
         subtitle = QLabel("Evidența activității bibliotecii")
         subtitle.setObjectName("splashSubtitle")
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setAlignment(Qt.AlignCenter)
         layout.addWidget(subtitle)
 
         layout.addSpacing(24)
@@ -77,7 +77,7 @@ class SplashScreen(QWidget):
 
         self._status = QLabel("Se pornește aplicația")
         self._status.setObjectName("splashStatus")
-        self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._status.setAlignment(Qt.AlignCenter)
         layout.addWidget(self._status)
 
         self._base_message = "Se pornește aplicația"

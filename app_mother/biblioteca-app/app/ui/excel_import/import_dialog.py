@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -82,11 +82,11 @@ class ImportExcelDialog(QDialog):
         layout.addWidget(self._replace)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
         buttons.accepted.connect(self._run_import)
         buttons.rejected.connect(self.reject)
-        ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok = buttons.button(QDialogButtonBox.Ok)
         if ok:
             ok.setText("Importă")
         layout.addWidget(buttons)

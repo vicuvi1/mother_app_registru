@@ -1,6 +1,6 @@
 """Dropdown cu valori predefinite pentru câmpuri text — click și selectezi."""
 
-from PyQt6.QtWidgets import QComboBox
+from PyQt5.QtWidgets import QComboBox
 
 from core.constants_manager import ensure_text_preset, get_text_presets
 
@@ -11,7 +11,7 @@ class PresetTextDropdown(QComboBox):
         self._parte = parte
         self._camp = camp
         self.setEditable(True)
-        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.setInsertPolicy(QComboBox.NoInsert)
         self.refresh()
 
     def refresh(self) -> None:

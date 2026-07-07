@@ -5,7 +5,10 @@
       1. Creeaza folderul aplicatiei in %LOCALAPPDATA%\RegistruDigital (fara drepturi de administrator)
       2. Descarca un Python "embeddable" izolat (nu atinge Python-ul din sistem)
       3. Descarca aplicatia din GitHub (sau o copiaza dintr-o sursa locala cu -AppSource)
-      4. Instaleaza automat toate dependentele (PyQt6, SQLAlchemy, openpyxl, python-docx, reportlab)
+      4. Instaleaza automat toate dependentele (PyQt5, SQLAlchemy, openpyxl, python-docx, reportlab)
+
+    Windows 7: necesita SP1 + actualizarea "Universal C Runtime" (KB2999226).
+    Fara ea, Python 3.8 nu porneste. Rulati Windows Update complet inainte.
       5. Creeaza o scurtatura pe Desktop si in Meniul Start
       6. Porneste aplicatia
 
@@ -35,9 +38,12 @@ $ProgressPreference     = 'SilentlyContinue'   # accelereaza mult descarcarile i
 
 $AppName       = 'Registru Digital Biblioteca'
 $ShortcutName  = 'Registru Digital'
-$PyVersion     = '3.12.7'
-$PyEmbedUrl    = "https://www.python.org/ftp/python/$PyVersion/python-$PyVersion-embed-amd64.zip"
-$GetPipUrl     = 'https://bootstrap.pypa.io/get-pip.py'
+# Windows 7: Python 3.8 (32-bit) — ultima serie Python care porneste pe Win7.
+# 32-bit (win32) ruleaza atat pe Win7 pe 32 cat si pe 64 de biti.
+$PyVersion     = '3.8.10'
+$PyEmbedUrl    = "https://www.python.org/ftp/python/$PyVersion/python-$PyVersion-embed-win32.zip"
+# get-pip fixat pe seria 3.8 (varianta generica cere Python 3.9+).
+$GetPipUrl     = 'https://bootstrap.pypa.io/pip/3.8/get-pip.py'
 $RepoZipUrl    = 'https://github.com/vicuvi1/mother_app_registru/archive/refs/heads/main.zip'
 
 # Fisierele aplicatiei sunt incluse (bundle) direct in acest instalator, sub forma de
@@ -128,6 +134,14 @@ try {
             ) | Set-Content -Path $pth.FullName -Encoding ASCII
         }
 
+        # Verificare Windows 7: fara UCRT (KB2999226) python.exe nu porneste.
+        & $pyExe --version > $null 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            Fail ("Python nu a putut porni. Pe Windows 7 este necesara actualizarea " +
+                  "'Universal C Runtime' (KB2999226). Rulati Windows Update complet " +
+                  "sau instalati KB2999226 de la Microsoft, apoi reincercati.")
+        }
+
         Write-Info 'Se instaleaza pip...'
         $getPip = Join-Path $WorkTmp 'get-pip.py'
         try { Invoke-WebRequest -Uri $GetPipUrl -OutFile $getPip -UseBasicParsing }
@@ -183,16 +197,24 @@ try {
     # -----------------------------------------------------------------------
     # 4. Instalare dependente
     # -----------------------------------------------------------------------
-    Write-Step 4 $TOTAL 'Instalare dependente (PyQt6, export Excel/Word/PDF)...'
+    Write-Step 4 $TOTAL 'Instalare dependente (PyQt5, export Excel/Word/PDF)...'
     Write-Info 'Aceasta este partea care dureaza cel mai mult, va rugam asteptati...'
     $reqFile = Join-Path $InstallRoot 'requirements-runtime.txt'
     if (-not (Test-Path $reqFile)) {
-        # Plasa de siguranta daca fisierul lipseste din sursa
-        @('PyQt6>=6.6,<7','SQLAlchemy>=2.0,<3','openpyxl>=3.1','python-docx>=1.1','reportlab>=4.0') |
+        # Plasa de siguranta daca fisierul lipseste din sursa (versiuni compatibile Win7 / Python 3.8)
+        @('PyQt5==5.15.10','SQLAlchemy>=2.0,<2.1','openpyxl>=3.1,<3.2','python-docx>=1.1,<1.2','reportlab>=4.0,<4.3') |
             Set-Content -Path $reqFile -Encoding ASCII
     }
     & $pyExe -m pip install --no-warn-script-location -r $reqFile
     if ($LASTEXITCODE -ne 0) { Fail 'Instalarea dependentelor a esuat.' }
+
+    # Verificare PyQt5: pe Windows 7 bibliotecile Qt5 cer "Visual C++ 2015-2022
+    # Redistributable (x86)". Daca lipseste, importul esueaza (ex: vcruntime140_1.dll).
+    & $pyExe -c "from PyQt5.QtWidgets import QApplication" > $null 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Fail ("PyQt5 nu a putut fi incarcat. Pe Windows 7 instalati 'Microsoft Visual C++ " +
+              "2015-2022 Redistributable (x86)' de la Microsoft, apoi reincercati.")
+    }
 
     # -----------------------------------------------------------------------
     # 5. Scurtaturi (Desktop + Meniul Start) + dezinstalator

@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor
+from PyQt5.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSignal
+from PyQt5.QtGui import QBrush, QColor
 
 from ui.widgets.table.column_def import ColumnDef
 from ui.widgets.table.data_store import TableDataStore
@@ -54,7 +54,7 @@ class RegisterTableModel(QAbstractTableModel):
             self.dataChanged.emit(
                 self.index(0, 0),
                 self.index(self.rowCount() - 1, self.columnCount() - 1),
-                [Qt.ItemDataRole.BackgroundRole],
+                [Qt.BackgroundRole],
             )
 
     def _is_today_row(self, row: int) -> bool:
@@ -79,10 +79,10 @@ class RegisterTableModel(QAbstractTableModel):
             return 0
         return self.store.row_count()
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.ItemDataRole.DisplayRole):
-        if role != Qt.ItemDataRole.DisplayRole:
+    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole:
             return None
-        if orientation == Qt.Orientation.Horizontal:
+        if orientation == Qt.Horizontal:
             return None
         row = section
         if self.store.is_total_row(row):
@@ -91,51 +91,51 @@ class RegisterTableModel(QAbstractTableModel):
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         if not index.isValid():
-            return Qt.ItemFlag.NoItemFlags
+            return Qt.NoItemFlags
         row, col = index.row(), index.column()
         if self.store.is_total_row(row):
-            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            return Qt.ItemIsEnabled | Qt.ItemIsSelectable
         col_def = self.store.columns[col]
         if col_def.computed_from or not col_def.editable:
-            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            return Qt.ItemIsEnabled | Qt.ItemIsSelectable
         if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
             return (
-                Qt.ItemFlag.ItemIsEnabled
-                | Qt.ItemFlag.ItemIsSelectable
-                | Qt.ItemFlag.ItemIsUserCheckable
+                Qt.ItemIsEnabled
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsUserCheckable
             )
         if col_def.col_type == "responsabil":
             return (
-                Qt.ItemFlag.ItemIsEnabled
-                | Qt.ItemFlag.ItemIsSelectable
-                | Qt.ItemFlag.ItemIsEditable
+                Qt.ItemIsEnabled
+                | Qt.ItemIsSelectable
+                | Qt.ItemIsEditable
             )
         if col_def.col_type in ("preset_text", "inline_text"):
-            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            return Qt.ItemIsEnabled | Qt.ItemIsSelectable
         return (
-            Qt.ItemFlag.ItemIsEnabled
-            | Qt.ItemFlag.ItemIsSelectable
-            | Qt.ItemFlag.ItemIsEditable
+            Qt.ItemIsEnabled
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsEditable
         )
 
-    def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
         if not index.isValid():
             return None
         row, col = index.row(), index.column()
         col_def = self.store.columns[col]
-        if role == Qt.ItemDataRole.CheckStateRole:
+        if role == Qt.CheckStateRole:
             if self.store.is_total_row(row):
                 return None
             if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
                 return (
-                    Qt.CheckState.Checked
+                    Qt.Checked
                     if self.store.get_cell(row, col)
-                    else Qt.CheckState.Unchecked
+                    else Qt.Unchecked
                 )
             return None
-        if role == Qt.ItemDataRole.TextAlignmentRole:
-            return Qt.AlignmentFlag.AlignCenter
-        if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
+        if role == Qt.TextAlignmentRole:
+            return Qt.AlignCenter
+        if role == Qt.DisplayRole or role == Qt.EditRole:
             val = self.store.get_cell(row, col)
             if self.store.is_total_row(row):
                 if col == 0:
@@ -156,13 +156,13 @@ class RegisterTableModel(QAbstractTableModel):
             ):
                 return str(val)
             if col_def.col_type in ("preset_text", "inline_text"):
-                if role == Qt.ItemDataRole.DisplayRole:
+                if role == Qt.DisplayRole:
                     return ""
                 return str(val) if val is not None else ""
-            if col_def.col_type == "responsabil" and role == Qt.ItemDataRole.DisplayRole:
+            if col_def.col_type == "responsabil" and role == Qt.DisplayRole:
                 return ""
             return str(val) if val is not None else ""
-        if role == Qt.ItemDataRole.BackgroundRole:
+        if role == Qt.BackgroundRole:
             if (row, col) in self._invalid_cells:
                 return QBrush(INVALID_COLOR)
             if self._is_today_row(row):
@@ -177,16 +177,16 @@ class RegisterTableModel(QAbstractTableModel):
                 and self.store.auto_flags[row]
             ):
                 return QBrush(AUTO_COLOR)
-        if role == Qt.ItemDataRole.FontRole and col_def.col_type == "date":
-            from PyQt6.QtGui import QFont
+        if role == Qt.FontRole and col_def.col_type == "date":
+            from PyQt5.QtGui import QFont
 
             font = QFont()
             font.setBold(True)
             return font
         return None
 
-    def setData(self, index: QModelIndex, value, role=Qt.ItemDataRole.EditRole) -> bool:  # noqa: N802
-        if role != Qt.ItemDataRole.EditRole or not index.isValid():
+    def setData(self, index: QModelIndex, value, role=Qt.EditRole) -> bool:  # noqa: N802
+        if role != Qt.EditRole or not index.isValid():
             return False
         row, col = index.row(), index.column()
         if self.store.is_total_row(row):
@@ -235,14 +235,14 @@ class RegisterTableModel(QAbstractTableModel):
                 num = max(0, int(text)) if text else 0
             except ValueError:
                 self._invalid_cells.add((row, col))
-                self.dataChanged.emit(index, index, [Qt.ItemDataRole.BackgroundRole])
+                self.dataChanged.emit(index, index, [Qt.BackgroundRole])
                 self.validation_error.emit("Doar numere întregi ≥ 0")
                 return False
             if self._cell_validator is not None:
                 ok, msg = self._cell_validator(row, col_def.key, num)
                 if not ok:
                     self._invalid_cells.add((row, col))
-                    self.dataChanged.emit(index, index, [Qt.ItemDataRole.BackgroundRole])
+                    self.dataChanged.emit(index, index, [Qt.BackgroundRole])
                     self.validation_error.emit(msg or "Valoare nepermisă")
                     return False
             self._invalid_cells.discard((row, col))

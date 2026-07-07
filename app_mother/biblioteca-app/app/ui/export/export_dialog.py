@@ -3,7 +3,7 @@
 from datetime import date
 
 from core.constants_manager import DEFAULT_EXPORT_FORMAT
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QDialog,
@@ -72,9 +72,9 @@ class ExportDialog(QDialog):
         layout.addWidget(QLabel("Veți alege locația de salvare în pasul următor."))
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
-        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        ok_btn = buttons.button(QDialogButtonBox.Ok)
         if ok_btn:
             ok_btn.setText("Continuă")
         buttons.accepted.connect(self.accept)

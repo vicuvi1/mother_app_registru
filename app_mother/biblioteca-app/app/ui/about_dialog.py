@@ -1,7 +1,7 @@
 """Dialog Despre aplicație."""
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QLabel, QVBoxLayout
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialog, QLabel, QVBoxLayout
 
 from core.constants_manager import APP_AUTHOR, APP_CREDIT
 from core.version import APP_VERSION, BUILD_DATE
@@ -31,7 +31,7 @@ class AboutDialog(QDialog):
             f"<p>{APP_CREDIT}</p>"
             f"<p style='color:#64748b'>© {APP_AUTHOR}</p>"
         )
-        body.setTextFormat(Qt.TextFormat.RichText)
+        body.setTextFormat(Qt.RichText)
         body.setWordWrap(True)
         body.setOpenExternalLinks(True)
         layout.addWidget(body)

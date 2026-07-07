@@ -5,9 +5,9 @@ from __future__ import annotations
 import calendar
 from datetime import date
 
-from PyQt6.QtCore import QDate, QLocale, Qt
-from PyQt6.QtGui import QColor, QFont, QTextCharFormat
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QDate, QLocale, Qt
+from PyQt5.QtGui import QColor, QFont, QTextCharFormat
+from PyQt5.QtWidgets import (
     QCalendarWidget,
     QDialog,
     QDialogButtonBox,
@@ -77,12 +77,12 @@ class ExcludedDaysDialog(QDialog):
 
         self._calendar = QCalendarWidget()
         self._calendar.setGridVisible(True)
-        self._calendar.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.ISOWeekNumbers)
+        self._calendar.setVerticalHeaderFormat(QCalendarWidget.ISOWeekNumbers)
         self._calendar.setHorizontalHeaderFormat(
-            QCalendarWidget.HorizontalHeaderFormat.ShortDayNames
+            QCalendarWidget.ShortDayNames
         )
-        self._calendar.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
-        self._calendar.setLocale(QLocale(QLocale.Language.Romanian, QLocale.Country.Romania))
+        self._calendar.setFirstDayOfWeek(Qt.Monday)
+        self._calendar.setLocale(QLocale(QLocale.Romanian, QLocale.Romania))
         self._calendar.clicked.connect(self._toggle_day)
         self._calendar.currentPageChanged.connect(self._on_month_changed)
         layout.addWidget(self._calendar)
@@ -105,9 +105,9 @@ class ExcludedDaysDialog(QDialog):
         layout.addLayout(actions)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
-        save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_btn = buttons.button(QDialogButtonBox.Save)
         if save_btn:
             save_btn.setText("Salvează")
         buttons.accepted.connect(self._save)
@@ -121,7 +121,7 @@ class ExcludedDaysDialog(QDialog):
         fmt = QTextCharFormat()
         fmt.setBackground(QColor("#fecaca"))
         fmt.setForeground(QColor("#991b1b"))
-        fmt.setFontWeight(QFont.Weight.Bold)
+        fmt.setFontWeight(QFont.Bold)
         return fmt
 
     @staticmethod
@@ -166,7 +166,7 @@ class ExcludedDaysDialog(QDialog):
             for day in range(1, calendar.monthrange(year, month)[1] + 1):
                 qd = QDate(year, month, day)
                 dow = qd.dayOfWeek()
-                if dow in (Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday):
+                if dow in (Qt.Saturday, Qt.Sunday):
                     self._calendar.setDateTextFormat(qd, self._fmt_weekend)
         for dd_mm in self._excluded:
             day_s, month_s = dd_mm.split(".")
@@ -178,13 +178,13 @@ class ExcludedDaysDialog(QDialog):
     def _toggle_day(self, qdate: QDate) -> None:
         if qdate.year() != self._year.value():
             return
-        if qdate.dayOfWeek() in (Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday):
+        if qdate.dayOfWeek() in (Qt.Saturday, Qt.Sunday):
             return
         dd_mm = f"{qdate.day():02d}.{qdate.month():02d}"
         if dd_mm in self._excluded:
             self._excluded.remove(dd_mm)
             dow = qdate.dayOfWeek()
-            if dow in (Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday):
+            if dow in (Qt.Saturday, Qt.Sunday):
                 self._calendar.setDateTextFormat(qdate, self._fmt_weekend)
             else:
                 self._calendar.setDateTextFormat(qdate, QTextCharFormat())

@@ -1,7 +1,7 @@
 """Dialog scurtături tastatură."""
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QLabel, QVBoxLayout
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialog, QLabel, QVBoxLayout
 
 from core.autosave import get_autosave_interval
 
@@ -44,6 +44,6 @@ class HelpDialog(QDialog):
         self.setMinimumWidth(420)
         layout = QVBoxLayout(self)
         label = QLabel(SHORTCUTS_HEADER + _autosave_hint())
-        label.setTextFormat(Qt.TextFormat.RichText)
+        label.setTextFormat(Qt.RichText)
         label.setWordWrap(True)
         layout.addWidget(label)

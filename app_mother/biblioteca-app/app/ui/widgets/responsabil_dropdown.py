@@ -1,7 +1,7 @@
 """Dropdown reutilizabil pentru Responsabil / Formator / Coordonator."""
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QComboBox
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QComboBox
 
 from core.constants_manager import ensure_personal_in_list, get_personal_names
 
@@ -10,8 +10,8 @@ class ResponsabilDropdown(QComboBox):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setEditable(True)
-        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setInsertPolicy(QComboBox.NoInsert)
+        self.setFocusPolicy(Qt.StrongFocus)
         self.refresh()
 
     def refresh(self) -> None:
@@ -44,12 +44,12 @@ class ResponsabilDropdown(QComboBox):
 
     def mousePressEvent(self, event) -> None:
         super().mousePressEvent(event)
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.LeftButton:
             event.accept()
 
     def mouseReleaseEvent(self, event) -> None:
         super().mouseReleaseEvent(event)
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.LeftButton:
             QTimer.singleShot(0, self.showPopup)
 
     def showPopup(self) -> None:

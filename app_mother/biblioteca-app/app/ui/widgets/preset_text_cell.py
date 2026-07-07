@@ -1,8 +1,8 @@
 """Celulă text: click stânga = listă, click dreapta = scriere direct în celulă."""
 
-from PyQt6.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QFocusEvent, QKeyEvent, QMouseEvent
+from PyQt5.QtWidgets import (
     QApplication,
     QFrame,
     QLabel,
@@ -41,10 +41,10 @@ class InlineTextEdit(QTextEdit):
         super().__init__(parent)
         self._cell = cell
         self.setObjectName("presetInlineEdit")
-        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setFrameShape(QFrame.NoFrame)
         self.setAcceptRichText(False)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setStyleSheet(
             "QTextEdit#presetInlineEdit {"
             "  background: #ffffff;"
@@ -57,25 +57,25 @@ class InlineTextEdit(QTextEdit):
         )
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
-        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if event.modifiers() & Qt.ControlModifier:
                 self.finished.emit()
                 event.accept()
                 return
-            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+            if event.modifiers() & Qt.ShiftModifier:
                 super().keyPressEvent(event)
                 return
             self.finished.emit()
             self.navigate.emit("down")
             event.accept()
             return
-        if event.key() == Qt.Key.Key_Escape:
+        if event.key() == Qt.Key_Escape:
             self.cancelled.emit()
             event.accept()
             return
-        if event.key() == Qt.Key.Key_Tab:
+        if event.key() == Qt.Key_Tab:
             self.finished.emit()
-            direction = "back" if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else "forward"
+            direction = "back" if event.modifiers() & Qt.ShiftModifier else "forward"
             self.navigate.emit(direction)
             event.accept()
             return
@@ -104,10 +104,10 @@ class PresetPickerPopup(QFrame):
     def __init__(self, parte: str, camp: str, on_select, parent=None) -> None:
         super().__init__(
             parent,
-            Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint,
+            Qt.Popup | Qt.FramelessWindowHint,
         )
         self.setObjectName("presetPickerPopup")
-        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setFrameShape(QFrame.StyledPanel)
         self._parte = parte
         self._camp = camp
         self._on_select = on_select
@@ -163,7 +163,7 @@ class PresetPickerPopup(QFrame):
         shown = [v for v in self._all_values if not filt or filt in v.casefold()]
         if not shown:
             item = QListWidgetItem("— Lista goală. Click dreapta în celulă pentru scriere directă. —")
-            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            item.setFlags(Qt.NoItemFlags)
             self._list.addItem(item)
             return
         for val in shown:
@@ -172,13 +172,13 @@ class PresetPickerPopup(QFrame):
     def _pick_first_visible(self) -> None:
         if self._list.count() > 0:
             item = self._list.item(0)
-            if item and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+            if item and item.flags() & Qt.ItemIsSelectable:
                 self._pick_item(item)
 
     def _pick_item(self, item: QListWidgetItem) -> None:
         if self._picked or item is None:
             return
-        if not (item.flags() & Qt.ItemFlag.ItemIsSelectable):
+        if not (item.flags() & Qt.ItemIsSelectable):
             return
         text = item.text().strip()
         if not text:
@@ -224,17 +224,17 @@ class PresetTextCell(QWidget):
         self._field_label = get_all_etichete(parte).get(camp, camp)
 
         self.setObjectName("presetTextCell")
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setContextMenuPolicy(Qt.NoContextMenu)
         self._update_tooltips()
 
         self._label = QLabel()
         self._label.setObjectName("presetTextLabel")
         self._label.setWordWrap(True)
-        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._label.setAlignment(Qt.AlignCenter)
+        self._label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
         self._editor = InlineTextEdit(cell=self)
         self._editor.setMinimumHeight(36)
@@ -254,7 +254,7 @@ class PresetTextCell(QWidget):
         self.set_value("")
 
     def eventFilter(self, watched, event) -> bool:
-        if watched is self._stack and event.type() == QEvent.Type.MouseButtonRelease:
+        if watched is self._stack and event.type() == QEvent.MouseButtonRelease:
             self._handle_click(event)
             return True
         return super().eventFilter(watched, event)
@@ -341,7 +341,7 @@ class PresetTextCell(QWidget):
         self._edit_snapshot = self._value
         self._editor.setPlainText(self._value)
         self._stack.setCurrentWidget(self._editor)
-        self.setCursor(Qt.CursorShape.IBeamCursor)
+        self.setCursor(Qt.IBeamCursor)
         self._editor.setFocus()
         if self._value:
             cursor = self._editor.textCursor()
@@ -363,7 +363,7 @@ class PresetTextCell(QWidget):
         self._suppress_open = False
         self._stack.setCurrentWidget(self._label)
         self.set_value(new_val)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setCursor(Qt.PointingHandCursor)
         if new_val != self._edit_snapshot:
             self._emit_value_changed()
 
@@ -374,7 +374,7 @@ class PresetTextCell(QWidget):
         self._suppress_open = False
         self._stack.setCurrentWidget(self._label)
         self.set_value(self._edit_snapshot)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setCursor(Qt.PointingHandCursor)
 
     def contextMenuEvent(self, event) -> None:
         self.start_inline_edit()
@@ -390,7 +390,7 @@ class PresetTextCell(QWidget):
         super().mouseReleaseEvent(event)
 
     def _handle_click(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.LeftButton:
             if self._picker_on_click:
                 if not self._editing and not self._suppress_open:
                     table = self._find_table()
@@ -406,7 +406,7 @@ class PresetTextCell(QWidget):
                     QTimer.singleShot(0, self.start_inline_edit)
             event.accept()
             return
-        if event.button() == Qt.MouseButton.RightButton and self._picker_on_click:
+        if event.button() == Qt.RightButton and self._picker_on_click:
             self._suppress_open = True
             self.close_picker()
             QTimer.singleShot(0, self.start_inline_edit)

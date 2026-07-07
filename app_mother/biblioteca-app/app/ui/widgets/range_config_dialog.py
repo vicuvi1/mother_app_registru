@@ -1,7 +1,7 @@
 """Dialog configurare range-uri min/max per coloană."""
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -53,8 +53,8 @@ class RangeConfigDialog(QDialog):
             name_item = QTableWidgetItem(label)
             name_item.setFlags(
                 name_item.flags()
-                & ~Qt.ItemFlag.ItemIsEditable
-                & ~Qt.ItemFlag.ItemIsSelectable
+                & ~Qt.ItemIsEditable
+                & ~Qt.ItemIsSelectable
             )
             name_item.setToolTip(col_key)
             self.table.setItem(row, 0, name_item)
@@ -89,7 +89,7 @@ class RangeConfigDialog(QDialog):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setFrameShape(QScrollArea.NoFrame)
         scroll.setWidget(self.table)
         layout.addWidget(scroll)
 
@@ -98,9 +98,9 @@ class RangeConfigDialog(QDialog):
         layout.addWidget(count_label)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
-        save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_btn = buttons.button(QDialogButtonBox.Save)
         if save_btn:
             save_btn.setText("Salvează range-urile")
         buttons.accepted.connect(self._save)

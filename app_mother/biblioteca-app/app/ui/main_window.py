@@ -3,9 +3,10 @@
 from datetime import datetime
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QUrl
-from PyQt6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence, QResizeEvent
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QCloseEvent, QDesktopServices, QKeySequence, QResizeEvent
+from PyQt5.QtWidgets import (
+    QAction,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -90,7 +91,7 @@ class MainWindow(QMainWindow):
 
         for row in range(self._part_list.count()):
             item = self._part_list.item(row)
-            if item and item.data(Qt.ItemDataRole.UserRole) == part_id:
+            if item and item.data(Qt.UserRole) == part_id:
                 self._part_list.blockSignals(True)
                 self._part_list.setCurrentRow(row)
                 self._part_list.blockSignals(False)
@@ -127,7 +128,7 @@ class MainWindow(QMainWindow):
             item = self._part_list.item(row)
             if item is None:
                 continue
-            part_id = item.data(Qt.ItemDataRole.UserRole)
+            part_id = item.data(Qt.UserRole)
             meta = self._part_label_meta.get(part_id)
             if not meta:
                 continue
@@ -256,7 +257,7 @@ class MainWindow(QMainWindow):
         page = self._content_stack.currentWidget()
         part_id = getattr(page, "part_id", None)
         dlg = ImportExcelDialog(self, default_part_id=part_id)
-        if dlg.exec() == dlg.DialogCode.Accepted:
+        if dlg.exec() == dlg.Accepted:
             if hasattr(page, "_invalidate_caches"):
                 page._invalidate_caches()
             if hasattr(page, "_load_current"):
@@ -288,9 +289,9 @@ class MainWindow(QMainWindow):
             self,
             "Confirmare restaurare",
             "Restaurarea înlocuiește datele curente. Aplicația va reporni.\n\nContinuați?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.Yes | QMessageBox.No,
         )
-        if reply != QMessageBox.StandardButton.Yes:
+        if reply != QMessageBox.Yes:
             return
         try:
             pre_restore = restore_backup(Path(path))
@@ -404,15 +405,15 @@ class MainWindow(QMainWindow):
                 self,
                 "Modificări nesalvate",
                 "Există modificări care nu au fost salvate.\n\nSalvați înainte de ieșire?",
-                QMessageBox.StandardButton.Save
-                | QMessageBox.StandardButton.Discard
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save,
+                QMessageBox.Save
+                | QMessageBox.Discard
+                | QMessageBox.Cancel,
+                QMessageBox.Save,
             )
-            if reply == QMessageBox.StandardButton.Cancel:
+            if reply == QMessageBox.Cancel:
                 event.ignore()
                 return
-            if reply == QMessageBox.StandardButton.Save:
+            if reply == QMessageBox.Save:
                 if not self._save_all_dirty_pages():
                     QMessageBox.warning(
                         self,
@@ -551,7 +552,7 @@ class MainWindow(QMainWindow):
         old_page = self._content_stack.currentWidget()
         for row in range(self._part_list.count()):
             item = self._part_list.item(row)
-            if item and item.data(Qt.ItemDataRole.UserRole) == part_id:
+            if item and item.data(Qt.UserRole) == part_id:
                 self._part_list.blockSignals(True)
                 self._part_list.setCurrentRow(row)
                 self._part_list.blockSignals(False)
@@ -651,7 +652,7 @@ class MainWindow(QMainWindow):
             self._part_label_meta[part_id] = (roman, short)
             item = QListWidgetItem(f"  {roman}   {short}")
             item.setToolTip(title)
-            item.setData(Qt.ItemDataRole.UserRole, part_id)
+            item.setData(Qt.UserRole, part_id)
             self._part_list.addItem(item)
 
         self._part_list.currentRowChanged.connect(self._on_part_selected)
@@ -685,7 +686,7 @@ class MainWindow(QMainWindow):
         item = self._part_list.item(row)
         if item is None:
             return
-        part_id = item.data(Qt.ItemDataRole.UserRole)
+        part_id = item.data(Qt.UserRole)
         old_page = self._content_stack.currentWidget()
         page = self._get_or_load_part(part_id)
         if page is not None:
@@ -716,7 +717,7 @@ class MainWindow(QMainWindow):
 
     def _open_setup(self) -> None:
         dlg = SetupWizard(first_run=False, parent=self)
-        if dlg.exec() == dlg.DialogCode.Accepted:
+        if dlg.exec() == dlg.Accepted:
             nume, loc = get_biblioteca_info()
             lib_text = nume if nume else "Bibliotecă"
             if loc:
@@ -725,7 +726,7 @@ class MainWindow(QMainWindow):
             self._autosave.set_interval(get_autosave_interval())
             from pathlib import Path
 
-            from PyQt6.QtWidgets import QApplication
+            from PyQt5.QtWidgets import QApplication
 
             app_root = Path(__file__).resolve().parent.parent
             app = QApplication.instance()
@@ -748,6 +749,6 @@ class MainWindow(QMainWindow):
     def select_part(self, part_id: str) -> None:
         for row in range(self._part_list.count()):
             item = self._part_list.item(row)
-            if item and item.data(Qt.ItemDataRole.UserRole) == part_id:
+            if item and item.data(Qt.UserRole) == part_id:
                 self._part_list.setCurrentRow(row)
                 break

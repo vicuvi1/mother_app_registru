@@ -2,22 +2,22 @@
 
 from __future__ import annotations
 
-from PyQt6.QtGui import QPageLayout, QPageSize, QTextDocument
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import QWidget
+from PyQt5.QtGui import QPageLayout, QPageSize, QTextDocument
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import QWidget
 
 from core.export_presets import get_print_orientation
 from ui.export.export_html import build_pages_html
 
 
 def configure_printer(printer: QPrinter | None = None) -> QPrinter:
-    printer = printer or QPrinter(QPrinter.PrinterMode.HighResolution)
+    printer = printer or QPrinter(QPrinter.HighResolution)
     orientation = get_print_orientation()
     if orientation == "portrait":
-        printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+        printer.setPageOrientation(QPageLayout.Portrait)
     else:
-        printer.setPageOrientation(QPageLayout.Orientation.Landscape)
-    printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+        printer.setPageOrientation(QPageLayout.Landscape)
+    printer.setPageSize(QPageSize(QPageSize.A4))
     return printer
 
 

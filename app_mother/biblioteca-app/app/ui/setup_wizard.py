@@ -1,6 +1,6 @@
 """Ecran inițial: Personal, range-uri default, date bibliotecă."""
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -74,9 +74,9 @@ class SetupWizard(QDialog):
         layout.addWidget(tabs)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
-        save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_btn = buttons.button(QDialogButtonBox.Save)
         if save_btn:
             save_btn.setText("Salvează și continuă")
             save_btn.setObjectName("btnPrimary")

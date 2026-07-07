@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import (
+from PyQt5.QtCore import (
     QAbstractAnimation,
     QEasingCurve,
     QEvent,
@@ -10,8 +10,9 @@ from PyQt6.QtCore import (
     Qt,
     QTimer,
 )
-from PyQt6.QtGui import QKeySequence, QShortcut
-from PyQt6.QtWidgets import (
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtWidgets import (
+    QShortcut,
     QAbstractItemView,
     QHBoxLayout,
     QLabel,
@@ -34,11 +35,11 @@ class TableScrollWrapper(QWidget):
         self._table = table
         self._scroll_anim: QPropertyAnimation | None = None
 
-        table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
-        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
+        table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -71,14 +72,14 @@ class TableScrollWrapper(QWidget):
         nav.addWidget(hint, stretch=1)
         layout.addLayout(nav)
 
-        self._top_bar = QScrollBar(Qt.Orientation.Horizontal)
+        self._top_bar = QScrollBar(Qt.Horizontal)
         self._top_bar.setObjectName("tableHScrollTop")
         self._top_bar.setTracking(True)
         layout.addWidget(self._top_bar)
 
         layout.addWidget(table, stretch=1)
 
-        self._bottom_bar = QScrollBar(Qt.Orientation.Horizontal)
+        self._bottom_bar = QScrollBar(Qt.Horizontal)
         self._bottom_bar.setObjectName("tableHScrollBottom")
         self._bottom_bar.setTracking(True)
         layout.addWidget(self._bottom_bar)
@@ -106,8 +107,8 @@ class TableScrollWrapper(QWidget):
             model.modelReset.connect(self._on_table_layout_changed)
 
         table.viewport().installEventFilter(self)
-        QShortcut(QKeySequence(Qt.Key.Key_End), self, self.scroll_to_end)
-        QShortcut(QKeySequence(Qt.Key.Key_Home), self, self.scroll_to_start)
+        QShortcut(QKeySequence(Qt.Key_End), self, self.scroll_to_end)
+        QShortcut(QKeySequence(Qt.Key_Home), self, self.scroll_to_start)
         QTimer.singleShot(50, self._refresh_scroll_steps)
 
     def scroll_to_end(self) -> None:
@@ -170,8 +171,8 @@ class TableScrollWrapper(QWidget):
             return
         if self._scroll_anim is None:
             self._scroll_anim = QPropertyAnimation(self._hbar, b"value", self)
-            self._scroll_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        elif self._scroll_anim.state() == QAbstractAnimation.State.Running:
+            self._scroll_anim.setEasingCurve(QEasingCurve.OutCubic)
+        elif self._scroll_anim.state() == QAbstractAnimation.Running:
             self._scroll_anim.stop()
         self._scroll_anim.setDuration(self.ANIM_MS)
         self._scroll_anim.setStartValue(self._hbar.value())
@@ -198,7 +199,7 @@ class TableScrollWrapper(QWidget):
 
     def eventFilter(self, obj, event) -> bool:
         if obj is self._table.viewport():
-            if event.type() == QEvent.Type.Wheel:
+            if event.type() == QEvent.Wheel:
                 delta_x = event.angleDelta().x()
                 delta_y = event.angleDelta().y()
                 if self._hbar.maximum() > 0:
@@ -206,7 +207,7 @@ class TableScrollWrapper(QWidget):
                         self._scroll_wheel_pixels(delta_x)
                         event.accept()
                         return True
-                    if event.modifiers() & Qt.KeyboardModifier.ShiftModifier and delta_y != 0:
+                    if event.modifiers() & Qt.ShiftModifier and delta_y != 0:
                         self._scroll_wheel_pixels(delta_y)
                         event.accept()
                         return True

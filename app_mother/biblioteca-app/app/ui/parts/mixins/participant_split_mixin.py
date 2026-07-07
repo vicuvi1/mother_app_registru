@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QTimer
+from PyQt5.QtCore import QTimer
 
 from core.participant_split import (
     OVERRIDE_PARTICIPANTI_GENDER,

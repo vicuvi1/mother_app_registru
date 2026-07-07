@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -88,10 +88,10 @@ class YearEndWizard(QDialog):
         actions.addStretch()
         layout.addLayout(actions)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
-        close_btn = buttons.button(QDialogButtonBox.StandardButton.Close)
+        close_btn = buttons.button(QDialogButtonBox.Close)
         if close_btn:
             close_btn.setText("Închide")
         layout.addWidget(buttons)
@@ -115,18 +115,18 @@ class YearEndWizard(QDialog):
         self._list.clear()
         if not slots:
             item = QListWidgetItem("✓ Toate lunile au date înregistrate.")
-            item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            item.setFlags(Qt.ItemIsEnabled)
             self._list.addItem(item)
         else:
             for slot in slots[:80]:
                 item = QListWidgetItem(slot.label)
-                item.setData(Qt.ItemDataRole.UserRole, slot)
+                item.setData(Qt.UserRole, slot)
                 self._list.addItem(item)
             if len(slots) > 80:
                 self._list.addItem(QListWidgetItem(f"… și încă {len(slots) - 80}"))
 
     def _open_slot(self, item: QListWidgetItem) -> None:
-        slot = item.data(Qt.ItemDataRole.UserRole)
+        slot = item.data(Qt.UserRole)
         if slot is None:
             return
         self.main_window.navigate_to_part(

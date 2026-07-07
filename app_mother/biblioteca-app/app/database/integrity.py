@@ -6,7 +6,7 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from PyQt6.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QMessageBox
 
 from database.backup import list_backups, restore_backup
 from database.db_manager import DB_PATH
@@ -41,7 +41,7 @@ def offer_restore_on_corruption(parent=None) -> bool:
             "Bază de date deteriorată",
             "Verificarea integrității a eșuat și nu există copii de rezervă.\n\n"
             "Aplicația nu poate continua în siguranță.",
-            QMessageBox.StandardButton.Ok,
+            QMessageBox.Ok,
         )
         return False
 
@@ -51,10 +51,10 @@ def offer_restore_on_corruption(parent=None) -> bool:
         "Verificarea integrității bazei de date a eșuat.\n\n"
         f"Restaurați din ultima copie automată?\n{latest.name}\n\n"
         "Aplicația va reporni după restaurare.",
-        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        QMessageBox.StandardButton.Yes,
+        QMessageBox.Yes | QMessageBox.No,
+        QMessageBox.Yes,
     )
-    if reply != QMessageBox.StandardButton.Yes:
+    if reply != QMessageBox.Yes:
         return False
 
     try:

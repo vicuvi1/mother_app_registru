@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from PyQt6.QtCore import QRect, QSize, Qt, pyqtSignal, QEvent, QTimer
-from PyQt6.QtGui import (
+from PyQt5.QtCore import QRect, QSize, Qt, pyqtSignal, QEvent, QTimer
+from PyQt5.QtGui import (
     QBrush,
     QColor,
     QFont,
@@ -11,9 +11,9 @@ from PyQt6.QtGui import (
     QKeySequence,
     QPainter,
     QPen,
-    QShortcut,
 )
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
+    QShortcut,
     QApplication,
     QCheckBox,
     QInputDialog,
@@ -65,24 +65,24 @@ class EditableTable(QTableWidget):
         self.cellChanged.connect(self._on_cell_changed)
         self.setAlternatingRowColors(True)
         self.setShowGrid(True)
-        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setEditTriggers(
-            QAbstractItemView.EditTrigger.DoubleClicked
-            | QAbstractItemView.EditTrigger.SelectedClicked
-            | QAbstractItemView.EditTrigger.EditKeyPressed
-            | QAbstractItemView.EditTrigger.AnyKeyPressed
+            QAbstractItemView.DoubleClicked
+            | QAbstractItemView.SelectedClicked
+            | QAbstractItemView.EditKeyPressed
+            | QAbstractItemView.AnyKeyPressed
         )
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setFocusPolicy(Qt.StrongFocus)
         self.viewport().installEventFilter(self)
         self.cellClicked.connect(self._on_cell_clicked)
         self.verticalHeader().setDefaultSectionSize(40)
         self.horizontalHeader().setDefaultSectionSize(88)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.horizontalHeader().setStretchLastSection(False)
         self.horizontalHeader().sectionDoubleClicked.connect(self._edit_header_label)
         self.setWordWrap(True)
-        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         QShortcut(QKeySequence("Ctrl+Z"), self, self.undo_last)
 
@@ -95,7 +95,7 @@ class EditableTable(QTableWidget):
             return
         self._updating = True
         item.setText(old_text)
-        item.setBackground(QBrush(Qt.GlobalColor.white))
+        item.setBackground(QBrush(Qt.white))
         self._updating = False
         col_def = self._columns[col]
         if col_def.col_type == "int":
@@ -132,14 +132,14 @@ class EditableTable(QTableWidget):
             return
         key = event.key()
         mods = event.modifiers()
-        if key == Qt.Key.Key_Tab:
+        if key == Qt.Key_Tab:
             self.close_all_inline_edits()
             row, col = self.currentRow(), self.currentColumn()
-            direction = "back" if mods & Qt.KeyboardModifier.ShiftModifier else "forward"
+            direction = "back" if mods & Qt.ShiftModifier else "forward"
             self._navigate(row, col, direction)
             event.accept()
             return
-        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+        if key in (Qt.Key_Return, Qt.Key_Enter):
             self.close_all_inline_edits()
             row, col = self.currentRow(), self.currentColumn()
             self._navigate(row, col, "down")
@@ -235,8 +235,8 @@ class EditableTable(QTableWidget):
     def eventFilter(self, obj, event) -> bool:
         if obj is self.viewport():
             et = event.type()
-            if et == QEvent.Type.MouseButtonRelease:
-                pos = event.position().toPoint()
+            if et == QEvent.MouseButtonRelease:
+                pos = event.pos()
                 index = self.indexAt(pos)
                 if not index.isValid():
                     return False
@@ -249,7 +249,7 @@ class EditableTable(QTableWidget):
                 col_def = self._columns[col]
                 w = self.cellWidget(row, col)
 
-                if event.button() == Qt.MouseButton.LeftButton:
+                if event.button() == Qt.LeftButton:
                     if (
                         col_def.col_type in ("preset_text", "inline_text")
                         and isinstance(w, PresetTextCell)
@@ -261,25 +261,25 @@ class EditableTable(QTableWidget):
                         self.close_all_inline_edits()
 
                 if col_def.col_type in ("preset_text", "inline_text") and isinstance(w, PresetTextCell):
-                    if event.button() == Qt.MouseButton.RightButton and col_def.col_type == "preset_text":
+                    if event.button() == Qt.RightButton and col_def.col_type == "preset_text":
                         w._suppress_open = True
                         w.close_picker()
                         QTimer.singleShot(0, w.start_inline_edit)
                         QTimer.singleShot(300, lambda cell=w: setattr(cell, "_suppress_open", False))
                         return True
-                    if event.button() == Qt.MouseButton.LeftButton and not w.is_editing():
+                    if event.button() == Qt.LeftButton and not w.is_editing():
                         if col_def.col_type == "inline_text":
                             QTimer.singleShot(0, w.start_inline_edit)
                         elif not w.is_editing():
                             QTimer.singleShot(0, w.open_picker)
                 elif (
-                    event.button() == Qt.MouseButton.LeftButton
+                    event.button() == Qt.LeftButton
                     and col_def.col_type == "responsabil"
                     and isinstance(w, ResponsabilDropdown)
                 ):
                     QTimer.singleShot(0, w.showPopup)
                 elif (
-                    event.button() == Qt.MouseButton.LeftButton
+                    event.button() == Qt.LeftButton
                     and w is None
                     and col_def.col_type in ("int", "date", "text")
                     and col_def.editable
@@ -526,17 +526,17 @@ class EditableTable(QTableWidget):
             ):
                 val = sums.get(col.key, 0)
                 item = QTableWidgetItem(str(val))
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(TOTAL_COLOR))
                 self.setItem(r, c, item)
             elif c == 0:
                 item = QTableWidgetItem(label)
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(TOTAL_COLOR))
                 self.setItem(r, c, item)
             else:
                 item = QTableWidgetItem("")
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(TOTAL_COLOR))
                 self.setItem(r, c, item)
         self._updating = False
@@ -623,16 +623,16 @@ class EditableTable(QTableWidget):
 
     def _editable_item_flags(self) -> Qt.ItemFlag:
         return (
-            Qt.ItemFlag.ItemIsEnabled
-            | Qt.ItemFlag.ItemIsSelectable
-            | Qt.ItemFlag.ItemIsEditable
+            Qt.ItemIsEnabled
+            | Qt.ItemIsSelectable
+            | Qt.ItemIsEditable
         )
 
     def _set_cell(self, row: int, col: int, col_def: ColumnDef, val, is_auto: bool) -> None:
         if col_def.col_type == "date":
             item = QTableWidgetItem(str(val or ""))
             if not col_def.editable:
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
             else:
                 item.setFlags(self._editable_item_flags())
             font = item.font()
@@ -642,14 +642,14 @@ class EditableTable(QTableWidget):
         elif col_def.col_type == "int":
             if col_def.computed_from:
                 item = QTableWidgetItem(str(val if val is not None else 0))
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(TOTAL_COLOR))
             else:
                 item = QTableWidgetItem(str(val if val is not None else 0))
                 if col_def.editable:
                     item.setFlags(self._editable_item_flags())
                 else:
-                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
             self.setItem(row, col, item)
         elif col_def.col_type == "bool":
             cb = QCheckBox()
@@ -671,7 +671,7 @@ class EditableTable(QTableWidget):
             cell.value_changed.connect(
                 lambda rw=row, k=col_def.key: self._widget_changed(rw, k)
             )
-            cell.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            cell.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.setCellWidget(row, col, cell)
         elif col_def.col_type == "inline_text":
             cell = PresetTextCell(self._part_id, col_def.key, picker_on_click=False)
@@ -679,7 +679,7 @@ class EditableTable(QTableWidget):
             cell.value_changed.connect(
                 lambda rw=row, k=col_def.key: self._widget_changed(rw, k)
             )
-            cell.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            cell.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self.setCellWidget(row, col, cell)
         elif col_def.col_type in ("scope_local", "scope_national", "scope_intl"):
             cb = QCheckBox()
@@ -691,10 +691,10 @@ class EditableTable(QTableWidget):
             if col_def.editable:
                 item.setFlags(self._editable_item_flags())
             else:
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
             if col_def.col_type in ("text", "date"):
                 item.setTextAlignment(
-                    int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                    int(Qt.AlignLeft | Qt.AlignVCenter)
                 )
             self.setItem(row, col, item)
 
@@ -753,7 +753,7 @@ class EditableTable(QTableWidget):
                 val = max(0, int(text)) if text else 0
                 self._updating = True
                 item.setText(str(val))
-                item.setBackground(QBrush(Qt.GlobalColor.white))
+                item.setBackground(QBrush(Qt.white))
                 self._updating = False
             except ValueError:
                 item.setBackground(QBrush(INVALID_COLOR))
@@ -766,7 +766,7 @@ class EditableTable(QTableWidget):
 
         if row < len(self._auto_flags):
             self._auto_flags[row] = False
-            item.setBackground(QBrush(Qt.GlobalColor.white))
+            item.setBackground(QBrush(Qt.white))
 
         if col_def.col_type == "int":
             self._apply_computed_row(row)
@@ -847,7 +847,7 @@ class EditableTable(QTableWidget):
             item = self.item(row, c_idx)
             if item is None:
                 item = QTableWidgetItem(str(total))
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
                 item.setBackground(QBrush(TOTAL_COLOR))
                 self.setItem(row, c_idx, item)
             else:
@@ -867,4 +867,4 @@ class EditableTable(QTableWidget):
             if item and is_auto:
                 item.setBackground(QBrush(AUTO_COLOR))
             elif item:
-                item.setBackground(QBrush(Qt.GlobalColor.white))
+                item.setBackground(QBrush(Qt.white))

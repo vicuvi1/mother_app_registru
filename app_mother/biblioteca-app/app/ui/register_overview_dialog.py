@@ -2,10 +2,10 @@
 
 from datetime import date
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextDocument
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QTextDocument
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -24,7 +24,7 @@ from core.constants_manager import LUNI_RO, get_cover_page
 from ui.export.export_errors import format_export_error, run_export_with_progress
 from ui.export.export_html import build_pages_html
 
-ROLE_DATA = Qt.ItemDataRole.UserRole
+ROLE_DATA = Qt.UserRole
 
 
 class RegisterOverviewDialog(QDialog):
@@ -104,8 +104,8 @@ class RegisterOverviewDialog(QDialog):
         for roman, title, part_id in self._parts:
             mode, has_copii = PART_LAYOUT.get(part_id, ("daily", False))
             top = QTreeWidgetItem([f"Partea {roman}. {title}"])
-            top.setFlags(top.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsAutoTristate)
-            top.setCheckState(0, Qt.CheckState.Checked)
+            top.setFlags(top.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsAutoTristate)
+            top.setCheckState(0, Qt.Checked)
             self._tree.addTopLevelItem(top)
 
             cats = ["adulti", "copii"] if has_copii else [None]
@@ -115,21 +115,21 @@ class RegisterOverviewDialog(QDialog):
                     for m in range(1, 13):
                         label = (f"{cat_label} — " if cat_label else "") + LUNI_RO[m - 1]
                         leaf = QTreeWidgetItem([label])
-                        leaf.setFlags(leaf.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                        leaf.setCheckState(0, Qt.CheckState.Checked)
+                        leaf.setFlags(leaf.flags() | Qt.ItemIsUserCheckable)
+                        leaf.setCheckState(0, Qt.Checked)
                         leaf.setData(0, ROLE_DATA, (part_id, m, cat))
                         top.addChild(leaf)
                 else:
                     label = (f"{cat_label} — " if cat_label else "") + "Tot anul"
                     leaf = QTreeWidgetItem([label])
-                    leaf.setFlags(leaf.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                    leaf.setCheckState(0, Qt.CheckState.Checked)
+                    leaf.setFlags(leaf.flags() | Qt.ItemIsUserCheckable)
+                    leaf.setCheckState(0, Qt.Checked)
                     leaf.setData(0, ROLE_DATA, (part_id, None, cat))
                     top.addChild(leaf)
             top.setExpanded(False)
 
     def _set_all(self, checked: bool) -> None:
-        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        state = Qt.Checked if checked else Qt.Unchecked
         for i in range(self._tree.topLevelItemCount()):
             self._tree.topLevelItem(i).setCheckState(0, state)
 
@@ -143,7 +143,7 @@ class RegisterOverviewDialog(QDialog):
             top = self._tree.topLevelItem(i)
             for j in range(top.childCount()):
                 leaf = top.child(j)
-                if leaf.checkState(0) == Qt.CheckState.Checked:
+                if leaf.checkState(0) == Qt.Checked:
                     checked.add(leaf.data(0, ROLE_DATA))
 
         pages = []

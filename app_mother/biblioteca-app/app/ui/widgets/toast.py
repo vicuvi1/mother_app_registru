@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 class ToastHost(QWidget):
@@ -12,7 +12,7 @@ class ToastHost(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("toastHost")
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.hide()
 
         layout = QVBoxLayout(self)
@@ -22,8 +22,8 @@ class ToastHost(QWidget):
         self._label.setObjectName("toastLabel")
         self._label.setWordWrap(True)
         self._label.setMaximumWidth(420)
-        self._label.setTextFormat(Qt.TextFormat.PlainText)
-        self._label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._label.setTextFormat(Qt.PlainText)
+        self._label.setAttribute(Qt.WA_TransparentForMouseEvents)
         layout.addWidget(self._label)
 
         self._timer = QTimer(self)

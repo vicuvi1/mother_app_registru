@@ -87,7 +87,7 @@ def run_export_with_progress(
     title: str = "Export",
 ) -> Path:
     """Export cu dialog de progres (blocare UI minimă)."""
-    from PyQt6.QtWidgets import QApplication, QProgressDialog
+    from PyQt5.QtWidgets import QApplication, QProgressDialog
 
     if main_window is not None:
         main_window._export_in_progress = True

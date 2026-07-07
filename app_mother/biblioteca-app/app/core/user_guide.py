@@ -42,7 +42,7 @@ def open_user_guide(parent=None) -> bool:
     path = get_user_guide_path()
     if path is None:
         if parent is not None:
-            from PyQt6.QtWidgets import QMessageBox
+            from PyQt5.QtWidgets import QMessageBox
 
             QMessageBox.information(
                 parent,
@@ -63,7 +63,7 @@ def open_user_guide(parent=None) -> bool:
     except OSError as exc:
         logger.warning("Nu s-a putut deschide ghidul: %s", exc)
         if parent is not None:
-            from PyQt6.QtWidgets import QMessageBox
+            from PyQt5.QtWidgets import QMessageBox
 
             QMessageBox.warning(parent, "Ghid bibliotecar", f"Nu s-a putut deschide fișierul:\n{exc}")
         return False

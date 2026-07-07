@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QKeySequence, QPageLayout, QPageSize, QShortcut
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QKeySequence, QPageLayout, QPageSize
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import (
+    QShortcut,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -125,7 +126,7 @@ class PartUiMixin:
 
         badge = QLabel(self.roman)
         badge.setObjectName("partRomanBadge")
-        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        badge.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(badge)
 
         title_col = QVBoxLayout()

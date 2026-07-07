@@ -3,9 +3,9 @@
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QFont, QGuiApplication, QIcon
-from PyQt6.QtWidgets import QApplication
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QFont, QGuiApplication, QIcon
+from PyQt5.QtWidgets import QApplication
 
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -46,9 +46,13 @@ def _center_on_screen(widget) -> None:
 
 
 def main() -> int:
-    QApplication.setHighDpiScaleFactorRoundingPolicy(
-        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-    )
+    # High-DPI rounding policy (Qt 5.14+); harmless to skip on standard-DPI displays.
+    try:
+        QApplication.setHighDpiScaleFactorRoundingPolicy(
+            Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+        )
+    except (AttributeError, TypeError):
+        pass
     app = QApplication(sys.argv)
     app.setApplicationName("Registru Digital Bibliotecă")
     app.setStyle("Fusion")
@@ -84,7 +88,7 @@ def main() -> int:
     if is_first_run():
         splash.hide()
         wizard = SetupWizard(first_run=True)
-        if wizard.exec() != wizard.DialogCode.Accepted:
+        if wizard.exec() != wizard.Accepted:
             return 0
         splash.show()
         _center_on_screen(splash)

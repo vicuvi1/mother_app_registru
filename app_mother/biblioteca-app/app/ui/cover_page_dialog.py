@@ -1,6 +1,6 @@
 """Editor pentru pagina de titlu (coperta registrului)."""
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -44,9 +44,9 @@ class CoverPageDialog(QDialog):
         layout.addLayout(form)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
-        save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_btn = buttons.button(QDialogButtonBox.Save)
         if save_btn:
             save_btn.setText("Salvează")
         buttons.accepted.connect(self._save)

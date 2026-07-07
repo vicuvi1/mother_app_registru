@@ -1,6 +1,6 @@
 """Dialog configurare liste text rapide (o dată, apoi select din celulă)."""
 
-from PyQt6.QtWidgets import (
+from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QLabel,
@@ -46,9 +46,9 @@ class TextPresetsDialog(QDialog):
         layout.addWidget(tabs)
 
         buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
         )
-        save_btn = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save_btn = buttons.button(QDialogButtonBox.Save)
         if save_btn:
             save_btn.setText("Salvează listele")
         buttons.accepted.connect(self._save)

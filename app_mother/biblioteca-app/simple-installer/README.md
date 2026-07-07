@@ -29,7 +29,7 @@ la internet **doar la prima instalare**.
 ### Ce se instalează și unde
 ```
 %LOCALAPPDATA%\RegistruDigital\
-├── python\        Python 3.12 izolat + bibliotecile (PyQt6, SQLAlchemy, openpyxl, ...)
+├── python\        Python 3.8 (32-bit) izolat + bibliotecile (PyQt5, SQLAlchemy, openpyxl, ...)
 ├── app\           codul aplicației
 │   └── data\      baza de date + backup-uri (datele tale)
 └── uninstall.ps1  dezinstalator

@@ -1,8 +1,8 @@
 """Antet tabel cu grupuri de coloane."""
 
-from PyQt6.QtCore import QRect, QSize, Qt
-from PyQt6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
-from PyQt6.QtWidgets import QHeaderView
+from PyQt5.QtCore import QRect, QSize, Qt
+from PyQt5.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PyQt5.QtWidgets import QHeaderView
 
 HEADER_BG = QColor("#eef2f7")
 GROUP_BG = QColor("#dbe3ee")
@@ -26,13 +26,13 @@ class GroupedHeaderView(QHeaderView):
     SUPER_GROUP_H = 28
 
     def __init__(self, parent=None) -> None:
-        super().__init__(Qt.Orientation.Horizontal, parent)
+        super().__init__(Qt.Horizontal, parent)
         self._labels: list[str] = []
         self._groups: list[str] = []
         self._super_groups: list[str] = []
         self.setSectionsClickable(True)
         self.setHighlightSections(False)
-        self.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setDefaultAlignment(Qt.AlignCenter)
 
     def set_model_groups(
         self,
@@ -74,7 +74,7 @@ class GroupedHeaderView(QHeaderView):
         painter.setPen(QPen(HEADER_TEXT))
         painter.drawText(
             rect.adjusted(4, 3, -4, -3),
-            int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextSingleLine),
+            int(Qt.AlignCenter | Qt.TextSingleLine),
             text,
         )
 

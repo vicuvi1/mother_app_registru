@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from PyQt6.QtCore import QEvent, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QGuiApplication, QKeyEvent, QKeySequence, QShortcut
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QEvent, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QGuiApplication, QKeyEvent, QKeySequence
+from PyQt5.QtWidgets import (
+    QShortcut,
     QAbstractItemView,
     QApplication,
     QHeaderView,
@@ -59,24 +60,24 @@ class RegisterTableView(QTableView):
         self._grouped_header = GroupedHeaderView(self)
         self.setHorizontalHeader(self._grouped_header)
 
-        self.setSizeAdjustPolicy(QAbstractItemView.SizeAdjustPolicy.AdjustIgnored)
+        self.setSizeAdjustPolicy(QAbstractItemView.AdjustIgnored)
         self.setAlternatingRowColors(True)
         self.setShowGrid(True)
-        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setEditTriggers(
-            QAbstractItemView.EditTrigger.DoubleClicked
-            | QAbstractItemView.EditTrigger.SelectedClicked
-            | QAbstractItemView.EditTrigger.EditKeyPressed
-            | QAbstractItemView.EditTrigger.AnyKeyPressed
+            QAbstractItemView.DoubleClicked
+            | QAbstractItemView.SelectedClicked
+            | QAbstractItemView.EditKeyPressed
+            | QAbstractItemView.AnyKeyPressed
         )
         self.verticalHeader().setDefaultSectionSize(40)
         self.horizontalHeader().setDefaultSectionSize(88)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.horizontalHeader().setStretchLastSection(False)
         self.horizontalHeader().sectionDoubleClicked.connect(self._edit_header_label)
-        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.setFocusPolicy(Qt.StrongFocus)
         self.viewport().installEventFilter(self)
 
         QShortcut(QKeySequence("Ctrl+Z"), self, self.undo_last)
@@ -88,8 +89,8 @@ class RegisterTableView(QTableView):
         """Click pe celule preset / responsabil / numere — ca în EditableTable."""
         if obj is self.viewport():
             et = event.type()
-            if et == QEvent.Type.MouseButtonRelease:
-                pos = event.position().toPoint()
+            if et == QEvent.MouseButtonRelease:
+                pos = event.pos()
                 index = self.indexAt(pos)
                 if not index.isValid():
                     return False
@@ -101,7 +102,7 @@ class RegisterTableView(QTableView):
                 col_def = self._columns[col]
                 w = self.indexWidget(index)
 
-                if event.button() == Qt.MouseButton.LeftButton:
+                if event.button() == Qt.LeftButton:
                     if (
                         col_def.col_type in ("preset_text", "inline_text")
                         and isinstance(w, PresetTextCell)
@@ -113,23 +114,23 @@ class RegisterTableView(QTableView):
                         self.close_all_inline_edits()
 
                 if col_def.col_type in ("preset_text", "inline_text") and isinstance(w, PresetTextCell):
-                    if event.button() == Qt.MouseButton.RightButton and col_def.col_type == "preset_text":
+                    if event.button() == Qt.RightButton and col_def.col_type == "preset_text":
                         w._suppress_open = True
                         w.close_picker()
                         QTimer.singleShot(0, w.start_inline_edit)
                         QTimer.singleShot(300, lambda cell=w: setattr(cell, "_suppress_open", False))
                         return True
-                    if event.button() == Qt.MouseButton.LeftButton and not w.is_editing():
+                    if event.button() == Qt.LeftButton and not w.is_editing():
                         if col_def.col_type == "inline_text":
                             QTimer.singleShot(0, w.start_inline_edit)
                         elif not w._suppress_open:
                             QTimer.singleShot(0, w.open_picker)
                         return True
-                elif event.button() == Qt.MouseButton.LeftButton and col_def.col_type == "responsabil":
+                elif event.button() == Qt.LeftButton and col_def.col_type == "responsabil":
                     QTimer.singleShot(0, lambda i=index: self.edit(i))
                     return True
                 elif (
-                    event.button() == Qt.MouseButton.LeftButton
+                    event.button() == Qt.LeftButton
                     and w is None
                     and col_def.col_type in ("int", "date", "text")
                     and col_def.editable
@@ -195,7 +196,7 @@ class RegisterTableView(QTableView):
         if isinstance(widget, PresetTextCell):
             QGuiApplication.clipboard().setText(widget.value())
             return
-        val = self._register_model.data(index, Qt.ItemDataRole.DisplayRole)
+        val = self._register_model.data(index, Qt.DisplayRole)
         QGuiApplication.clipboard().setText(str(val if val is not None else ""))
 
     def paste_from_clipboard(self) -> None:
@@ -455,7 +456,7 @@ class RegisterTableView(QTableView):
                 self.setRowHeight(r, 34 if self.store.is_total_row(r) else 40)
 
     def is_editing_cell(self) -> bool:
-        if self.state() == QAbstractItemView.State.EditingState:
+        if self.state() == QAbstractItemView.EditingState:
             return True
         return any(cell.is_editing() for cell in self._preset_cells)
 
@@ -519,8 +520,8 @@ class RegisterTableView(QTableView):
                 )
                 cell.set_value(str(self._register_model.store.get_cell(r, c) or ""))
                 cell.setSizePolicy(
-                    QSizePolicy.Policy.Expanding,
-                    QSizePolicy.Policy.Expanding,
+                    QSizePolicy.Expanding,
+                    QSizePolicy.Expanding,
                 )
                 cell.value_changed.connect(
                     lambda row=r, col_idx=c: self._on_preset_changed(row, col_idx)
@@ -569,14 +570,14 @@ class RegisterTableView(QTableView):
                 return
         key = event.key()
         mods = event.modifiers()
-        if key == Qt.Key.Key_Tab:
+        if key == Qt.Key_Tab:
             self.close_all_inline_edits()
             row, col = self.currentIndex().row(), self.currentIndex().column()
-            direction = "back" if mods & Qt.KeyboardModifier.ShiftModifier else "forward"
+            direction = "back" if mods & Qt.ShiftModifier else "forward"
             self._navigate(row, col, direction)
             event.accept()
             return
-        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+        if key in (Qt.Key_Return, Qt.Key_Enter):
             self.close_all_inline_edits()
             row, col = self.currentIndex().row(), self.currentIndex().column()
             self._navigate(row, col, "down")
@@ -649,7 +650,7 @@ class RegisterTableView(QTableView):
         col_def = self._columns[col]
         if col_def.col_type in ("bool",) or col_def.col_type.startswith("scope_"):
             self._register_model.setData(
-                index, old_text.lower() in ("true", "1"), Qt.ItemDataRole.EditRole
+                index, old_text.lower() in ("true", "1"), Qt.EditRole
             )
         else:
             self._register_model.setData(index, old_text)

@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QKeySequence, QPageLayout, QPageSize, QShortcut
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QKeySequence, QPageLayout, QPageSize
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import (
+    QShortcut,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -195,7 +196,7 @@ class PartDataMixin:
                 "Există deja date pentru această lună. Regenerarea zilelor poate păstra "
                 "valorile existente pentru zile comune. Continuați?",
             )
-            if reply != QMessageBox.StandardButton.Yes:
+            if reply != QMessageBox.Yes:
                 return
 
         days = self._working_days()
@@ -232,7 +233,7 @@ class PartDataMixin:
                 "Atenție",
                 f"{manual} rânduri au date introduse manual. Sigur doriți să le suprascrieți?",
             )
-            if reply != QMessageBox.StandardButton.Yes:
+            if reply != QMessageBox.Yes:
                 return
 
         if self.mode == "monthly":
@@ -379,9 +380,9 @@ class PartDataMixin:
             "Copiază luna trecută",
             f"Copiați datele din {LUNI_RO[prev - 1]} în {LUNI_RO[self.month - 1]}?\n\n"
             "Valorile curente din luna afișată vor fi înlocuite (nu se salvează automat).",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.Yes | QMessageBox.No,
         )
-        if reply != QMessageBox.StandardButton.Yes:
+        if reply != QMessageBox.Yes:
             return
 
         self._cache_current_period()

@@ -15,7 +15,8 @@ REM Check if Python is installed
 python --version >nul 2>&1
 if errorlevel 1 (
   echo ERROR: Python is not installed or not in PATH
-  echo Please install Python 3.11+ from https://www.python.org
+  echo For Windows 7 builds install Python 3.8 (32-bit) from https://www.python.org
+  echo   (see BUILD_WINDOWS7.md). Python 3.9+ will NOT run on Windows 7.
   echo.
   pause
   exit /b 1

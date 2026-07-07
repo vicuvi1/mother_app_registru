@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QKeySequence, QPageLayout, QPageSize, QShortcut
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QKeySequence, QPageLayout, QPageSize
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import (
+    QShortcut,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -213,7 +214,7 @@ class PartExportMixin:
         return stub
     def _export(self) -> None:
         dlg = ExportDialog(self, default_year=self.year)
-        if dlg.exec() != dlg.DialogCode.Accepted:
+        if dlg.exec() != dlg.Accepted:
             return
         fmt = dlg.selected_format()
         scope = dlg.selected_scope()
@@ -262,7 +263,7 @@ class PartExportMixin:
             "Deschide fișierul?",
             f"Fișierul a fost salvat:\n{out_path}\n\nDoriți să îl deschideți?",
         )
-        if reply == QMessageBox.StandardButton.Yes:
+        if reply == QMessageBox.Yes:
             self._open_file(out_path)
     def _open_file(self, path: str) -> None:
         import os

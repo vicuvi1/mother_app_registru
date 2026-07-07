@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 
 class TableEmptyState(QWidget):
@@ -16,24 +16,24 @@ class TableEmptyState(QWidget):
         self.setObjectName("tableEmptyState")
 
         layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(12)
         layout.setContentsMargins(32, 48, 32, 48)
 
         self._icon = QLabel("📋")
         self._icon.setObjectName("emptyStateIcon")
-        self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._icon.setAlignment(Qt.AlignCenter)
         layout.addWidget(self._icon)
 
         self._title = QLabel()
         self._title.setObjectName("emptyStateTitle")
-        self._title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._title.setAlignment(Qt.AlignCenter)
         self._title.setWordWrap(True)
         layout.addWidget(self._title)
 
         self._subtitle = QLabel()
         self._subtitle.setObjectName("emptyStateSubtitle")
-        self._subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._subtitle.setAlignment(Qt.AlignCenter)
         self._subtitle.setWordWrap(True)
         layout.addWidget(self._subtitle)
 
@@ -41,7 +41,7 @@ class TableEmptyState(QWidget):
 
         btn_row = QWidget()
         btn_layout = QVBoxLayout(btn_row)
-        btn_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        btn_layout.setAlignment(Qt.AlignCenter)
         btn_layout.setSpacing(8)
 
         self._btn_regenerate = QPushButton("📅 Regenerează zilele lunii")

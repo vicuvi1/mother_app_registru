@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextDocument
-from PyQt6.QtPrintSupport import QPrintPreviewDialog, QPrinter
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QTextDocument
+from PyQt5.QtPrintSupport import QPrintPreviewDialog, QPrinter
+from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
@@ -28,7 +28,7 @@ from core.constants_manager import LUNI_RO, get_cover_page
 from ui.export.export_errors import format_export_error, run_export_with_progress
 from ui.export.export_html import build_pages_html
 
-ROLE_META = Qt.ItemDataRole.UserRole
+ROLE_META = Qt.UserRole
 
 
 class RegisterFinalPage(QWidget):
@@ -90,7 +90,7 @@ class RegisterFinalPage(QWidget):
         self._cover_cb.stateChanged.connect(self._update_summary)
         outer.addWidget(self._cover_cb)
 
-        split = QSplitter(Qt.Orientation.Horizontal)
+        split = QSplitter(Qt.Horizontal)
         self._tree = QTreeWidget()
         self._tree.setHeaderLabels(["Pag.", "Conținut pagină", "Include"])
         self._tree.setColumnWidth(0, 52)
@@ -148,8 +148,8 @@ class RegisterFinalPage(QWidget):
 
         if self._cover_cb.isChecked():
             item = QTreeWidgetItem([str(page_no), "Copertă — Pagina de titlu", ""])
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(2, Qt.CheckState.Checked)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(2, Qt.Checked)
             item.setData(0, ROLE_META, {"type": "cover", "year": year})
             self._tree.addTopLevelItem(item)
             page_no += 1
@@ -164,8 +164,8 @@ class RegisterFinalPage(QWidget):
                         label += f" — {cat_label}"
                     label += f" — {LUNI_RO[m - 1]} {year}"
                     item = QTreeWidgetItem([str(page_no), label, ""])
-                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                    item.setCheckState(2, Qt.CheckState.Checked)
+                    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                    item.setCheckState(2, Qt.Checked)
                     item.setData(
                         0,
                         ROLE_META,
@@ -186,8 +186,8 @@ class RegisterFinalPage(QWidget):
                     label += f" — {cat_label}"
                 label += f" — anul {year}"
                 item = QTreeWidgetItem([str(page_no), label, ""])
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                item.setCheckState(2, Qt.CheckState.Checked)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(2, Qt.Checked)
                 item.setData(
                     0,
                     ROLE_META,
@@ -209,7 +209,7 @@ class RegisterFinalPage(QWidget):
             self._tree.setCurrentItem(self._tree.topLevelItem(0))
 
     def _set_all(self, checked: bool) -> None:
-        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        state = Qt.Checked if checked else Qt.Unchecked
         self._tree.blockSignals(True)
         for i in range(self._tree.topLevelItemCount()):
             self._tree.topLevelItem(i).setCheckState(2, state)
@@ -221,7 +221,7 @@ class RegisterFinalPage(QWidget):
         selected = sum(
             1
             for i in range(total)
-            if self._tree.topLevelItem(i).checkState(2) == Qt.CheckState.Checked
+            if self._tree.topLevelItem(i).checkState(2) == Qt.Checked
         )
         self._summary.setText(
             f"Registru final {self._year.value()}: {selected} pagini selectate din {total} "
@@ -233,7 +233,7 @@ class RegisterFinalPage(QWidget):
         pages = []
         for i in range(self._tree.topLevelItemCount()):
             item = self._tree.topLevelItem(i)
-            if item.checkState(2) != Qt.CheckState.Checked:
+            if item.checkState(2) != Qt.Checked:
                 continue
             meta = item.data(0, ROLE_META) or {}
             if meta.get("type") == "cover":
@@ -323,7 +323,7 @@ class RegisterFinalPage(QWidget):
         )
 
     def _export(self) -> None:
-        from PyQt6.QtWidgets import QFileDialog
+        from PyQt5.QtWidgets import QFileDialog
 
         pages = self._selected_pages()
         if not pages:
