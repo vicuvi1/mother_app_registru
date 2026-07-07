@@ -168,12 +168,13 @@
     else if (p.period === "luna") { btns.push(["genDays", "🗓 Creează luna", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
     else if (p.period === "lista") { btns.push(["addRow", "+ Rând", "ghost"], ["dupRow", "⧉ Duplică rând", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
     else { btns.push(["addRow", "+ Rând", "ghost"]); }
+    if (p.period === "zi" || p.period === "lista") btns.push(["autoFill", "🎲 Auto valori", "ghost"]);
     if (p.period !== "crud") btns.push(["ranges", "⚖ Range-uri", "ghost"]);
     if (p.cols.some((c) => c[2] === "text" || c[2] === "txt")) btns.push(["presets", "📝 Liste text", "ghost"]);
     btns.push(["sp", "", ""], ["exportXls", "⬇ Excel", "ghost"], ["exportPdf", "⬇ PDF", "ghost"], ["exportDoc", "⬇ Word", "ghost"], ["printBtn", "🖶 Printează", "ghost"]);
     tb.innerHTML = btns.map(([id, l, c]) => id === "sp" ? '<span style="flex:1"></span>' : `<button id="${id}" class="${c}">${l}</button>`).join("");
     const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
-    bind("genDays", autoGenerate); bind("exclDays", openExcluded); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges); bind("presets", openPresetLists); bind("dupRow", duplicateRow);
+    bind("genDays", autoGenerate); bind("exclDays", openExcluded); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges); bind("presets", openPresetLists); bind("dupRow", duplicateRow); bind("autoFill", autoFillValues);
     bind("exportXls", exportCurrent);
     bind("exportPdf", () => window.RegistruExport.exportPDF(p, state.rows, exCtx()));
     bind("exportDoc", () => window.RegistruExport.exportWord(p, state.rows, exCtx()));
@@ -450,6 +451,20 @@
     if (!toAdd.length) { toast("Zilele lucrătoare există deja"); return; }
     const { error } = await sb.from(p.key).insert(toAdd); if (error) { toast("Eroare: " + error.message); return; }
     toast(`${toAdd.length} zile adăugate`); await loadData();
+  }
+  async function autoFillValues() {
+    const p = state.part;
+    if (p.period !== "zi" && p.period !== "lista") { toast("Disponibil pe părți zilnice/evenimente"); return; }
+    if (!state.rows.length) { toast("Generați întâi rândurile"); return; }
+    if (!confirm("Completați rândurile cu valori aleatorii de test? Suprascrie valorile numerice existente.")) return;
+    const cols = effCols().filter((c) => c[2] === "int" && !(c[3] && c[3].ro));
+    for (const row of state.rows) {
+      cols.forEach(([k]) => { const rg = colRange(p, k); row[k] = rg.min + Math.floor(Math.random() * (rg.max - rg.min + 1)); });
+      cols.forEach(([k]) => deriveRow(p, row, k));
+      const payload = {}; effCols().forEach(([k]) => (payload[k] = row[k]));
+      await sb.from(p.key).update(payload).eq("id", row.id);
+    }
+    toast("Valori generate"); await loadData();
   }
   async function copyLastMonth() {
     const p = state.part, pm = state.luna === 1 ? 12 : state.luna - 1, py = state.luna === 1 ? state.an - 1 : state.an;
@@ -733,34 +748,43 @@
   }
 
   // ---- Registru final (document compilat pe an) -----------------------------
+  function buildFinalPageList() {
+    const pages = [];
+    const add = (p, cat) => { if (p.period === "zi" || p.period === "lista") { for (let m = 1; m <= 12; m++) pages.push({ key: p.key, nr: p.nr, title: p.title, cat, month: m }); } else pages.push({ key: p.key, nr: p.nr, title: p.title, cat, month: null }); };
+    for (const p of PARTS) add(p, p.categorie ? "adulti" : null);
+    for (const p of PARTS) if (p.categorie) add(p, "copii");
+    return pages;
+  }
   function renderFinal() {
-    $("content").innerHTML = `<div class="card" style="max-width:660px">
-      <h3>📗 Registru final — anul ${state.an}</h3>
-      <p class="status">Compilează într-un singur document toate părțile și lunile care au date, cu pagină de titlu (copertă) și tabele cu totaluri.</p>
-      <label class="row" style="margin:10px 0"><input type="checkbox" id="fin_cover" checked style="width:auto;margin-right:8px"> Include pagina de titlu (copertă)</label>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button id="fin_word" class="ok">⬇ Export Word (.doc)</button>
-        <button id="fin_pdf" class="ghost">⬇ Export PDF</button>
-      </div>
-      <p class="status" id="fin_status" style="margin-top:12px">Schimbați anul din antet pentru a compila alt an.</p></div>`;
-    $("fin_word").onclick = () => exportFinal("word");
-    $("fin_pdf").onclick = () => exportFinal("pdf");
+    const pages = buildFinalPageList();
+    if (!state.finalChecked) state.finalChecked = {};
+    const list = pages.map((pg, i) => {
+      const checked = state.finalChecked[i] !== false;
+      const lbl = `Partea ${pg.nr}. ${esc(pg.title)}${pg.cat ? " — " + (pg.cat === "adulti" ? "Adulți" : "Copii") : ""}${pg.month ? " — " + LUNI[pg.month - 1] : " — anul"} ${state.an}`;
+      return `<div style="padding:2px 0"><label style="display:flex;gap:8px;align-items:center;font-size:13px"><input type="checkbox" data-i="${i}" ${checked ? "checked" : ""} style="width:auto">${lbl}</label></div>`;
+    }).join("");
+    $("content").innerHTML = `<div class="card" style="max-width:840px"><h3>📗 Registru final — anul ${state.an}</h3>
+      <p class="status">Bifați paginile de inclus. Ordine: copertă, apoi toate părțile (Adulți), apoi toate părțile (Copii).</p>
+      <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="fin_cover" checked style="width:auto">Include pagina de titlu (copertă)</label>
+      <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap"><button class="ghost" id="fin_all">Bifează tot</button><button class="ghost" id="fin_none">Debifează tot</button><button class="ghost" id="fin_coveredit">📄 Editează coperta</button></div>
+      <div style="max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px">${list}</div>
+      <div style="display:flex;gap:8px;margin-top:12px"><button class="ok" id="fin_word">⬇ Export Word (.doc)</button><button class="ghost" id="fin_pdf">⬇ Export PDF</button></div>
+      <p class="status" id="fin_status" style="margin-top:10px"></p></div>`;
+    $("content").querySelectorAll("input[data-i]").forEach((cb) => (cb.onchange = () => (state.finalChecked[+cb.dataset.i] = cb.checked)));
+    const setAll = (v) => { pages.forEach((pg, i) => { state.finalChecked[i] = v; }); renderFinal(); };
+    $("fin_all").onclick = () => setAll(true); $("fin_none").onclick = () => setAll(false);
+    $("fin_coveredit").onclick = openCover;
+    $("fin_word").onclick = () => exportFinal("word"); $("fin_pdf").onclick = () => exportFinal("pdf");
   }
   function finalSections(dataByPart) {
-    const secs = [];
-    for (const p of PARTS) {
-      const all = dataByPart[p.key] || [];
-      const cats = p.categorie ? ["adulti", "copii"] : [null];
-      for (const cat of cats) {
-        const cols = partCols(p, cat || "copii");
-        if (p.period === "crud") { if (all.length) secs.push({ title: `Partea ${p.nr}. ${p.title}`, cols, rows: all }); continue; }
-        for (let m = 1; m <= 12; m++) {
-          const rows = all.filter((r) => r.luna === m && (!p.categorie || r.categorie_varsta === cat));
-          if (rows.length) secs.push({ title: `Partea ${p.nr}. ${p.title} — ${LUNI[m - 1]} ${state.an}${cat ? " (" + cat + ")" : ""}`, cols, rows });
-        }
-      }
-    }
-    return secs;
+    const pages = buildFinalPageList().filter((pg, i) => state.finalChecked[i] !== false);
+    return pages.map((pg) => {
+      const p = PARTS.find((x) => x.key === pg.key), cols = partCols(p, pg.cat || "copii");
+      let rows = dataByPart[p.key] || [];
+      if (p.period !== "crud") rows = rows.filter((r) => (pg.month ? r.luna === pg.month : true) && (!p.categorie || r.categorie_varsta === pg.cat));
+      const title = `Partea ${pg.nr}. ${p.title}${pg.cat ? " (" + pg.cat + ")" : ""}${pg.month ? " — " + LUNI[pg.month - 1] + " " + state.an : " — anul " + state.an}`;
+      return { title, cols, rows };
+    });
   }
   function finalHeadWord(cols) {
     const hasSG = cols.some((c) => c[3] && c[3].sg), hasG = cols.some((c) => c[3] && c[3].g), rows = [];
@@ -788,7 +812,7 @@
       const { data } = await q; dataByPart[p.key] = data || [];
     }
     const secs = finalSections(dataByPart);
-    if (!secs.length) { $("fin_status").textContent = "Nu există date pentru anul selectat."; return; }
+    if (!secs.length && !cover) { $("fin_status").textContent = "Nu ați selectat nicio pagină."; return; }
     if (format === "word") {
       const coverHtml = cover ? `<div style="text-align:center;page-break-after:always"><p>${esc(c.institutie_1)}<br>${esc(c.institutie_2)}</p><h1>${esc(c.titlu)}</h1><h2>${esc(c.biblioteca)}</h2><p>${esc(c.localitate)}</p><p style="margin-top:60px;font-size:20px">${esc(c.an)}</p></div>` : "";
       const body = secs.map((s, i) => {
