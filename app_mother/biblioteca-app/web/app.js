@@ -139,7 +139,7 @@
     if (!isPart()) { tb.innerHTML = ""; tb.style.display = "none"; return; }
     tb.style.display = "flex";
     const btns = [];
-    if (p.period === "zi") { btns.push(["genDays", "🗓 Generează zilele", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"], ["addRow", "+ Zi", "ghost"]); }
+    if (p.period === "zi") { btns.push(["genDays", "🗓 Generează zilele", "ghost"], ["exclDays", "🚫 Zile libere", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"], ["addRow", "+ Zi", "ghost"]); }
     else if (p.period === "luna") { btns.push(["genDays", "🗓 Creează luna", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
     else if (p.period === "lista") { btns.push(["addRow", "+ Rând", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
     else { btns.push(["addRow", "+ Rând", "ghost"]); }
@@ -147,7 +147,7 @@
     btns.push(["sp", "", ""], ["exportXls", "⬇ Excel", "ghost"], ["exportPdf", "⬇ PDF", "ghost"], ["exportDoc", "⬇ Word", "ghost"], ["printBtn", "🖶 Printează", "ghost"]);
     tb.innerHTML = btns.map(([id, l, c]) => id === "sp" ? '<span style="flex:1"></span>' : `<button id="${id}" class="${c}">${l}</button>`).join("");
     const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
-    bind("genDays", autoGenerate); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges);
+    bind("genDays", autoGenerate); bind("exclDays", openExcluded); bind("copyPrev", copyLastMonth); bind("addRow", addRow); bind("ranges", openRanges);
     bind("exportXls", exportCurrent);
     bind("exportPdf", () => window.RegistruExport.exportPDF(p, state.rows, exCtx()));
     bind("exportDoc", () => window.RegistruExport.exportWord(p, state.rows, exCtx()));
@@ -300,6 +300,9 @@
     const payload = {}; affected.forEach((k) => (payload[k] = row[k]));
     const { error } = await sb.from(state.part.key).update(payload).eq("id", id);
     if (error) { toast("Eroare salvare: " + error.message); return; }
+    // sincronizare inversă II → IX/XI
+    const cdef = effCols().find((c) => c[0] === col);
+    if (state.part.key === "evidenta_utilizatori_copii_adulti" && cdef && cdef[3] && cdef[3].rev) await reverseSync(col, row.data, +row[col] || 0);
     el.classList.remove("dirty"); markOOR(el);
     if ((type === "text" || type === "txt") && row[col]) {
       const arr = state.presets[col] || (state.presets[col] = []);
@@ -307,6 +310,39 @@
     }
     affected.forEach((k) => { if (k === col) return; const inp = $("content").querySelector(`tbody input[data-id="${id}"][data-col="${k}"]`); if (inp) { if (inp.type === "checkbox") inp.checked = !!row[k]; else inp.value = row[k] == null ? "" : row[k]; markOOR(inp); } });
     renderFooter();
+  }
+
+  // ---- Lipire din Excel (Ctrl+V) --------------------------------------------
+  async function handlePaste(e) {
+    const el = document.activeElement;
+    if (!isPart() || !el || !el.matches || !el.matches("#content tbody input")) return;
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!text) return;
+    e.preventDefault();
+    const cols = effCols();
+    const startCol = cols.findIndex((c) => c[0] === el.dataset.col);
+    const startIdx = state.rows.findIndex((r) => r.id === +el.dataset.id);
+    if (startCol < 0 || startIdx < 0) return;
+    const lines = text.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
+    let n = 0;
+    for (let dr = 0; dr < lines.length; dr++) {
+      const ri = startIdx + dr; if (ri >= state.rows.length) break;
+      const row = state.rows[ri], cells = lines[dr].split("\t"), affected = new Set();
+      for (let dc = 0; dc < cells.length; dc++) {
+        const ci = startCol + dc; if (ci >= cols.length) break;
+        const [k, l, t, o = {}] = cols[ci]; if (o.ro) continue;
+        const raw = cells[dc].trim();
+        if (t === "int") row[k] = Math.max(0, parseInt(raw.replace(/[^\d-]/g, ""), 10) || 0);
+        else if (t === "bool") row[k] = /^(1|true|da|x|✓|adevărat)$/i.test(raw);
+        else row[k] = raw === "" ? (o.req ? "" : null) : raw;
+        deriveRow(state.part, row, k).forEach((x) => affected.add(x)); affected.add(k);
+      }
+      if (affected.size) {
+        const payload = {}; affected.forEach((k) => (payload[k] = row[k]));
+        await sb.from(state.part.key).update(payload).eq("id", row.id); n++;
+      }
+    }
+    toast(`Lipit din Excel: ${n} rânduri`); await loadData();
   }
 
   async function addRow() {
@@ -334,7 +370,8 @@
       await loadData(); return;
     }
     const have = new Set(state.rows.map((r) => r[p.dateField]));
-    const toAdd = weekdays(state.an, state.luna).filter((d) => !have.has(d)).map((d) => {
+    const excl = await getExcluded(state.an), exSet = new Set(excl[state.luna] || []);
+    const toAdd = weekdays(state.an, state.luna).filter((d) => !have.has(d) && !exSet.has(d)).map((d) => {
       const o = { an: state.an, luna: state.luna, [p.dateField]: d }; if (p.categorie) o.categorie_varsta = state.cat; return o;
     });
     if (!toAdd.length) { toast("Zilele lucrătoare există deja"); return; }
@@ -403,6 +440,52 @@
           if (Object.keys(u).length) await sb.from(p.key).update(u).eq("id", r.id); }
       }
     } catch (e) { /* nu bloca */ }
+  }
+
+  // Sincronizare inversă: editarea Părții II (instruiri/activități) → IX/XI.
+  // Pune întreaga sumă pe primul rând al datei, restul = 0; dacă nu există, inserează.
+  async function reverseSync(col, dateStr, value) {
+    if (!dateStr) return;
+    const table = col === "instruiri" ? "instruiri" : "activitati_culturale";
+    const { data } = await sb.from(table).select("id").eq("an", state.an).eq("luna", state.luna).eq("categorie_varsta", state.cat).eq("data", dateStr).order("id", { ascending: true });
+    if (data && data.length) {
+      await sb.from(table).update({ total_participanti: value }).eq("id", data[0].id);
+      for (let i = 1; i < data.length; i++) await sb.from(table).update({ total_participanti: 0 }).eq("id", data[i].id);
+    } else if (value > 0) {
+      const ins = { an: state.an, luna: state.luna, categorie_varsta: state.cat, data: dateStr, total_participanti: value };
+      if (table === "activitati_culturale") ins.total_activitati = 1;
+      await sb.from(table).insert(ins);
+    }
+  }
+
+  // ---- Excluse (zile libere / sărbători) ------------------------------------
+  async function getExcluded(year) {
+    const { data } = await sb.from("app_settings").select("valoare").eq("cheie", `excluded_days_${year}`).maybeSingle();
+    let obj = {}; try { obj = JSON.parse((data && data.valoare) || "{}"); } catch (e) {}
+    const res = {}; for (let m = 1; m <= 12; m++) res[m] = obj[String(m)] || obj[m] || [];
+    return res;
+  }
+  async function saveExcluded(year, byMonth) {
+    const payload = {}; for (let m = 1; m <= 12; m++) payload[String(m)] = byMonth[m] || [];
+    await sb.from("app_settings").upsert({ cheie: `excluded_days_${year}`, valoare: JSON.stringify(payload) }, { onConflict: "cheie" });
+  }
+  async function openExcluded() {
+    const excl = await getExcluded(state.an), cur = new Set(excl[state.luna] || []);
+    const items = weekdays(state.an, state.luna).map((d) => `<label class="row" style="width:88px;display:inline-flex;margin:2px 0"><input type="checkbox" data-d="${d}" ${cur.has(d) ? "checked" : ""} style="width:auto;margin-right:6px">${d}</label>`).join("");
+    $("settings").innerHTML = `<div class="box"><h3>🚫 Zile libere — ${LUNI[state.luna - 1]} ${state.an}</h3>
+      <p class="status">Bifați zilele nelucrătoare (sărbători). Nu vor fi generate de „Generează zilele".</p>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${items}</div>
+      <div class="actions"><button class="ghost" id="ex_cancel">Renunță</button><button class="ok" id="ex_save">Salvează</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    $("ex_cancel").onclick = () => $("settings").classList.add("hidden");
+    $("ex_save").onclick = async () => {
+      const chosen = [...$("settings").querySelectorAll("input[data-d]:checked")].map((i) => i.dataset.d);
+      excl[state.luna] = chosen; await saveExcluded(state.an, excl);
+      // șterge rândurile deja generate care acum sunt excluse (partea curentă, luna curentă)
+      const ex = new Set(chosen), toDel = state.rows.filter((r) => ex.has(r[state.part.dateField]));
+      for (const r of toDel) await sb.from(state.part.key).delete().eq("id", r.id);
+      $("settings").classList.add("hidden"); toast("Zile libere salvate"); if (isPart()) loadData();
+    };
   }
 
   // ---- Dashboard ------------------------------------------------------------
@@ -480,6 +563,21 @@
     }
     return secs;
   }
+  function finalHeadWord(cols) {
+    const hasSG = cols.some((c) => c[3] && c[3].sg), hasG = cols.some((c) => c[3] && c[3].g), rows = [];
+    if (hasSG) rows.push(spanRow(cols, (c) => (c[3] && c[3].sg) || null));
+    if (hasG || hasSG) rows.push(spanRow(cols, (c) => (c[3] && c[3].g) || null));
+    rows.push(cols.map((c) => `<th>${esc(c[1])}</th>`).join(""));
+    return rows.map((r) => `<tr>${r}</tr>`).join("");
+  }
+  function finalHeadPDF(cols) {
+    const build = (fn) => { const r = []; let i = 0; while (i < cols.length) { const k = fn(cols[i]); if (k == null) { r.push({ text: "", fillColor: "#eef2f7" }); i++; continue; } let j = i + 1; while (j < cols.length && fn(cols[j]) === k) j++; r.push({ text: k, colSpan: j - i, bold: true, fontSize: 6, fillColor: "#eef2f7" }); for (let x = 1; x < j - i; x++) r.push({}); i = j; } return r; };
+    const rows = [], hasSG = cols.some((c) => c[3] && c[3].sg), hasG = cols.some((c) => c[3] && c[3].g);
+    if (hasSG) rows.push(build((c) => (c[3] && c[3].sg) || null));
+    if (hasG || hasSG) rows.push(build((c) => (c[3] && c[3].g) || null));
+    rows.push(cols.map((c) => ({ text: c[1], bold: true, fontSize: 6, fillColor: "#eef2f7" })));
+    return rows;
+  }
   async function exportFinal(format) {
     const cover = $("fin_cover").checked, nm = state.settings.library_name || "Biblioteca", loc = state.settings.library_loc || "";
     $("fin_status").textContent = "Se generează…";
@@ -494,9 +592,8 @@
     if (format === "word") {
       const coverHtml = cover ? `<div style="text-align:center;page-break-after:always"><p>Ministerul Culturii al Republicii Moldova<br>Consiliul Biblioteconomic Național</p><h1>Registru de evidență a activității</h1><h2>Bibliotecii Publice „${esc(nm)}"</h2><p>${esc(loc)}</p><p style="margin-top:60px;font-size:20px">${state.an}</p></div>` : "";
       const body = secs.map((s, i) => {
-        const th = s.cols.map((c) => `<th>${esc(c[1])}</th>`).join("");
         const trs = s.rows.map((r) => `<tr>${s.cols.map(([k, l, t]) => `<td>${t === "bool" ? (r[k] ? "✓" : "") : esc(r[k])}</td>`).join("")}</tr>`).join("");
-        return `<div style="${i > 0 || cover ? "page-break-before:always" : ""}"><h3>${esc(s.title)}</h3><table><tr>${th}</tr>${trs}</table></div>`;
+        return `<div style="${i > 0 || cover ? "page-break-before:always" : ""}"><h3>${esc(s.title)}</h3><table>${finalHeadWord(s.cols)}${trs}</table></div>`;
       }).join("");
       const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 landscape}body{font:10px Segoe UI,sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:2px;text-align:center}th{background:#eef2f7}h1,h2,h3{text-align:center}</style></head><body>${coverHtml}${body}</body></html>`;
       download(new Blob(["﻿", html], { type: "application/msword" }), `registru_final_${state.an}.doc`);
@@ -504,10 +601,10 @@
       const content = [];
       if (cover) content.push({ text: "Ministerul Culturii al Republicii Moldova\nConsiliul Biblioteconomic Național", alignment: "center", margin: [0, 60, 0, 24] }, { text: "Registru de evidență a activității", fontSize: 18, bold: true, alignment: "center" }, { text: `Bibliotecii Publice „${nm}"`, fontSize: 14, alignment: "center", margin: [0, 6, 0, 6] }, { text: loc, alignment: "center" }, { text: String(state.an), fontSize: 20, alignment: "center", margin: [0, 60, 0, 0], pageBreak: "after" });
       secs.forEach((s, i) => {
-        const tbl = [s.cols.map((c) => ({ text: c[1], bold: true, fontSize: 6, fillColor: "#eef2f7" }))];
+        const head = finalHeadPDF(s.cols), tbl = head.slice();
         s.rows.forEach((r) => tbl.push(s.cols.map(([k, l, t]) => ({ text: t === "bool" ? (r[k] ? "✓" : "") : (r[k] == null ? "" : String(r[k])), fontSize: 6 }))));
         content.push({ text: s.title, bold: true, fontSize: 10, margin: [0, 8, 0, 4], pageBreak: i > 0 ? "before" : undefined });
-        content.push({ table: { body: tbl }, layout: "lightHorizontalLines" });
+        content.push({ table: { headerRows: head.length, body: tbl }, layout: "lightHorizontalLines" });
       });
       window.pdfMake.createPdf({ pageOrientation: "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 20], content, defaultStyle: { fontSize: 6 } }).download(`registru_final_${state.an}.pdf`);
     }
@@ -579,6 +676,7 @@
   $("loginBtn").onclick = login;
   $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
   $("settingsBtn").onclick = openSettings;
+  document.addEventListener("paste", handlePaste);
   $("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
   sb.auth.getSession().then(({ data }) => { if (data.session) onLoggedIn(); });
 })();
