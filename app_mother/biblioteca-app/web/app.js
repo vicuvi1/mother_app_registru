@@ -25,6 +25,8 @@
   const toInt = (v) => Math.max(0, parseInt(v, 10) || 0);
   const ddmm = (d, m) => `${pad2(d)}.${pad2(m)}`;
   function toast(m) { const t = $("toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1500); }
+  let busyCount = 0;
+  function setBusy(b) { busyCount += b ? 1 : -1; if (busyCount < 0) busyCount = 0; const el = $("busy"); if (el) el.classList.toggle("hidden", busyCount === 0); }
   const effCols = () => partCols(state.part, state.cat);
   const isPart = () => state.part && state.part.key && state.part.key.indexOf("__") !== 0;
 
@@ -72,6 +74,7 @@
       <label>Numele bibliotecii</label><input id="st_name" value="${esc(s.library_name || "")}">
       <label>Localitate</label><input id="st_loc" value="${esc(s.library_loc || "")}">
       <label>Temă interfață</label><select id="st_theme"><option value="light"${dark ? "" : " selected"}>Deschis</option><option value="dark"${dark ? " selected" : ""}>Întunecat</option></select>
+      <label class="row" style="margin-top:10px"><input type="checkbox" id="st_strict" ${s.strict_validation === "1" ? "checked" : ""} style="width:auto;margin-right:8px">Validare strictă (respinge valori peste limite)</label>
       <label>Backup automat — la câte zile (0 = dezactivat)</label><input id="st_bk" type="number" min="0" value="${esc(s.backup_days || "3")}">
       <div style="display:flex;gap:8px;margin-top:14px"><button class="ghost" id="st_help">Ajutor (scurtături)</button><button class="ghost" id="st_about">Despre</button></div>
       <div class="actions"><button class="ghost" id="st_cancel">Renunță</button><button class="ok" id="st_save">Salvează</button></div></div>`;
@@ -85,6 +88,7 @@
         { cheie: "library_name", valoare: $("st_name").value.trim() },
         { cheie: "library_loc", valoare: $("st_loc").value.trim() },
         { cheie: "ui_theme", valoare: $("st_theme").value },
+        { cheie: "strict_validation", valoare: $("st_strict").checked ? "1" : "0" },
         { cheie: "backup_days", valoare: String(toInt($("st_bk").value)) },
       ];
       const { error } = await sb.from("app_settings").upsert(rows, { onConflict: "cheie" });
@@ -128,6 +132,8 @@
 
   function selectPart(key) {
     if (channel) { sb.removeChannel(channel); channel = null; }
+    const aside = document.querySelector("aside"); if (aside) aside.classList.remove("open");
+    undoStack.length = 0;
     if (key === "__home") { state.part = HOME; updateChrome(); renderHome(); return; }
     if (key === "__final") { state.part = FINAL; updateChrome(); renderFinal(); return; }
     if (key === "__staff") { state.part = STAFF; updateChrome(); renderStaff(); subscribe("personal"); return; }
@@ -185,22 +191,25 @@
   // ---- Încărcare + meta -----------------------------------------------------
   async function loadData() {
     const p = state.part;
-    let q = sb.from(p.key).select("*");
-    if (p.period !== "crud") q = q.eq("an", state.an).eq("luna", state.luna);
-    if (p.categorie) q = q.eq("categorie_varsta", state.cat);
-    q = p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true });
-    const { data, error } = await q;
-    if (error) { toast("Eroare: " + error.message); return; }
-    state.rows = data || [];
-    await syncIn(p); await loadMeta(p);
-    state.prior = null;
-    if (p.cumulative) {
-      let pq = sb.from(p.key).select("*").eq("an", state.an).lt("luna", state.luna);
-      if (p.categorie) pq = pq.eq("categorie_varsta", state.cat);
-      const { data: pd } = await pq; state.prior = computeAcc(effCols(), pd || []);
-    }
-    renderGrid();
-    saveSession();
+    setBusy(true);
+    try {
+      let q = sb.from(p.key).select("*");
+      if (p.period !== "crud") q = q.eq("an", state.an).eq("luna", state.luna);
+      if (p.categorie) q = q.eq("categorie_varsta", state.cat);
+      q = p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true });
+      const { data, error } = await q;
+      if (error) { toast("Eroare: " + error.message); return; }
+      state.rows = data || [];
+      await syncIn(p); await loadMeta(p);
+      state.prior = null;
+      if (p.cumulative) {
+        let pq = sb.from(p.key).select("*").eq("an", state.an).lt("luna", state.luna);
+        if (p.categorie) pq = pq.eq("categorie_varsta", state.cat);
+        const { data: pd } = await pq; state.prior = computeAcc(effCols(), pd || []);
+      }
+      renderGrid();
+      saveSession();
+    } finally { setBusy(false); }
   }
   async function loadMeta(p) {
     state.presets = {}; state.labels = {}; state.ranges = {};
@@ -388,13 +397,23 @@
     else if (type === "bool") row[col] = el.checked;
     else row[col] = el.value === "" ? (el.dataset.req ? "" : null) : el.value;
     const affected = deriveRow(state.part, row, col);
+    if (state.settings.strict_validation === "1") {
+      const rg = type === "int" ? colRange(state.part, col) : null;
+      const oor = rg && ((+row[col] || 0) > rg.max || (+row[col] || 0) < rg.min);
+      if (oor || validateRow(state.part, row).has(col)) {
+        row[col] = oldVal; deriveRow(state.part, row, col);
+        if (type === "bool") el.checked = !!oldVal; else el.value = oldVal == null ? "" : oldVal;
+        toast(oor ? `Valoare în afara limitelor (${rg.min}–${rg.max})` : "Valoare respinsă (validare strictă)");
+        markOOR(el); applyRowValidation(id); renderFooter(); return;
+      }
+    }
     const payload = {}; affected.forEach((k) => (payload[k] = row[k]));
     setSaveState("saving");
     const res = await saveUpdate(state.part.key, payload, id, prevUpdated);
     if (res.error) { setSaveState("err"); toast("Eroare salvare: " + res.error.message); return; }
     if (!res.data) { setSaveState("ok"); toast("Rând modificat de alt utilizator — se reîncarcă"); await loadData(); return; }
     row.updated_at = res.data.updated_at; setSaveState("ok");
-    if (oldVal !== row[col]) pushUndo({ id, col, type, old: oldVal });
+    if (oldVal !== row[col]) pushUndo({ kind: "cell", key: state.part.key, id, col, type, old: oldVal });
     // sincronizare inversă II → IX/XI
     const cdef = effCols().find((c) => c[0] === col);
     if (state.part.key === "evidenta_utilizatori_copii_adulti" && cdef && cdef[3] && cdef[3].rev) await reverseSync(col, row.data, +row[col] || 0);
@@ -448,12 +467,15 @@
     if (p.period === "zi") { const d = prompt("Data (ZZ.LL):", ddmm(1, state.luna)); if (!d) return; base[p.dateField] = d; }
     else if (p.period === "lista" && p.dateField) base[p.dateField] = ddmm(1, state.luna);
     p.cols.forEach(([k, l, t, o]) => { if (o && o.req && (t === "text" || t === "txt") && base[k] === undefined) base[k] = ""; });
-    const { error } = await sb.from(p.key).insert(base); if (error) { toast("Eroare: " + error.message); return; }
+    const { data, error } = await sb.from(p.key).insert(base).select().maybeSingle(); if (error) { toast("Eroare: " + error.message); return; }
+    if (data) pushUndo({ kind: "add", key: p.key, id: data.id });
     await loadData();
   }
   async function deleteRow(id) {
     if (!confirm("Ștergeți acest rând?")) return;
+    const row = state.rows.find((r) => r.id === id);
     const { error } = await sb.from(state.part.key).delete().eq("id", id); if (error) { toast("Eroare: " + error.message); return; }
+    if (row) pushUndo({ kind: "del", key: state.part.key, row: { ...row } });
     await loadData();
   }
 
@@ -735,7 +757,7 @@
   async function renderHome() {
     updateChrome();
     $("content").innerHTML = `<div class="status">Se încarcă…</div>`;
-    await computeBadges(); renderNav();
+    setBusy(true); await computeBadges(); setBusy(false); renderNav();
     const done = PARTS.filter((p) => state.badges[p.key] === "ok").length;
     const warn = PARTS.filter((p) => state.badges[p.key] === "warn").length;
     const empty = PARTS.filter((p) => state.badges[p.key] === "empty").length;
@@ -839,13 +861,14 @@
   async function exportFinal(format) {
     const cover = $("fin_cover").checked, c = await getCover();
     c.an = c.an || String(state.an);
-    $("fin_status").textContent = "Se generează…";
+    $("fin_status").textContent = "Se generează…"; setBusy(true);
     const dataByPart = {};
-    for (const p of PARTS) {
+    (await Promise.all(PARTS.map(async (p) => {
       let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
       q = p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true });
-      const { data } = await q; dataByPart[p.key] = data || [];
-    }
+      const { data } = await q; return [p.key, data || []];
+    }))).forEach(([k, v]) => (dataByPart[k] = v));
+    setBusy(false);
     const secs = finalSections(dataByPart);
     if (!secs.length && !cover) { $("fin_status").textContent = "Nu ați selectat nicio pagină."; return; }
     if (format === "word") {
@@ -977,6 +1000,9 @@
   function pushUndo(e) { undoStack.push(e); if (undoStack.length > 25) undoStack.shift(); }
   async function undo() {
     const e = undoStack.pop(); if (!e) { toast("Nimic de anulat"); return; }
+    if (e.key && isPart() && e.key !== state.part.key) { toast("Anulare disponibilă pe partea unde s-a modificat"); undoStack.push(e); return; }
+    if (e.kind === "add") { await sb.from(e.key).delete().eq("id", e.id); await loadData(); toast("Anulat: adăugare"); return; }
+    if (e.kind === "del") { const o = {}; Object.keys(e.row).forEach((k) => { if (!["id", "created_at", "updated_at"].includes(k)) o[k] = e.row[k]; }); await sb.from(e.key).insert(o); await loadData(); toast("Anulat: ștergere"); return; }
     const row = state.rows.find((r) => r.id === e.id); if (!row) { toast("Rândul nu mai există"); return; }
     row[e.col] = e.old;
     const affected = deriveRow(state.part, row, e.col);
@@ -1046,6 +1072,7 @@
   $("loginBtn").onclick = login;
   $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
   $("settingsBtn").onclick = openSettings;
+  $("menuBtn").onclick = () => { const a = document.querySelector("aside"); if (a) a.classList.toggle("open"); };
   document.addEventListener("paste", handlePaste);
   $("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
   sb.auth.getSession().then(({ data }) => { if (data.session) onLoggedIn(); });
