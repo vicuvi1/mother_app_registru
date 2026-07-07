@@ -215,13 +215,24 @@
     if (t === "bool") return `<input type="checkbox" ${v ? "checked" : ""} ${attr}>`;
     if (t === "date") return `<input class="date" type="text" placeholder="ZZ.LL" value="${esc(v)}" ${attr}>`;
     if (t === "staff") return `<input class="txt" type="text" list="staffList" value="${esc(v)}" ${attr}>`;
-    if (t === "txt") return `<input class="txt wide" type="text" list="pl_${k}" value="${esc(v)}" ${attr}>`;
-    return `<input class="txt" type="text" list="pl_${k}" value="${esc(v)}" ${attr}>`;
+    if (t === "txt") return `<input class="txt wide" type="text" value="${esc(v)}" ${attr}>`;
+    return `<input class="txt" type="text" value="${esc(v)}" ${attr}>`;
   }
-  function presetDatalists(cols) {
-    return cols.filter((c) => c[2] === "text" || c[2] === "txt").map((c) =>
-      `<datalist id="pl_${c[0]}">${(state.presets[c[0]] || []).map((v) => `<option value="${esc(v)}">`).join("")}</datalist>`).join("");
+  // Popup listă presets: click stânga → listă (ca în desktop); scrii direct → filtrează
+  let presetPop = null;
+  function ensurePresetPop() { if (!presetPop) { presetPop = document.createElement("div"); presetPop.className = "presetpop"; presetPop.style.display = "none"; document.body.appendChild(presetPop); } return presetPop; }
+  function openPresetPopup(inp) {
+    const col = inp.dataset.col, vals = state.presets[col] || [];
+    if (!vals.length) { closePresetPopup(); return; }
+    const flt = String(inp.value || "").toLowerCase();
+    const shown = vals.filter((v) => v.toLowerCase().includes(flt));
+    const pop = ensurePresetPop();
+    pop.innerHTML = shown.length ? shown.map((v) => `<div class="pp-item">${esc(v)}</div>`).join("") : `<div class="pp-empty">Nicio potrivire · scrieți direct</div>`;
+    const r = inp.getBoundingClientRect();
+    pop.style.left = r.left + "px"; pop.style.top = (r.bottom + 2) + "px"; pop.style.minWidth = r.width + "px"; pop.style.display = "block";
+    pop.querySelectorAll(".pp-item").forEach((d) => (d.onmousedown = (ev) => { ev.preventDefault(); inp.value = d.textContent; inp.dispatchEvent(new Event("change", { bubbles: true })); closePresetPopup(); }));
   }
+  function closePresetPopup() { if (presetPop) presetPop.style.display = "none"; }
 
   function renderGrid() {
     const p = state.part, cols = effCols(), tk = todayStr(), showToday = p.period === "zi" && tk.y === state.an && tk.m === state.luna;
@@ -232,12 +243,18 @@
     }).join("");
     const hintMsg = p.period === "zi" ? "Apăsați butonul Generează zilele." : "Apăsați butonul + Rând.";
     const empty = `<tr><td colspan="${cols.length + 1}" style="padding:16px;color:var(--muted)">Niciun rând. ${hintMsg}</td></tr>`;
-    $("content").innerHTML = presetDatalists(cols) +
+    $("content").innerHTML =
       `<div class="tablebox"><table><thead>${buildHead(cols)}</thead><tbody>${state.rows.length ? body : empty}</tbody><tfoot id="gridFoot"></tfoot></table></div>`;
     $("content").querySelectorAll("thead tr:last-child th[data-col]").forEach((th) => { th.style.cursor = "pointer"; th.ondblclick = () => renameCol(th.dataset.col, cols.find((c) => c[0] === th.dataset.col)); });
     $("content").querySelectorAll("tbody input").forEach((inp) => {
       inp.addEventListener("change", saveCell);
-      if (inp.type !== "checkbox" && !inp.readOnly) {
+      const t = inp.dataset.type;
+      if (t === "text" || t === "txt") {
+        inp.addEventListener("focus", () => openPresetPopup(inp));
+        inp.addEventListener("input", () => { inp.classList.add("dirty"); openPresetPopup(inp); });
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); closePresetPopup(); moveDown(inp); } else if (e.key === "Escape") closePresetPopup(); });
+        inp.addEventListener("blur", () => setTimeout(closePresetPopup, 160));
+      } else if (inp.type !== "checkbox" && !inp.readOnly) {
         inp.addEventListener("input", () => inp.classList.add("dirty"));
         inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); moveDown(inp); } });
       }
