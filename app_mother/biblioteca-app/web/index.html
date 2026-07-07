@@ -46,7 +46,7 @@
     .tablebox { overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; }
     table { border-collapse:collapse; width:100%; }
     th, td { border:1px solid var(--line); padding:0; text-align:center; white-space:nowrap; }
-    th { background:#eef2f7; font-size:11px; font-weight:600; padding:6px 8px; position:sticky; top:0; }
+    th { background:#eef2f7; font-size:11px; font-weight:600; padding:6px 8px; }
     td .txtcell { padding:8px; }
     td input.num { width:64px; }
     td input.txt { width:150px; } td input.txt.wide { width:230px; }
@@ -54,7 +54,14 @@
     td input { border:0; padding:8px 4px; text-align:center; background:transparent; }
     td input:focus { outline:2px solid var(--accent); outline-offset:-2px; background:#fff; }
     td input.dirty { background:#fef9c3; }
-    tr:nth-child(even) td { background:#fafbfe; }
+    td input.calc { background:#eef2f7; color:#475569; font-weight:600; }
+    td input.oor { background:#fee2e2 !important; color:#b91c1c; }
+    tbody tr:nth-child(even) td { background:#fafbfe; }
+    /* Rânduri de total */
+    tfoot td { font-weight:600; }
+    tfoot .totalrow { background:#e2e8f0; }
+    tfoot .cumrow { background:#dbeafe; }
+    td.totlbl { font-weight:700; text-align:left; padding:6px 10px; background:#cbd5e1; white-space:nowrap; }
     button.del { background:transparent; color:#b91c1c; border:0; font-weight:700; padding:6px 10px; }
     button.del:hover { background:#fee2e2; }
 

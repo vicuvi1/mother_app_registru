@@ -36,15 +36,16 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
-  const headers = (part) => part.cols.map((c) => c[1]);
-  const rowText = (part, r) => part.cols.map(([k, l, t]) => fmt(r[k], t));
+  const headers = (cols) => cols.map((c) => c[1]);
+  const rowText = (cols, r) => cols.map(([k, l, t]) => fmt(r[k], t));
 
   // ---- PDF (pdfmake) --------------------------------------------------------
   function exportPDF(part, rows, ctx) {
     if (!window.pdfMake) { ctx.toast && ctx.toast("PDF indisponibil (rețea?)"); return; }
-    const body = [headers(part).map((h) => ({ text: h, bold: true, fontSize: 6, fillColor: "#eef2f7" }))];
-    rows.forEach((r) => body.push(rowText(part, r).map((x) => ({ text: x, fontSize: 6 }))));
-    if (!rows.length) body.push([{ text: "— fără date —", colSpan: part.cols.length, alignment: "center", fontSize: 8 }]);
+    const cols = (ctx && ctx.cols) || part.cols;
+    const body = [headers(cols).map((h) => ({ text: h, bold: true, fontSize: 6, fillColor: "#eef2f7" }))];
+    rows.forEach((r) => body.push(rowText(cols, r).map((x) => ({ text: x, fontSize: 6 }))));
+    if (!rows.length) body.push([{ text: "— fără date —", colSpan: cols.length, alignment: "center", fontSize: 8 }]);
     const dd = {
       pageOrientation: "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 20],
       content: [
@@ -59,9 +60,10 @@
 
   // ---- Word (.doc prin HTML) ------------------------------------------------
   function exportWord(part, rows, ctx) {
-    const th = headers(part).map((h) => `<th>${esc(h)}</th>`).join("");
+    const cols = (ctx && ctx.cols) || part.cols;
+    const th = headers(cols).map((h) => `<th>${esc(h)}</th>`).join("");
     const trs = rows.map((r) =>
-      `<tr>${rowText(part, r).map((x) => `<td>${esc(x)}</td>`).join("")}</tr>`).join("");
+      `<tr>${rowText(cols, r).map((x) => `<td>${esc(x)}</td>`).join("")}</tr>`).join("");
     const html =
       `<html xmlns:o='urn:schemas-microsoft-com:office:office' ` +
       `xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>` +
@@ -71,7 +73,7 @@
       `th{background:#eef2f7}</style></head><body>` +
       `<h3>Partea ${esc(part.nr)} — ${esc(part.title)}</h3>` +
       `<p>${esc(subtitle(part, ctx))}</p>` +
-      `<table><tr>${th}</tr>${trs || `<tr><td colspan='${part.cols.length}'>— fără date —</td></tr>`}</table>` +
+      `<table><tr>${th}</tr>${trs || `<tr><td colspan='${cols.length}'>— fără date —</td></tr>`}</table>` +
       `</body></html>`;
     download(new Blob(["﻿", html], { type: "application/msword" }), baseName(part, ctx) + ".doc");
   }
