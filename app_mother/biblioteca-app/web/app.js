@@ -6,7 +6,8 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const PARTS = window.REGISTRU_PARTS, MAX5 = window.REGISTRU_MAX5, partCols = window.partCols;
-  const HOME = { key: "__home" }, STAFF = { key: "__staff" }, IMPORT = { key: "__import" };
+  const HOME = { key: "__home" }, STAFF = { key: "__staff" }, IMPORT = { key: "__import" }, FINAL = { key: "__final" };
+  function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
   const LUNI = ["Ianuarie","Februarie","Martie","Aprilie","Mai","Iunie","Iulie","August","Septembrie","Octombrie","Noiembrie","Decembrie"];
 
   if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY) $("authErr").textContent = "Lipsește config.js.";
@@ -54,7 +55,7 @@
     for (let y = 2023; y <= 2027; y++) $("an").add(new Option(y, y, false, y === state.an));
     $("an").onchange = () => { state.an = +$("an").value; state.part === HOME ? renderHome() : (!special() && loadData()); };
   }
-  const special = () => state.part === STAFF || state.part === IMPORT || state.part === HOME;
+  const special = () => state.part === STAFF || state.part === IMPORT || state.part === HOME || state.part === FINAL;
 
   // ---- Setări ---------------------------------------------------------------
   async function loadSettings() {
@@ -90,6 +91,8 @@
   function renderNav() {
     $("nav").innerHTML =
       `<button class="nav" data-key="__home">🏠 Acasă</button>` +
+      `<button class="nav" data-key="__final">📗 Registru final</button>` +
+      `<div class="navsep"></div>` +
       PARTS.map((p) => `<button class="nav" data-key="${p.key}">${p.nr}. ${esc(p.title.split(" ").slice(0, 2).join(" "))}${badge(state.badges[p.key])}</button>`).join("") +
       `<div class="navsep"></div><button class="nav" data-key="__staff">👤 Personal</button>` +
       `<button class="nav" data-key="__import">⬆ Import / Migrare</button>`;
@@ -101,6 +104,7 @@
   function selectPart(key) {
     if (channel) { sb.removeChannel(channel); channel = null; }
     if (key === "__home") { state.part = HOME; updateChrome(); renderHome(); return; }
+    if (key === "__final") { state.part = FINAL; updateChrome(); renderFinal(); return; }
     if (key === "__staff") { state.part = STAFF; updateChrome(); renderStaff(); subscribe("personal"); return; }
     if (key === "__import") { state.part = IMPORT; updateChrome(); renderImport(); return; }
     state.part = PARTS.find((p) => p.key === key);
@@ -111,8 +115,8 @@
   function updateChrome() {
     const p = state.part, sp = special();
     markActive(p.key);
-    $("hbadge").textContent = p === HOME ? "🏠" : p === STAFF ? "👤" : p === IMPORT ? "⬆" : p.nr;
-    $("title").textContent = p === HOME ? "Acasă" : p === STAFF ? "Personal (responsabili)" : p === IMPORT ? "Import / Migrare date" : `Partea ${p.nr}. ${p.title}`;
+    $("hbadge").textContent = p === HOME ? "🏠" : p === FINAL ? "📗" : p === STAFF ? "👤" : p === IMPORT ? "⬆" : p.nr;
+    $("title").textContent = p === HOME ? "Acasă" : p === FINAL ? "Registru final" : p === STAFF ? "Personal (responsabili)" : p === IMPORT ? "Import / Migrare date" : `Partea ${p.nr}. ${p.title}`;
     $("subtitle").textContent = isPart() && p.period !== "crud" ? `${LUNI[state.luna - 1]} ${state.an}` : "";
     $("anWrap").style.display = (p === HOME || (isPart() && p.period !== "crud")) ? "" : "none";
     buildToolbar();
@@ -444,6 +448,70 @@
     const h = window.RegistruBackup.hoursSinceBackup();
     $("homeBk").textContent = h === null ? "Nu există încă copii de rezervă." : h > 24 ? `Ultimul backup acum ${Math.floor(h / 24)} zi(le).` : "Backup local recent ✔";
     $("homeBackup").onclick = doBackup; $("homeSettings").onclick = openSettings;
+  }
+
+  // ---- Registru final (document compilat pe an) -----------------------------
+  function renderFinal() {
+    $("content").innerHTML = `<div class="card" style="max-width:660px">
+      <h3>📗 Registru final — anul ${state.an}</h3>
+      <p class="status">Compilează într-un singur document toate părțile și lunile care au date, cu pagină de titlu (copertă) și tabele cu totaluri.</p>
+      <label class="row" style="margin:10px 0"><input type="checkbox" id="fin_cover" checked style="width:auto;margin-right:8px"> Include pagina de titlu (copertă)</label>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="fin_word" class="ok">⬇ Export Word (.doc)</button>
+        <button id="fin_pdf" class="ghost">⬇ Export PDF</button>
+      </div>
+      <p class="status" id="fin_status" style="margin-top:12px">Schimbați anul din antet pentru a compila alt an.</p></div>`;
+    $("fin_word").onclick = () => exportFinal("word");
+    $("fin_pdf").onclick = () => exportFinal("pdf");
+  }
+  function finalSections(dataByPart) {
+    const secs = [];
+    for (const p of PARTS) {
+      const all = dataByPart[p.key] || [];
+      const cats = p.categorie ? ["adulti", "copii"] : [null];
+      for (const cat of cats) {
+        const cols = partCols(p, cat || "copii");
+        if (p.period === "crud") { if (all.length) secs.push({ title: `Partea ${p.nr}. ${p.title}`, cols, rows: all }); continue; }
+        for (let m = 1; m <= 12; m++) {
+          const rows = all.filter((r) => r.luna === m && (!p.categorie || r.categorie_varsta === cat));
+          if (rows.length) secs.push({ title: `Partea ${p.nr}. ${p.title} — ${LUNI[m - 1]} ${state.an}${cat ? " (" + cat + ")" : ""}`, cols, rows });
+        }
+      }
+    }
+    return secs;
+  }
+  async function exportFinal(format) {
+    const cover = $("fin_cover").checked, nm = state.settings.library_name || "Biblioteca", loc = state.settings.library_loc || "";
+    $("fin_status").textContent = "Se generează…";
+    const dataByPart = {};
+    for (const p of PARTS) {
+      let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
+      q = p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true });
+      const { data } = await q; dataByPart[p.key] = data || [];
+    }
+    const secs = finalSections(dataByPart);
+    if (!secs.length) { $("fin_status").textContent = "Nu există date pentru anul selectat."; return; }
+    if (format === "word") {
+      const coverHtml = cover ? `<div style="text-align:center;page-break-after:always"><p>Ministerul Culturii al Republicii Moldova<br>Consiliul Biblioteconomic Național</p><h1>Registru de evidență a activității</h1><h2>Bibliotecii Publice „${esc(nm)}"</h2><p>${esc(loc)}</p><p style="margin-top:60px;font-size:20px">${state.an}</p></div>` : "";
+      const body = secs.map((s, i) => {
+        const th = s.cols.map((c) => `<th>${esc(c[1])}</th>`).join("");
+        const trs = s.rows.map((r) => `<tr>${s.cols.map(([k, l, t]) => `<td>${t === "bool" ? (r[k] ? "✓" : "") : esc(r[k])}</td>`).join("")}</tr>`).join("");
+        return `<div style="${i > 0 || cover ? "page-break-before:always" : ""}"><h3>${esc(s.title)}</h3><table><tr>${th}</tr>${trs}</table></div>`;
+      }).join("");
+      const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 landscape}body{font:10px Segoe UI,sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:2px;text-align:center}th{background:#eef2f7}h1,h2,h3{text-align:center}</style></head><body>${coverHtml}${body}</body></html>`;
+      download(new Blob(["﻿", html], { type: "application/msword" }), `registru_final_${state.an}.doc`);
+    } else {
+      const content = [];
+      if (cover) content.push({ text: "Ministerul Culturii al Republicii Moldova\nConsiliul Biblioteconomic Național", alignment: "center", margin: [0, 60, 0, 24] }, { text: "Registru de evidență a activității", fontSize: 18, bold: true, alignment: "center" }, { text: `Bibliotecii Publice „${nm}"`, fontSize: 14, alignment: "center", margin: [0, 6, 0, 6] }, { text: loc, alignment: "center" }, { text: String(state.an), fontSize: 20, alignment: "center", margin: [0, 60, 0, 0], pageBreak: "after" });
+      secs.forEach((s, i) => {
+        const tbl = [s.cols.map((c) => ({ text: c[1], bold: true, fontSize: 6, fillColor: "#eef2f7" }))];
+        s.rows.forEach((r) => tbl.push(s.cols.map(([k, l, t]) => ({ text: t === "bool" ? (r[k] ? "✓" : "") : (r[k] == null ? "" : String(r[k])), fontSize: 6 }))));
+        content.push({ text: s.title, bold: true, fontSize: 10, margin: [0, 8, 0, 4], pageBreak: i > 0 ? "before" : undefined });
+        content.push({ table: { body: tbl }, layout: "lightHorizontalLines" });
+      });
+      window.pdfMake.createPdf({ pageOrientation: "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 20], content, defaultStyle: { fontSize: 6 } }).download(`registru_final_${state.an}.pdf`);
+    }
+    $("fin_status").textContent = `Gata: ${secs.length} secțiuni compilate.`;
   }
 
   // ---- Personal / Import (neschimbate în esență) ----------------------------
