@@ -146,7 +146,7 @@
     $("hbadge").textContent = p === HOME ? "🏠" : p === FINAL ? "📗" : p === STAFF ? "👤" : p === IMPORT ? "⬆" : p.nr;
     $("title").textContent = p === HOME ? "Acasă" : p === FINAL ? "Registru final" : p === STAFF ? "Personal (responsabili)" : p === IMPORT ? "Import / Migrare date" : `Partea ${p.nr}. ${p.title}`;
     $("subtitle").textContent = isPart() && p.period !== "crud" ? `${LUNI[state.luna - 1]} ${state.an}` : "";
-    $("anWrap").style.display = (p === HOME || (isPart() && p.period !== "crud")) ? "" : "none";
+    $("anWrap").style.display = (p === HOME || p === FINAL || (isPart() && p.period !== "crud")) ? "" : "none";
     buildToolbar();
     // taburi
     const showMonths = isPart() && p.period !== "crud";
@@ -186,7 +186,7 @@
   const exCtx = () => ({ an: state.an, luna: state.luna, cat: state.cat, cols: effCols(), toast });
 
   // ---- Încărcare + meta -----------------------------------------------------
-  async function loadData() {
+  async function loadData(fromScaffold) {
     const p = state.part;
     setBusy(true);
     try {
@@ -199,11 +199,11 @@
       state.rows = data || [];
       // Auto-schelet (ca în desktop): la deschiderea unei luni goale, creează
       // automat zilele lucrătoare (părți zilnice) sau rândul lunii (parte lunară).
-      if (!state.rows.length && (p.period === "zi" || p.period === "luna")) {
+      if (!fromScaffold && !state.rows.length && (p.period === "zi" || p.period === "luna")) {
         const scaffold = [];
         if (p.period === "luna") { const o = { an: state.an, luna: state.luna }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); }
         else { const excl = await getExcluded(state.an), exSet = new Set(excl[state.luna] || []); weekdays(state.an, state.luna).filter((d) => !exSet.has(d)).forEach((d) => { const o = { an: state.an, luna: state.luna, [p.dateField]: d }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); }); }
-        if (scaffold.length) { const { error: e2 } = await sb.from(p.key).insert(scaffold); if (!e2) return loadData(); }
+        if (scaffold.length) { const { error: e2 } = await sb.from(p.key).insert(scaffold); if (!e2) return loadData(true); }
       }
       await syncIn(p); await loadMeta(p);
       state.prior = null;
@@ -966,6 +966,8 @@
     if (error) { toast("Eroare: " + error.message); return; } state.labels[camp] = nv; renderGrid();
   }
   function editingRowId() { const a = document.activeElement; return (a && a.matches && a.matches("#content tbody input")) ? +a.dataset.id : null; }
+  let rtReloadTimer = null;
+  function rtReload() { clearTimeout(rtReloadTimer); rtReloadTimer = setTimeout(() => { if (isPart() && editingRowId() === null) loadData(); }, 300); }
   function patchRowInputs(row) {
     effCols().forEach(([k]) => { const inp = $("content").querySelector(`tbody input[data-id="${row.id}"][data-col="${k}"]`); if (inp) { if (inp.type === "checkbox") inp.checked = !!row[k]; else if (document.activeElement !== inp) inp.value = row[k] == null ? "" : row[k]; markOOR(inp); } });
     applyRowValidation(row.id);
@@ -984,7 +986,7 @@
           if (idx >= 0) { if (nw.id === editId) return; state.rows[idx] = nw; patchRowInputs(nw); renderFooter(); return; }
         }
       }
-      if (editId === null) loadData(); // INSERT/DELETE sau în afara vizualizării → reîncarcă doar dacă nu se editează
+      if (editId === null) rtReload(); // INSERT/DELETE sau în afara vizualizării → reîncarcă (debounced) dacă nu se editează
     }).subscribe((st) => { const ok = st === "SUBSCRIBED"; $("live").textContent = ok ? "live" : "offline"; $("live").classList.toggle("live", ok); });
   }
 
