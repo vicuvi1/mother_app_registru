@@ -173,7 +173,7 @@
     else { btns.push(["addRow", "+ Rând", "ghost"]); }
     if (p.period === "zi" || p.period === "lista") btns.push(["autoFill", "🎲 Auto valori", "ghost"]);
     if (p.period !== "crud") btns.push(["ranges", "⚖ Range-uri", "ghost"]);
-    if (p.cols.some((c) => c[2] === "text" || c[2] === "txt")) btns.push(["presets", "📝 Liste text", "ghost"]);
+    if (p.cols.some((c) => c[2] === "text" || c[2] === "txt" || c[2] === "staff")) btns.push(["presets", "📝 Liste text", "ghost"]);
     btns.push(["sp", "", ""], ["exportXls", "⬇ Excel", "ghost"], ["exportPdf", "⬇ PDF", "ghost"], ["exportDoc", "⬇ Word", "ghost"], ["printBtn", "🖶 Printează", "ghost"]);
     tb.innerHTML = btns.map(([id, l, c]) => id === "sp" ? '<span style="flex:1"></span>' : `<button id="${id}" class="${c}">${l}</button>`).join("");
     const bind = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
@@ -254,7 +254,7 @@
     }
     if (t === "bool") return `<input type="checkbox" ${v ? "checked" : ""} ${attr}>`;
     if (t === "date") return `<input class="date" type="text" placeholder="ZZ.LL" value="${esc(v)}" ${attr}>`;
-    if (t === "staff") return `<input class="txt" type="text" list="staffList" value="${esc(v)}" ${attr}>`;
+    if (t === "staff") return `<input class="txt" type="text" value="${esc(v)}" ${attr}>`;
     if (t === "txt") return `<input class="txt wide" type="text" value="${esc(v)}" ${attr}>`;
     return `<input class="txt" type="text" value="${esc(v)}" ${attr}>`;
   }
@@ -262,7 +262,9 @@
   let presetPop = null;
   function ensurePresetPop() { if (!presetPop) { presetPop = document.createElement("div"); presetPop.className = "presetpop"; presetPop.style.display = "none"; document.body.appendChild(presetPop); } return presetPop; }
   function openPresetPopup(inp) {
-    const col = inp.dataset.col, vals = state.presets[col] || [];
+    const col = inp.dataset.col;
+    let vals = state.presets[col] ? state.presets[col].slice() : [];
+    if (inp.dataset.type === "staff") { const names = state.staff.filter((s) => s.activ).map((s) => s.nume_prenume); vals = [...new Set([...names, ...vals])].sort((a, b) => String(a).localeCompare(b)); }
     if (!vals.length) { closePresetPopup(); return; }
     const flt = String(inp.value || "").toLowerCase();
     const shown = vals.filter((v) => v.toLowerCase().includes(flt));
@@ -289,7 +291,7 @@
     $("content").querySelectorAll("tbody input").forEach((inp) => {
       inp.addEventListener("change", saveCell);
       const t = inp.dataset.type;
-      if (t === "text" || t === "txt") {
+      if (t === "text" || t === "txt" || t === "staff") {
         inp.addEventListener("focus", () => openPresetPopup(inp));
         inp.addEventListener("input", () => { inp.classList.add("dirty"); openPresetPopup(inp); });
         inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); closePresetPopup(); moveDown(inp); } else if (e.key === "Escape") closePresetPopup(); });
@@ -411,7 +413,7 @@
     const cdef = effCols().find((c) => c[0] === col);
     if (state.part.key === "evidenta_utilizatori_copii_adulti" && cdef && cdef[3] && cdef[3].rev) await reverseSync(col, row.data, +row[col] || 0);
     el.classList.remove("dirty"); markOOR(el);
-    if ((type === "text" || type === "txt") && row[col]) {
+    if ((type === "text" || type === "txt" || type === "staff") && row[col]) {
       const arr = state.presets[col] || (state.presets[col] = []);
       if (!arr.includes(row[col])) { arr.push(row[col]); const dl = $("pl_" + col); if (dl) dl.insertAdjacentHTML("beforeend", `<option value="${esc(row[col])}">`); sb.from("text_presets").upsert({ parte: state.part.pid, camp: col, valoare: row[col] }, { onConflict: "parte,camp,valoare", ignoreDuplicates: true }).then(() => {}, () => {}); }
     }
@@ -550,7 +552,7 @@
 
   // ---- Liste text rapide (presets gestionate) -------------------------------
   function openPresetLists() {
-    const p = state.part, cols = effCols().filter((c) => c[2] === "text" || c[2] === "txt");
+    const p = state.part, cols = effCols().filter((c) => c[2] === "text" || c[2] === "txt" || c[2] === "staff");
     if (!cols.length) { toast("Nu există câmpuri text cu liste"); return; }
     const tabs = cols.map((c, i) => `<button class="ptab ${i === 0 ? "active" : ""}" data-i="${i}">${esc(label(c))}</button>`).join("");
     const areas = cols.map((c, i) => `<textarea class="parea" data-col="${c[0]}" rows="9" placeholder="O valoare pe rând..." style="${i === 0 ? "" : "display:none"}">${esc((state.presets[c[0]] || []).join("\n"))}</textarea>`).join("");
