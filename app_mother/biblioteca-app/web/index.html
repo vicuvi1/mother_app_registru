@@ -11,6 +11,7 @@
     :root[data-theme="dark"] { --bg:#0b1220; --panel:#111827; --line:#243044; --text:#e2e8f0; --muted:#94a3b8; --sidebar:#060b16; --sidebar2:#1e293b; --today:#3a3a12; }
     :root[data-theme="dark"] th { background:#1e293b; color:#e2e8f0; }
     :root[data-theme="dark"] tbody tr:nth-child(even) td { background:#0f172a; }
+    :root[data-theme="dark"] tbody tr.blank td { background:#16233b; }
     :root[data-theme="dark"] td input { color:#e2e8f0; }
     :root[data-theme="dark"] td input.calc { background:#1e293b; color:#cbd5e1; }
     :root[data-theme="dark"] tfoot .totalrow { background:#334155; } :root[data-theme="dark"] tfoot .cumrow { background:#1e3a5f; }
@@ -83,6 +84,7 @@
     td input.calc { background:#eef2f7; color:#475569; font-weight:600; }
     td input.oor, td input.badrel { background:#fee2e2 !important; color:#b91c1c; }
     tbody tr:nth-child(even) td { background:#fafbfe; }
+    tbody tr.blank td { background:#e6efff; }
     tbody tr.today td { background:var(--today); }
     tfoot td { font-weight:600; }
     tfoot .totalrow { background:#e2e8f0; } tfoot .cumrow { background:#dbeafe; }
@@ -174,7 +176,7 @@
       <div class="toolbar" id="toolbar"></div>
       <div class="tabs hidden" id="tabs"></div>
       <div class="cattabs hidden" id="cattabs"></div>
-      <div class="hintbar hidden" id="hintbar">Click pe celulă + tastați · Enter = rândul următor · Galben = azi · Bleu = calculat automat</div>
+      <div class="hintbar hidden" id="hintbar">Click pe celulă + tastați · Enter = rândul următor · Ctrl+F caută · Ctrl+Z anulează · Galben = azi · Bleu = rând necompletat</div>
       <div class="wrap"><div id="content"></div></div>
     </main>
   </div>

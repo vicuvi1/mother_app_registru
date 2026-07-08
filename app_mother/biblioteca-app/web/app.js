@@ -300,8 +300,9 @@
     const p = state.part, cols = effCols(), tk = todayStr(), showToday = p.period === "zi" && tk.y === state.an && tk.m === state.luna;
     const body = state.rows.map((r) => {
       const isToday = showToday && r[p.dateField] === tk.d;
+      const cls = isToday ? "today" : (rowHasContent(r) ? "" : "blank");
       const tds = cols.map((c) => `<td>${inputHtml(p, r, c)}</td>`).join("");
-      return `<tr class="${isToday ? "today" : ""}">${tds}<td><button class="del" data-id="${r.id}" title="Șterge">✕</button></td></tr>`;
+      return `<tr class="${cls}">${tds}<td><button class="del" data-id="${r.id}" title="Șterge">✕</button></td></tr>`;
     }).join("");
     const hintMsg = p.period === "zi" ? "Apăsați butonul Generează zilele." : "Apăsați butonul + Rând.";
     const empty = `<tr><td colspan="${cols.length + 1}" style="padding:16px;color:var(--muted)">Niciun rând. ${hintMsg}</td></tr>`;
