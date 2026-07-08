@@ -71,6 +71,7 @@
     }
     return out;
   }
+  async function snapshot(sb) { return { created: new Date().toISOString(), tables: await fetchAll(sb) }; }
 
   // ---- Excel (.xlsx) — o foaie per tabel ------------------------------------
   function buildExcel(dataByTable) {
@@ -183,5 +184,5 @@
     return JSON.parse(await data.text());
   }
 
-  window.RegistruBackup = { runBackup, hoursSinceBackup, cloudBackup, hoursSinceCloudBackup, listCloudBackups, downloadCloud, ALL_TABLES };
+  window.RegistruBackup = { runBackup, hoursSinceBackup, cloudBackup, hoursSinceCloudBackup, listCloudBackups, downloadCloud, snapshot, stamp, ALL_TABLES };
 })();

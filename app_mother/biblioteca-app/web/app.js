@@ -48,7 +48,9 @@
     $("who").textContent = data.user.email; $("who2").textContent = data.user.email;
     initSelectors(); await loadSettings(); const firstRun = await seedDefaults(); await loadStaff(); renderNav();
     selectPart("__home"); refreshBackupInfo(); maybeAutoBackup();
+    const F = window.RegistruLocalFolder;
     if (firstRun && !state.settings.library_name) setTimeout(openSettings, 500);
+    else if (F && F.supported && !(await F.hasFolder()) && !localStorage.getItem("folderPromptSeen")) { try { localStorage.setItem("folderPromptSeen", "1"); } catch (e) {} setTimeout(openFolderSetup, 700); }
   }
 
   function initSelectors() {
@@ -95,13 +97,15 @@
       <label>Orientare printare / PDF</label><select id="st_print"><option value="landscape"${(s.print_orientation || "landscape") === "landscape" ? " selected" : ""}>Peisaj (recomandat)</option><option value="portrait"${s.print_orientation === "portrait" ? " selected" : ""}>Portret</option></select>
       <label class="row" style="margin-top:10px"><input type="checkbox" id="st_strict" ${s.strict_validation === "1" ? "checked" : ""} style="width:auto;margin-right:8px">Validare strictă (respinge valori peste limite)</label>
       <label>Backup automat — la câte zile (0 = dezactivat)</label><input id="st_bk" type="number" min="0" value="${esc(s.backup_days || "3")}">
-      <div style="display:flex;gap:8px;margin-top:14px"><button class="ghost" id="st_help">Ajutor (scurtături)</button><button class="ghost" id="st_about">Despre</button></div>
+      <div style="margin-top:12px"><button class="ghost" id="st_folder" style="width:100%">📁 Folder local de siguranță „registru mother"…</button></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="ghost" id="st_help">Ajutor (scurtături)</button><button class="ghost" id="st_about">Despre</button></div>
       <div class="actions"><button class="ghost" id="st_cancel">Renunță</button><button class="ok" id="st_save">Salvează</button></div></div>`;
     $("settings").classList.remove("hidden");
     applyTheme($("st_theme").value);
     $("st_theme").onchange = () => applyTheme($("st_theme").value);
     $("st_cancel").onclick = () => { applyTheme(s.ui_theme || "light"); $("settings").classList.add("hidden"); };
     $("st_help").onclick = openHelp; $("st_about").onclick = openAbout;
+    $("st_folder").onclick = openFolderSetup;
     $("st_save").onclick = async () => {
       const rows = [
         { cheie: "library_name", valoare: $("st_name").value.trim() },
@@ -443,7 +447,7 @@
     const res = await saveUpdate(state.part.key, payload, id);
     if (res.error) { setSaveState("err"); toast("Eroare salvare: " + res.error.message); return; }
     if (res.data) row.updated_at = res.data.updated_at;
-    setSaveState("ok");
+    setSaveState("ok"); markDirty();
     if (oldVal !== row[col]) pushUndo({ kind: "cell", key: state.part.key, id, col, type, old: oldVal });
     // sincronizare inversă II → IX/XI
     const cdef = effCols().find((c) => c[0] === col);
@@ -500,14 +504,14 @@
     p.cols.forEach(([k, l, t, o]) => { if (o && o.req && (t === "text" || t === "txt") && base[k] === undefined) base[k] = ""; });
     const { data, error } = await sb.from(p.key).insert(base).select().maybeSingle(); if (error) { toast("Eroare: " + error.message); return; }
     if (data) pushUndo({ kind: "add", key: p.key, id: data.id });
-    await loadData();
+    markDirty(); await loadData();
   }
   async function deleteRow(id) {
     if (!confirm("Ștergeți acest rând?")) return;
     const row = state.rows.find((r) => r.id === id);
     const { error } = await sb.from(state.part.key).delete().eq("id", id); if (error) { toast("Eroare: " + error.message); return; }
     if (row) pushUndo({ kind: "del", key: state.part.key, row: { ...row } });
-    await loadData();
+    markDirty(); await loadData();
   }
 
   // ---- Generare automată zile lucrătoare + copiere lună ---------------------
@@ -818,9 +822,12 @@
         <div class="card"><h3>Backup</h3>
           <p class="status" id="homeBk">—</p>
           <p class="status" id="homeCloudBk">—</p>
-          <button id="homeBackup" style="width:100%;margin-bottom:8px">⬇ Salvează copie (local + cloud)</button>
+          <p class="status" id="homeFolderBk">—</p>
+          <button id="homeBackup" style="width:100%;margin-bottom:8px">⬇ Salvează copie (descărcare + cloud + folder)</button>
+          <button class="ghost" id="homeFolder" style="width:100%;margin-bottom:8px">📁 Salvează în folderul „registru mother"</button>
+          <button class="ghost" id="homeFolderRestore" style="width:100%;margin-bottom:8px">📂 Restaurează din folderul local</button>
           <button class="ghost" id="homeCloudRestore" style="width:100%;margin-bottom:8px">☁ Restaurează din cloud…</button>
-          <p class="status">Local = Excel + SQLite pe acest PC. Cloud = copie off-device în Supabase.</p>
+          <p class="status">Folder local = copie pe acest PC. Cloud = copie off-device. Descărcare = Excel/SQLite.</p>
           <h3 style="margin-top:16px">Document</h3>
           <button class="ghost" id="homeCover" style="width:100%;margin-bottom:8px">📄 Pagina de titlu (copertă)…</button>
           <button class="ghost" id="homeSettings" style="width:100%">⚙ Setări (nume, temă, backup automat)…</button>
@@ -830,8 +837,13 @@
     $("homeBk").textContent = h === null ? "Local: nicio copie încă." : h > 24 ? `Local: acum ${Math.floor(h / 24)} zi(le).` : "Local: recent ✔";
     const hc = window.RegistruBackup.hoursSinceCloudBackup();
     $("homeCloudBk").textContent = hc === null ? "Cloud: nicio copie încă." : hc > 24 ? `Cloud: acum ${Math.floor(hc / 24)} zi(le).` : "Cloud: recent ✔";
+    const F = window.RegistruLocalFolder;
+    let lf = null; try { lf = localStorage.getItem("lastLocalFolder"); } catch (e) {}
+    $("homeFolderBk").textContent = !F || !F.supported ? "Folder local: necesită Chrome/Edge." : (!(await F.hasFolder()) ? "Folder local: neconfigurat (apăsați butonul)." : (lf ? "Folder local: registru mother ✔" : "Folder local: configurat."));
     $("homeBackup").onclick = doBackup; $("homeSettings").onclick = openSettings;
     $("homeCloudRestore").onclick = openCloudRestore;
+    $("homeFolder").onclick = async () => { const F2 = window.RegistruLocalFolder; if (!F2 || !F2.supported) { toast("Necesită Chrome/Edge"); return; } if (!(await F2.hasFolder())) return openFolderSetup(); const ok = await saveLocalFolder((m) => toast(m), true); if (ok) renderHome(); };
+    $("homeFolderRestore").onclick = async () => { if (!confirm("Restaurați datele din folderul local registru mother? (se actualizează/adaugă)")) return; await restoreFromFolder(false, (m) => toast(m)); };
     $("homeContinue").onclick = continueLastSession; $("homeYearEnd").onclick = openYearEnd;
     $("homeReport").onclick = openIncompleteReport; $("homeCover").onclick = openCover;
     $("content").querySelectorAll(".todo div[data-i]").forEach((d) => (d.onclick = () => { const s = state.incomplete[+d.dataset.i]; navigateTo(s.key, state.an, s.month, s.cat || "copii"); }));
@@ -970,12 +982,48 @@
     w.document.close();
   }
   function refreshBackupInfo() { const h = window.RegistruBackup.hoursSinceBackup(), info = $("backupInfo"); info.textContent = h === null ? "fără backup" : h > 24 ? `backup acum ${Math.floor(h / 24)}z` : "backup recent ✔"; }
+  // ---- Folder local de siguranță „registru mother" --------------------------
+  let localDirty = false;
+  function markDirty() { localDirty = true; }
+  async function saveLocalFolder(note, request) {
+    try {
+      const F = window.RegistruLocalFolder; if (!F || !F.supported) return false;
+      const h = await F.getFolder(request); if (!h) return false;
+      const obj = await window.RegistruBackup.snapshot(sb);
+      await F.saveSnapshot(h, obj, window.RegistruBackup.stamp());
+      localDirty = false; try { localStorage.setItem("lastLocalFolder", new Date().toISOString()); } catch (e) {}
+      if (note) note("Copie salvată în folderul local ✔");
+      return true;
+    } catch (e) { if (note) note("Folder local: " + e.message); return false; }
+  }
+  async function restoreFromFolder(replace, put) {
+    const F = window.RegistruLocalFolder; if (!F || !F.supported) { toast("Necesită Chrome/Edge"); return; }
+    const h = await F.getFolder(true); if (!h) { toast("Folderul local nu e configurat"); return; }
+    const obj = await F.readSnapshot(h);
+    await window.RegistruImport.restoreJson(sb, obj, put || toast, { replace });
+  }
+  function openFolderSetup() {
+    const F = window.RegistruLocalFolder;
+    if (!F || !F.supported) { toast("Salvarea în folder local necesită Chrome sau Edge"); return; }
+    $("settings").innerHTML = `<div class="box"><h3>📁 Copie de siguranță pe acest calculator</h3>
+      <p style="font-size:13px">Alegeți un loc (recomandat: <b>Desktop</b>). Aplicația creează automat folderul <b>„registru mother"</b> și salvează acolo o copie completă a datelor — ca să nu se piardă nimic, chiar dacă nu merge internetul sau backup-ul cloud.</p>
+      <p class="status">Pe alt calculator, alegeți din nou o dată — folderul se creează dacă lipsește.</p>
+      <div class="actions"><button class="ghost" id="fs_later">Mai târziu</button><button class="ok" id="fs_pick">Alege locul și creează folderul</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    $("fs_later").onclick = () => $("settings").classList.add("hidden");
+    $("fs_pick").onclick = async () => {
+      try { await F.pickFolder(); await saveLocalFolder((m) => toast(m), true); $("settings").classList.add("hidden"); if (state.part === HOME) renderHome(); }
+      catch (e) { toast(e.message); }
+    };
+  }
   async function doBackup() {
     await window.RegistruBackup.runBackup(sb, { note: (m) => ($("backupInfo").textContent = m) });
     await window.RegistruBackup.cloudBackup(sb, (m) => ($("backupInfo").textContent = m));
+    await saveLocalFolder((m) => ($("backupInfo").textContent = m), true);
     refreshBackupInfo(); if (state.part === HOME) renderHome();
   }
   async function maybeAutoBackup() {
+    await saveLocalFolder(null, false); // copie în folderul local (dacă permisiunea e deja acordată)
     const days = toInt(state.settings.backup_days || "0"); if (!days) return;
     const h = window.RegistruBackup.hoursSinceCloudBackup(); if (h !== null && h < days * 24) return;
     await window.RegistruBackup.cloudBackup(sb, (m) => ($("backupInfo").textContent = m)); // off-device, silent
@@ -1113,6 +1161,8 @@
   $("settingsBtn").onclick = openSettings;
   $("menuBtn").onclick = () => { const a = document.querySelector("aside"); if (a) a.classList.toggle("open"); };
   document.addEventListener("paste", handlePaste);
+  setInterval(() => { if (localDirty) saveLocalFolder(null, false); }, 5 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => { if (document.hidden && localDirty) saveLocalFolder(null, false); });
   $("logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
   sb.auth.getSession().then(({ data }) => { if (data.session) onLoggedIn(); });
 })();
