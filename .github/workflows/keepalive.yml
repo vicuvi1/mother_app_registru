@@ -1,0 +1,27 @@
+name: keepalive
+# Menține proiectul Supabase (plan gratuit) ACTIV — un ping zilnic la baza de
+# date previne pauza după 7 zile de inactivitate (și ștergerea după 90 de zile
+# în pauză). Folosește DOAR cheia publică din config.js (sigură). Nu costă nimic.
+on:
+  schedule:
+    - cron: "17 6 * * *"   # zilnic ~06:17 UTC
+    - cron: "17 18 * * *"  # și ~18:17 UTC (redundanță)
+  workflow_dispatch:        # rulare manuală din tab-ul Actions
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ping Supabase REST (keep project awake)
+        run: |
+          cd app_mother/biblioteca-app/web
+          URL=$(grep -oE 'https://[a-z0-9]+\.supabase\.co' config.js | head -1)
+          KEY=$(grep -oE '(sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9_.-]+)' config.js | head -1)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "config.js fără URL/cheie — sar peste"; exit 0; fi
+          echo "Ping $URL"
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$URL/rest/v1/app_settings?select=cheie&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          echo "Răspuns HTTP: $code"
+          # Orice răspuns înseamnă că baza a primit o cerere = activitate.
+          case "$code" in 200|206|400|401|404) echo "Proiect activ ✔"; exit 0;; *) echo "Neaccesibil (cod $code)"; exit 1;; esac
