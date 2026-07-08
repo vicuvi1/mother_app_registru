@@ -92,6 +92,7 @@
       <label>Numele bibliotecii</label><input id="st_name" value="${esc(s.library_name || "")}">
       <label>Localitate</label><input id="st_loc" value="${esc(s.library_loc || "")}">
       <label>Temă interfață</label><select id="st_theme"><option value="light"${dark ? "" : " selected"}>Deschis</option><option value="dark"${dark ? " selected" : ""}>Întunecat</option></select>
+      <label>Orientare printare / PDF</label><select id="st_print"><option value="landscape"${(s.print_orientation || "landscape") === "landscape" ? " selected" : ""}>Peisaj (recomandat)</option><option value="portrait"${s.print_orientation === "portrait" ? " selected" : ""}>Portret</option></select>
       <label class="row" style="margin-top:10px"><input type="checkbox" id="st_strict" ${s.strict_validation === "1" ? "checked" : ""} style="width:auto;margin-right:8px">Validare strictă (respinge valori peste limite)</label>
       <label>Backup automat — la câte zile (0 = dezactivat)</label><input id="st_bk" type="number" min="0" value="${esc(s.backup_days || "3")}">
       <div style="display:flex;gap:8px;margin-top:14px"><button class="ghost" id="st_help">Ajutor (scurtături)</button><button class="ghost" id="st_about">Despre</button></div>
@@ -106,6 +107,7 @@
         { cheie: "library_name", valoare: $("st_name").value.trim() },
         { cheie: "library_loc", valoare: $("st_loc").value.trim() },
         { cheie: "ui_theme", valoare: $("st_theme").value },
+        { cheie: "print_orientation", valoare: $("st_print").value },
         { cheie: "strict_validation", valoare: $("st_strict").checked ? "1" : "0" },
         { cheie: "backup_days", valoare: String(toInt($("st_bk").value)) },
       ];
@@ -204,7 +206,7 @@
     bind("exportDoc", () => window.RegistruExport.exportWord(p, state.rows, exCtx()));
     bind("printBtn", printCurrent);
   }
-  const exCtx = () => ({ an: state.an, luna: state.luna, cat: state.cat, cols: effCols(), toast });
+  const exCtx = () => ({ an: state.an, luna: state.luna, cat: state.cat, cols: effCols(), orientation: state.settings.print_orientation || "landscape", toast });
 
   // ---- Încărcare + meta -----------------------------------------------------
   async function loadData(fromScaffold) {
@@ -909,7 +911,7 @@
         content.push({ text: s.title, bold: true, fontSize: 10, margin: [0, 8, 0, 4], pageBreak: i > 0 ? "before" : undefined });
         content.push({ table: { headerRows: head.length, body: tbl }, layout: "lightHorizontalLines" });
       });
-      window.pdfMake.createPdf({ pageOrientation: "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 20], content, defaultStyle: { fontSize: 6 } }).download(`registru_final_${state.an}.pdf`);
+      window.pdfMake.createPdf({ pageOrientation: state.settings.print_orientation || "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 28], content, defaultStyle: { fontSize: 6 }, footer: (cur, tot) => ({ text: `Pagina ${cur} din ${tot}`, alignment: "right", fontSize: 8, color: "#555", margin: [0, 6, 16, 0] }) }).download(`registru_final_${state.an}.pdf`);
     }
     $("fin_status").textContent = `Gata: ${secs.length} secțiuni compilate.`;
   }
@@ -949,11 +951,12 @@
   // ---- Export / print / backup ----------------------------------------------
   function exportCurrent() { const p = state.part; if (!isPart() || !state.rows.length) { toast("Nimic de exportat"); return; } const ws = XLSX.utils.json_to_sheet(state.rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `Partea ${p.nr}`.slice(0, 31)); XLSX.writeFile(wb, `partea_${p.nr}_${state.an}_${pad2(state.luna)}.xlsx`); }
   function printCurrent() {
-    const p = state.part, cols = effCols();
+    const p = state.part, cols = effCols(), ori = state.settings.print_orientation || "landscape";
     const head = `<tr>${cols.map((c) => `<th>${esc(label(c))}</th>`).join("")}</tr>`;
     const body = state.rows.map((r) => `<tr>${cols.map(([k, l, t]) => `<td>${esc(cellText(r, k, t))}</td>`).join("")}</tr>`).join("");
+    const per = p.period === "luna" ? `Anul ${state.an}` : (p.period !== "crud" ? `${LUNI[state.luna - 1]} ${state.an}` : "");
     const w = window.open("", "_blank");
-    w.document.write(`<html><head><meta charset="utf-8"><title>Partea ${p.nr}</title><style>@page{size:A4 landscape}body{font:11px Segoe UI,sans-serif}h3{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:3px;text-align:center}th{background:#eef2f7}</style></head><body><h3>Partea ${p.nr}. ${esc(p.title)} — ${LUNI[state.luna - 1]} ${state.an}${p.categorie ? " (" + state.cat + ")" : ""}</h3><table>${head}${body}</table><script>window.onload=function(){window.print()}<\/script></body></html>`);
+    w.document.write(`<html><head><meta charset="utf-8"><title>Partea ${p.nr}</title><style>@page{size:A4 ${ori}}body{font:11px Segoe UI,sans-serif}h3{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:3px;text-align:center}th{background:#eef2f7}</style></head><body><h3>Partea ${p.nr}. ${esc(p.title)} — ${per}${p.categorie ? " (" + state.cat + ")" : ""}</h3><table>${head}${body}</table><script>window.onload=function(){window.print()}<\/script></body></html>`);
     w.document.close();
   }
   function refreshBackupInfo() { const h = window.RegistruBackup.hoursSinceBackup(), info = $("backupInfo"); info.textContent = h === null ? "fără backup" : h > 24 ? `backup acum ${Math.floor(h / 24)}z` : "backup recent ✔"; }

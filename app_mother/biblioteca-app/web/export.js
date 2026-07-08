@@ -48,13 +48,14 @@
     rows.forEach((r) => body.push(rowText(cols, r).map((x) => ({ text: x, fontSize: 6 }))));
     if (!rows.length) body.push([{ text: "— fără date —", colSpan: cols.length, alignment: "center", fontSize: 8 }]);
     const dd = {
-      pageOrientation: "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 20],
+      pageOrientation: (ctx && ctx.orientation) || "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 28],
       content: [
         { text: `Partea ${part.nr} — ${part.title}`, bold: true, fontSize: 12, margin: [0, 0, 0, 2] },
         { text: subtitle(part, ctx), fontSize: 9, color: "#555", margin: [0, 0, 0, 8] },
         { table: { headerRows: 1, body }, layout: "lightHorizontalLines" },
       ],
       defaultStyle: { fontSize: 6 },
+      footer: (cur, tot) => ({ text: `Pagina ${cur} din ${tot}`, alignment: "right", fontSize: 8, color: "#555", margin: [0, 6, 16, 0] }),
     };
     window.pdfMake.createPdf(dd).download(baseName(part, ctx) + ".pdf");
   }
