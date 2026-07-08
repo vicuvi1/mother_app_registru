@@ -4,6 +4,13 @@ Versiune web, multi-user, a aplicației desktop. Mai mulți bibliotecari, mai mu
 calculatoare (inclusiv Windows 7 cu un browser modern — Firefox ESR / Chrome ≤109),
 toți lucrează pe **același registru**, în timp real.
 
+> ### 🔒 IMPORTANT — ca datele să NU se piardă (plan gratuit)
+> Citește ghidul complet: **[docs/SIGURANTA-DATELOR.md](docs/SIGURANTA-DATELOR.md)**
+> Pe scurt: proiectul gratuit Supabase intră în pauză după 7 zile de inactivitate
+> și se șterge după 90 de zile în pauză. Aplicația are deja un **ping automat zilnic**
+> (GitHub Actions) + **folder local „registru mother"** + backup cloud. Pentru siguranță
+> maximă, configurează și un **ping extern** (5 min pe cron-job.org — vezi ghidul).
+
 Aceasta este o **dovadă de concept (POC)**: autentificare + Partea I editabilă +
 sincronizare live între utilizatori. Restul părților și exporturile urmează (vezi roadmap).
 
