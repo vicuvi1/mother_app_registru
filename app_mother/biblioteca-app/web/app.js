@@ -312,7 +312,17 @@
     const hintMsg = p.period === "zi" ? "Apăsați butonul Generează zilele." : "Apăsați butonul + Rând.";
     const empty = `<tr><td colspan="${cols.length + 1}" style="padding:16px;color:var(--muted)">Niciun rând. ${hintMsg}</td></tr>`;
     $("content").innerHTML =
+      `<div id="scrollNav" style="display:none;gap:6px;margin-bottom:8px"><button class="ghost" id="scL">◀ Stânga</button><button class="ghost" id="scR">Dreapta ▶</button><button class="ghost" id="scE">La sfârșit ▶▶</button></div>` +
       `<div class="tablebox"><table><thead>${buildHead(cols)}</thead><tbody>${state.rows.length ? body : empty}</tbody><tfoot id="gridFoot"></tfoot></table></div>`;
+    setTimeout(() => {
+      const box = $("content").querySelector(".tablebox"), nav = $("scrollNav");
+      if (box && nav && box.scrollWidth > box.clientWidth + 4) {
+        nav.style.display = "flex"; const step = () => Math.max(220, box.clientWidth * 0.6);
+        $("scL").onclick = () => box.scrollBy({ left: -step(), behavior: "smooth" });
+        $("scR").onclick = () => box.scrollBy({ left: step(), behavior: "smooth" });
+        $("scE").onclick = () => box.scrollTo({ left: box.scrollWidth, behavior: "smooth" });
+      }
+    }, 0);
     $("content").querySelectorAll("thead tr:last-child th[data-col]").forEach((th) => { th.style.cursor = "pointer"; th.ondblclick = () => renameCol(th.dataset.col, cols.find((c) => c[0] === th.dataset.col)); });
     $("content").querySelectorAll("tbody input").forEach((inp) => {
       inp.addEventListener("change", saveCell);
@@ -1092,6 +1102,7 @@
     else if (k === "z") { e.preventDefault(); undo(); }
     else if (k === "s") { e.preventDefault(); toast("Salvat automat ✔"); }
     else if (k === "e") { if (isPart()) { e.preventDefault(); exportCurrent(); } }
+    else if (k === "c") { const el = document.activeElement; if (el && el.matches && el.matches("#content tbody input") && el.type !== "checkbox" && el.selectionStart === el.selectionEnd && navigator.clipboard) navigator.clipboard.writeText(el.value || "").catch(() => {}); }
     else if (k === "d") { if (isPart() && state.part.period === "lista") { e.preventDefault(); duplicateRow(); } }
     else if (e.shiftKey && k === "m") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista")) { e.preventDefault(); copyLastMonth(); } }
     else if (e.key === "ArrowLeft") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista") && state.luna > 1) { e.preventDefault(); state.luna--; loadData(); updateChrome(); } }
