@@ -45,8 +45,9 @@
     const { data } = await sb.auth.getUser(); if (!data.user) return;
     $("auth").classList.add("hidden"); $("app").classList.remove("hidden");
     $("who").textContent = data.user.email; $("who2").textContent = data.user.email;
-    initSelectors(); await loadSettings(); await loadStaff(); renderNav();
+    initSelectors(); await loadSettings(); const firstRun = await seedDefaults(); await loadStaff(); renderNav();
     selectPart("__home"); refreshBackupInfo(); maybeAutoBackup();
+    if (firstRun && !state.settings.library_name) setTimeout(openSettings, 500);
   }
 
   function initSelectors() {
@@ -64,6 +65,25 @@
     const nm = state.settings.library_name || "Biblioteca", loc = state.settings.library_loc || "";
     $("brandsub").textContent = nm + (loc ? " · " + loc : "");
     applyTheme(state.settings.ui_theme || "light");
+  }
+  // Liste implicite utile (o singură dată, la prima pornire).
+  const SEED_PRESETS = {
+    part_05: { statut_socio_profesional: ["Elev", "Student", "Profesor", "Cercetător", "Pensionar", "Angajat", "Șomer", "Alte categorii"] },
+    part_06: { grup_tinta_subiect: ["Elevi", "Studenți", "Adulți", "Pensionari", "Copii"] },
+    part_09: { tema_instruirii: ["Utilizarea catalogului online", "Căutarea în baze de date", "Cultura informației", "Alfabetizare digitală", "Utilizarea internetului"] },
+    part_11: { tipul_activitatii: ["Expoziție", "Lansare de carte", "Atelier", "Concurs", "Oră de lectură", "Masă rotundă", "Prezentare"] },
+    part_12: { tipul_activitatii: ["Expoziție virtuală", "Atelier online", "Prezentare online", "Concurs online"], platforma: ["Facebook", "Zoom", "YouTube", "Google Meet", "Instagram", "Microsoft Teams"] },
+  };
+  async function seedDefaults() {
+    if (state.settings.seeded_v1 === "1") return false;
+    const rows = [];
+    for (const pid in SEED_PRESETS) for (const camp in SEED_PRESETS[pid]) SEED_PRESETS[pid][camp].forEach((v) => rows.push({ parte: pid, camp, valoare: v }));
+    try { if (rows.length) await sb.from("text_presets").upsert(rows, { onConflict: "parte,camp,valoare", ignoreDuplicates: true }); } catch (e) {}
+    const up = [{ cheie: "seeded_v1", valoare: "1" }];
+    if (state.settings.backup_days == null) up.push({ cheie: "backup_days", valoare: "7" });
+    try { await sb.from("app_settings").upsert(up, { onConflict: "cheie" }); } catch (e) {}
+    await loadSettings();
+    return true;
   }
   function openSettings() {
     const s = state.settings, dark = s.ui_theme === "dark";
