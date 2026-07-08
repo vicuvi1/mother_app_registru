@@ -13,6 +13,7 @@
   }
   function fmt(v, t) {
     if (t === "bool") return v ? "✓" : "";
+    if (t === "monthlabel") { const n = LUNI[(+v || 1) - 1]; return n ? n.charAt(0).toUpperCase() + n.slice(1) : ""; }
     return v == null ? "" : String(v);
   }
   function subtitle(part, ctx) {

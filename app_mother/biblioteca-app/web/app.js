@@ -22,6 +22,7 @@
   const P2_INTR = ["imprumut_carti", "sedinte_calculatoare", "activitati_culturale_stiintifice", "instruiri", "alte_scopuri_excursii"];
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const cellText = (r, k, t) => t === "bool" ? (r[k] ? "✓" : "") : t === "monthlabel" ? (LUNI[(+r[k] || 1) - 1] || "") : (r[k] == null ? "" : String(r[k]));
   const pad2 = (n) => String(n).padStart(2, "0");
   const toInt = (v) => Math.max(0, parseInt(v, 10) || 0);
   const ddmm = (d, m) => `${pad2(d)}.${pad2(m)}`;
@@ -165,11 +166,11 @@
     markActive(p.key);
     $("hbadge").textContent = p === HOME ? "🏠" : p === FINAL ? "📗" : p === STAFF ? "👤" : p === IMPORT ? "⬆" : p.nr;
     $("title").textContent = p === HOME ? "Acasă" : p === FINAL ? "Registru final" : p === STAFF ? "Personal (responsabili)" : p === IMPORT ? "Import / Migrare date" : `Partea ${p.nr}. ${p.title}`;
-    $("subtitle").textContent = isPart() && p.period !== "crud" ? `${LUNI[state.luna - 1]} ${state.an}` : "";
+    $("subtitle").textContent = isPart() ? (p.period === "luna" ? `Anul ${state.an}` : (p.period !== "crud" ? `${LUNI[state.luna - 1]} ${state.an}` : "")) : "";
     $("anWrap").style.display = (p === HOME || p === FINAL || (isPart() && p.period !== "crud")) ? "" : "none";
     buildToolbar();
-    // taburi
-    const showMonths = isPart() && p.period !== "crud";
+    // taburi lună — doar la părțile zilnice/evenimente
+    const showMonths = isPart() && (p.period === "zi" || p.period === "lista");
     $("tabs").classList.toggle("hidden", !showMonths);
     if (showMonths) $("tabs").innerHTML = LUNI.map((m, i) => `<button class="${i + 1 === state.luna ? "active" : ""}" data-l="${i + 1}">${m}</button>`).join("");
     $("tabs").querySelectorAll("button").forEach((b) => (b.onclick = () => { state.luna = +b.dataset.l; loadData(); updateChrome(); }));
@@ -188,7 +189,7 @@
     tb.style.display = "flex";
     const btns = [];
     if (p.period === "zi") { btns.push(["genDays", "🗓 Generează zilele", "ghost"], ["exclDays", "🚫 Zile libere", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"], ["addRow", "+ Zi", "ghost"]); }
-    else if (p.period === "luna") { btns.push(["genDays", "🗓 Creează luna", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
+    else if (p.period === "luna") { btns.push(["genDays", "🗓 Creează lunile", "ghost"]); }
     else if (p.period === "lista") { btns.push(["addRow", "+ Rând", "ghost"], ["dupRow", "⧉ Duplică rând", "ghost"], ["copyPrev", "⧉ Copiază luna trecută", "ghost"]); }
     else { btns.push(["addRow", "+ Rând", "ghost"]); }
     if (p.period === "zi" || p.period === "lista") btns.push(["autoFill", "🎲 Auto valori", "ghost"]);
@@ -211,9 +212,10 @@
     setBusy(true);
     try {
       let q = sb.from(p.key).select("*");
-      if (p.period !== "crud") q = q.eq("an", state.an).eq("luna", state.luna);
+      if (p.period === "luna") q = q.eq("an", state.an); // toate cele 12 luni
+      else if (p.period !== "crud") q = q.eq("an", state.an).eq("luna", state.luna);
       if (p.categorie) q = q.eq("categorie_varsta", state.cat);
-      q = p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true });
+      q = p.period === "luna" ? q.order("luna", { ascending: true }) : (p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true }));
       const { data, error } = await q;
       if (error) { toast("Eroare: " + error.message); return; }
       state.rows = data || [];
@@ -221,7 +223,7 @@
       // automat zilele lucrătoare (părți zilnice) sau rândul lunii (parte lunară).
       if (!fromScaffold && !state.rows.length && (p.period === "zi" || p.period === "luna")) {
         const scaffold = [];
-        if (p.period === "luna") { const o = { an: state.an, luna: state.luna }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); }
+        if (p.period === "luna") { for (let m = 1; m <= 12; m++) { const o = { an: state.an, luna: m }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); } }
         else { const excl = await getExcluded(state.an), exSet = new Set(excl[state.luna] || []); weekdays(state.an, state.luna).filter((d) => !exSet.has(d)).forEach((d) => { const o = { an: state.an, luna: state.luna, [p.dateField]: d }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); }); }
         if (scaffold.length) { const { error: e2 } = await sb.from(p.key).insert(scaffold); if (!e2) return loadData(true); }
       }
@@ -272,6 +274,7 @@
       const rg = colRange(p, k), oor = !o.ro && ((+v || 0) > rg.max || (+v || 0) < rg.min);
       return `<input class="num${o.ro ? " calc" : ""}${oor ? " oor" : ""}" type="number" ${o.ro ? "readonly" : `data-min="${rg.min}" data-max="${rg.max}"`} value="${esc(v == null ? 0 : v)}" ${attr}>`;
     }
+    if (t === "monthlabel") return `<input class="txt calc" type="text" readonly value="${esc(LUNI[(+v || 1) - 1] || "")}" ${attr}>`;
     if (t === "bool") return `<input type="checkbox" ${v ? "checked" : ""} ${attr}>`;
     if (t === "date") return `<input class="date" type="text" placeholder="ZZ.LL" value="${esc(v)}" ${attr}>`;
     if (t === "staff") return `<input class="txt" type="text" value="${esc(v)}" ${attr}>`;
@@ -461,7 +464,7 @@
       const row = state.rows[ri], cells = lines[dr].split("\t"), affected = new Set();
       for (let dc = 0; dc < cells.length; dc++) {
         const ci = startCol + dc; if (ci >= cols.length) break;
-        const [k, l, t, o = {}] = cols[ci]; if (o.ro) continue;
+        const [k, l, t, o = {}] = cols[ci]; if (o.ro || t === "monthlabel") continue;
         const raw = cells[dc].trim();
         if (t === "int") row[k] = Math.max(0, parseInt(raw.replace(/[^\d-]/g, ""), 10) || 0);
         else if (t === "bool") row[k] = /^(1|true|da|x|✓|adevărat)$/i.test(raw);
@@ -499,9 +502,11 @@
   async function autoGenerate() {
     const p = state.part;
     if (p.period === "luna") {
-      if (state.rows.length) { toast("Rândul lunii există deja"); return; }
-      await sb.from(p.key).insert({ an: state.an, luna: state.luna, categorie_varsta: state.cat });
-      await loadData(); return;
+      const have = new Set(state.rows.map((r) => r.luna)), toAdd = [];
+      for (let m = 1; m <= 12; m++) if (!have.has(m)) { const o = { an: state.an, luna: m }; if (p.categorie) o.categorie_varsta = state.cat; toAdd.push(o); }
+      if (!toAdd.length) { toast("Toate lunile există deja"); return; }
+      const { error } = await sb.from(p.key).insert(toAdd); if (error) { toast("Eroare: " + error.message); return; }
+      toast(`${toAdd.length} luni create`); await loadData(); return;
     }
     const have = new Set(state.rows.map((r) => r[p.dateField]));
     const excl = await getExcluded(state.an), exSet = new Set(excl[state.luna] || []);
@@ -890,7 +895,7 @@
     if (format === "word") {
       const coverHtml = cover ? `<div style="text-align:center;page-break-after:always"><p>${esc(c.institutie_1)}<br>${esc(c.institutie_2)}</p><h1>${esc(c.titlu)}</h1><h2>${esc(c.biblioteca)}</h2><p>${esc(c.localitate)}</p><p style="margin-top:60px;font-size:20px">${esc(c.an)}</p></div>` : "";
       const body = secs.map((s, i) => {
-        const trs = s.rows.map((r) => `<tr>${s.cols.map(([k, l, t]) => `<td>${t === "bool" ? (r[k] ? "✓" : "") : esc(r[k])}</td>`).join("")}</tr>`).join("");
+        const trs = s.rows.map((r) => `<tr>${s.cols.map(([k, l, t]) => `<td>${esc(cellText(r, k, t))}</td>`).join("")}</tr>`).join("");
         return `<div style="${i > 0 || cover ? "page-break-before:always" : ""}"><h3>${esc(s.title)}</h3><table>${finalHeadWord(s.cols)}${trs}</table></div>`;
       }).join("");
       const html = `<html><head><meta charset="utf-8"><style>@page{size:A4 landscape}body{font:10px Segoe UI,sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:2px;text-align:center}th{background:#eef2f7}h1,h2,h3{text-align:center}</style></head><body>${coverHtml}${body}</body></html>`;
@@ -900,7 +905,7 @@
       if (cover) content.push({ text: c.institutie_1 + "\n" + c.institutie_2, alignment: "center", margin: [0, 60, 0, 24] }, { text: c.titlu, fontSize: 18, bold: true, alignment: "center" }, { text: c.biblioteca, fontSize: 14, alignment: "center", margin: [0, 6, 0, 6] }, { text: c.localitate, alignment: "center" }, { text: c.an, fontSize: 20, alignment: "center", margin: [0, 60, 0, 0], pageBreak: "after" });
       secs.forEach((s, i) => {
         const head = finalHeadPDF(s.cols), tbl = head.slice();
-        s.rows.forEach((r) => tbl.push(s.cols.map(([k, l, t]) => ({ text: t === "bool" ? (r[k] ? "✓" : "") : (r[k] == null ? "" : String(r[k])), fontSize: 6 }))));
+        s.rows.forEach((r) => tbl.push(s.cols.map(([k, l, t]) => ({ text: cellText(r, k, t), fontSize: 6 }))));
         content.push({ text: s.title, bold: true, fontSize: 10, margin: [0, 8, 0, 4], pageBreak: i > 0 ? "before" : undefined });
         content.push({ table: { headerRows: head.length, body: tbl }, layout: "lightHorizontalLines" });
       });
@@ -946,7 +951,7 @@
   function printCurrent() {
     const p = state.part, cols = effCols();
     const head = `<tr>${cols.map((c) => `<th>${esc(label(c))}</th>`).join("")}</tr>`;
-    const body = state.rows.map((r) => `<tr>${cols.map(([k, l, t]) => `<td>${t === "bool" ? (r[k] ? "✓" : "") : esc(r[k])}</td>`).join("")}</tr>`).join("");
+    const body = state.rows.map((r) => `<tr>${cols.map(([k, l, t]) => `<td>${esc(cellText(r, k, t))}</td>`).join("")}</tr>`).join("");
     const w = window.open("", "_blank");
     w.document.write(`<html><head><meta charset="utf-8"><title>Partea ${p.nr}</title><style>@page{size:A4 landscape}body{font:11px Segoe UI,sans-serif}h3{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:3px;text-align:center}th{background:#eef2f7}</style></head><body><h3>Partea ${p.nr}. ${esc(p.title)} — ${LUNI[state.luna - 1]} ${state.an}${p.categorie ? " (" + state.cat + ")" : ""}</h3><table>${head}${body}</table><script>window.onload=function(){window.print()}<\/script></body></html>`);
     w.document.close();
@@ -1085,9 +1090,9 @@
     else if (k === "s") { e.preventDefault(); toast("Salvat automat ✔"); }
     else if (k === "e") { if (isPart()) { e.preventDefault(); exportCurrent(); } }
     else if (k === "d") { if (isPart() && state.part.period === "lista") { e.preventDefault(); duplicateRow(); } }
-    else if (e.shiftKey && k === "m") { if (isPart() && state.part.period !== "crud") { e.preventDefault(); copyLastMonth(); } }
-    else if (e.key === "ArrowLeft") { if (isPart() && state.part.period !== "crud" && state.luna > 1) { e.preventDefault(); state.luna--; loadData(); updateChrome(); } }
-    else if (e.key === "ArrowRight") { if (isPart() && state.part.period !== "crud" && state.luna < 12) { e.preventDefault(); state.luna++; loadData(); updateChrome(); } }
+    else if (e.shiftKey && k === "m") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista")) { e.preventDefault(); copyLastMonth(); } }
+    else if (e.key === "ArrowLeft") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista") && state.luna > 1) { e.preventDefault(); state.luna--; loadData(); updateChrome(); } }
+    else if (e.key === "ArrowRight") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista") && state.luna < 12) { e.preventDefault(); state.luna++; loadData(); updateChrome(); } }
   });
   $("loginBtn").onclick = login;
   $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });

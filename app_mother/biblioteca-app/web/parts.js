@@ -138,6 +138,7 @@
       key: "documente_electronice", nr: "VII", title: "Documente electronice online",
       period: "luna", categorie: true, dateField: null, cumulative: false,
       cols: [
+        ["luna", "Luna", "monthlabel"],
         ["total_documente_electronice", "Total doc. electronice", "int"],
         ["mediu_email", "Prin email", "int", { g: "Mediu furnizare" }],
         ["mediu_skype_retele_sociale", "Skype/rețele sociale", "int", { g: "Mediu furnizare" }],
