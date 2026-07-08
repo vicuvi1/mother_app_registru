@@ -15,6 +15,18 @@
 
   const ALL_TABLES = (window.RegistruBackup && window.RegistruBackup.ALL_TABLES) || [];
 
+  // Chei unice → import idempotent (upsert). Tabelele fără cheie (evenimente,
+  // crud) rămân additive. Astfel, re-importul NU dublează datele importante.
+  const CONFLICT = {
+    personal: "nume_prenume", range_config: "parte,coloana", etichete_custom: "parte,camp",
+    text_presets: "parte,camp,valoare", app_settings: "cheie",
+    evidenta_utilizatori: "an,luna,data",
+    evidenta_utilizatori_copii_adulti: "an,luna,data,categorie_varsta",
+    documente_inregistrate: "an,luna,data,categorie_varsta",
+    documente_continut_czu: "an,luna,data,categorie_varsta",
+    documente_electronice: "an,luna,categorie_varsta",
+  };
+
   function cleanRow(obj) {
     const out = {};
     for (const k of Object.keys(obj)) {
@@ -27,23 +39,26 @@
     return out;
   }
 
-  async function insertRows(sb, table, rows, log) {
+  async function insertRows(sb, table, rows, log, replace) {
     if (!rows.length) return { table, inserted: 0 };
+    if (replace && table !== "app_settings") { await sb.from(table).delete().gte("id", 0); }
     const clean = rows.map(cleanRow);
+    const target = CONFLICT[table];
     let inserted = 0;
     for (let i = 0; i < clean.length; i += 200) {
       const batch = clean.slice(i, i + 200);
-      const { error } = await sb.from(table).insert(batch);
+      const { error } = target ? await sb.from(table).upsert(batch, { onConflict: target }) : await sb.from(table).insert(batch);
       if (error) { log(`  ✗ ${table}: ${error.message}`); return { table, inserted, error: error.message }; }
       inserted += batch.length;
     }
-    log(`  ✓ ${table}: ${inserted} rânduri`);
+    log(`  ${replace ? "⟳" : "✓"} ${table}: ${inserted} rânduri`);
     return { table, inserted };
   }
 
   // ---- Migrare din SQLite (biblioteca.db) -----------------------------------
-  async function migrateSqlite(sb, file, log) {
-    log("Se citește baza SQLite…");
+  async function migrateSqlite(sb, file, log, opts) {
+    const replace = !!(opts && opts.replace);
+    log("Se citește baza SQLite…" + (replace ? " (mod înlocuire)" : ""));
     const buf = new Uint8Array(await file.arrayBuffer());
     const SQL = await initSqlJs({ locateFile: (f) => SQLJS_CDN + f });
     let db;
@@ -64,7 +79,7 @@
         const rows = q[0].values.map((vals) => {
           const o = {}; cols.forEach((c, i) => (o[c] = vals[i])); return o;
         });
-        const r = await insertRows(sb, t, rows, log);
+        const r = await insertRows(sb, t, rows, log, replace);
         total += r.inserted || 0;
       }
       log(`Gata. Total importat: ${total} rânduri.`);
@@ -81,8 +96,9 @@
     return null;
   }
 
-  async function importExcel(sb, file, log) {
-    log("Se citește Excel…");
+  async function importExcel(sb, file, log, opts) {
+    const replace = !!(opts && opts.replace);
+    log("Se citește Excel…" + (replace ? " (mod înlocuire)" : ""));
     const buf = new Uint8Array(await file.arrayBuffer());
     const wb = XLSX.read(buf, { type: "array" });
     let total = 0;
@@ -90,19 +106,20 @@
       const table = tableForSheet(sheet);
       if (!table) { log(`  · foaie ignorată: „${sheet}" (necunoscută)`); continue; }
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet]);
-      const r = await insertRows(sb, table, rows, log);
+      const r = await insertRows(sb, table, rows, log, replace);
       total += r.inserted || 0;
     }
     log(`Gata. Total importat: ${total} rânduri.`);
   }
 
   // ---- Restaurare din snapshot JSON (backup cloud/local) --------------------
-  async function restoreJson(sb, obj, log) {
+  async function restoreJson(sb, obj, log, opts) {
+    const replace = !!(opts && opts.replace);
     const tables = (obj && obj.tables) || {};
     let total = 0;
     for (const t of ALL_TABLES) {
       const rows = tables[t]; if (!rows || !rows.length) continue;
-      const r = await insertRows(sb, t, rows, log);
+      const r = await insertRows(sb, t, rows, log, replace);
       total += r.inserted || 0;
     }
     log(`Gata. Total restaurat: ${total} rânduri.`);

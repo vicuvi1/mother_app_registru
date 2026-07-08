@@ -911,10 +911,11 @@
       <input type="file" id="sqliteFile" accept=".db,.sqlite,.sqlite3"><button id="doSqlite">Importă din SQLite</button>
       <hr style="margin:20px 0;border:0;border-top:1px solid var(--line)"><h3>Import din Excel (backup)</h3>
       <input type="file" id="xlsxFile" accept=".xlsx"><button id="doXlsx">Importă din Excel</button>
-      <pre id="importLog" style="margin-top:16px;background:#0f172a;color:#cbd5e1;padding:12px;border-radius:8px;max-height:320px;overflow:auto;font-size:12px;white-space:pre-wrap"></pre>
-      <p class="status">⚠ Importul adaugă rânduri. Rulați o singură dată per fișier.</p></div>`;
+      <label class="row" style="margin:10px 0"><input type="checkbox" id="impReplace" style="width:auto;margin-right:8px"><b>Înlocuiește</b> datele existente (restaurare curată — șterge înainte de import)</label>
+      <pre id="importLog" style="margin-top:8px;background:#0f172a;color:#cbd5e1;padding:12px;border-radius:8px;max-height:320px;overflow:auto;font-size:12px;white-space:pre-wrap"></pre>
+      <p class="status">Fără „Înlocuiește": importul e sigur (nu dublează datele zilnice — actualizează pe cheie). Cu „Înlocuiește": șterge tot și pune datele din fișier.</p></div>`;
     const logEl = $("importLog"), log = (m) => { logEl.textContent += m + "\n"; logEl.scrollTop = logEl.scrollHeight; };
-    const run = async (btnId, fileId, fn) => { const f = $(fileId).files[0]; if (!f) { toast("Alegeți un fișier"); return; } logEl.textContent = ""; $(btnId).disabled = true; try { await fn(sb, f, log); await loadStaff(); } catch (e) { log("✗ " + e.message); } finally { $(btnId).disabled = false; } };
+    const run = async (btnId, fileId, fn) => { const f = $(fileId).files[0]; if (!f) { toast("Alegeți un fișier"); return; } const replace = $("impReplace").checked; if (replace && !confirm("Mod înlocuire: datele curente vor fi ȘTERSE și înlocuite cu cele din fișier. Continuați?")) return; logEl.textContent = ""; $(btnId).disabled = true; try { await fn(sb, f, log, { replace }); await loadStaff(); } catch (e) { log("✗ " + e.message); } finally { $(btnId).disabled = false; } };
     $("doSqlite").onclick = () => run("doSqlite", "sqliteFile", window.RegistruImport.migrateSqlite);
     $("doXlsx").onclick = () => run("doXlsx", "xlsxFile", window.RegistruImport.importExcel);
   }
@@ -942,22 +943,23 @@
     refreshBackupInfo();
   }
   async function openCloudRestore() {
-    $("settings").innerHTML = `<div class="box"><h3>☁ Restaurează din cloud</h3><p class="status">Se încarcă lista…</p></div>`;
+    $("settings").innerHTML = `<div class="box"><h3>☁ Backup cloud</h3><p class="status">Se încarcă lista…</p></div>`;
     $("settings").classList.remove("hidden");
     const list = await window.RegistruBackup.listCloudBackups(sb);
-    const items = list.map((f) => `<div class="pp-item" data-n="${esc(f.name)}">${esc(f.name)}</div>`).join("") || "<div class='pp-empty'>Nicio copie în cloud.</div>";
-    $("settings").innerHTML = `<div class="box"><h3>☁ Restaurează din cloud</h3>
-      <p class="status">⚠ Restaurarea ADAUGĂ rândurile din copie peste datele curente.</p>
-      <div style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px">${items}</div>
+    const rows = list.map((f) => `<div style="display:flex;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${esc(f.name)}</span><button class="ghost cr-dl" data-n="${esc(f.name)}" title="Descarcă pe PC">⬇</button><button class="ghost cr-rs" data-n="${esc(f.name)}">Restaurează</button></div>`).join("") || "<div class='pp-empty'>Nicio copie în cloud.</div>";
+    $("settings").innerHTML = `<div class="box"><h3>☁ Backup cloud</h3>
+      <label class="row" style="margin:6px 0"><input type="checkbox" id="cr_replace" style="width:auto;margin-right:8px"><b>Înlocuiește</b> datele la restaurare (curat)</label>
+      <div style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 8px">${rows}</div>
       <pre id="restLog" style="margin-top:10px;background:#0f172a;color:#cbd5e1;padding:10px;border-radius:8px;max-height:160px;overflow:auto;font-size:12px;white-space:pre-wrap;display:none"></pre>
       <div class="actions"><button class="ghost" id="cr_close">Închide</button></div></div>`;
     $("cr_close").onclick = () => $("settings").classList.add("hidden");
-    $("settings").querySelectorAll(".pp-item[data-n]").forEach((d) => (d.onclick = async () => {
-      if (!confirm("Restaurați „" + d.dataset.n + "”? Rândurile se adaugă peste cele existente.")) return;
+    $("settings").querySelectorAll(".cr-dl").forEach((b) => (b.onclick = async () => { try { const obj = await window.RegistruBackup.downloadCloud(sb, b.dataset.n); download(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" }), b.dataset.n); } catch (e) { toast("Eroare: " + e.message); } }));
+    $("settings").querySelectorAll(".cr-rs").forEach((b) => (b.onclick = async () => {
+      const replace = $("cr_replace").checked;
+      if (!confirm((replace ? "ÎNLOCUIEȘTE toate datele cu " : "Adaugă/actualizează din ") + "„" + b.dataset.n + "”?")) return;
       const log = $("restLog"); log.style.display = "block"; log.textContent = "";
       const put = (m) => { log.textContent += m + "\n"; log.scrollTop = log.scrollHeight; };
-      try { const obj = await window.RegistruBackup.downloadCloud(sb, d.dataset.n); await window.RegistruImport.restoreJson(sb, obj, put); await loadStaff(); }
-      catch (e) { put("✗ " + e.message); }
+      try { const obj = await window.RegistruBackup.downloadCloud(sb, b.dataset.n); await window.RegistruImport.restoreJson(sb, obj, put, { replace }); await loadSettings(); await loadStaff(); } catch (e) { put("✗ " + e.message); }
     }));
   }
 

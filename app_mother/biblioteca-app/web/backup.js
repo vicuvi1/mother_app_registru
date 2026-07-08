@@ -164,6 +164,8 @@
       const { error } = await sb.storage.from("backups").upload(name, new Blob([json], { type: "application/json" }), { upsert: false });
       if (error) { note("Backup cloud eșuat: " + error.message); return { error }; }
       try { localStorage.setItem("lastCloudBackup", new Date().toISOString()); } catch (e) {}
+      // Păstrează cele mai noi 15 copii, șterge restul (nu umple Storage).
+      try { const all = await listCloudBackups(sb); if (all.length > 15) await sb.storage.from("backups").remove(all.slice(15).map((f) => f.name)); } catch (e) {}
       note("Backup cloud salvat ✔ (" + name + ")");
       return { name };
     } catch (e) { note("Backup cloud eșuat: " + e.message); return { error: e }; }
