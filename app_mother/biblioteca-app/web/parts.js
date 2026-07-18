@@ -11,6 +11,8 @@
 // part: { key, nr, title, period, categorie, dateField, cumulative, cols, extra? }
 //   period: "zi" | "lista" | "luna" | "crud"
 //   cumulative: adaugă rând „Total de la început" (I,II,III,IV,V,VI,IX,XI,XII)
+//   orderById: afișează rândurile în ordinea adăugării (după id), nu după dată —
+//     rândurile noi se adaugă la sfârșit (jos), fiindcă userul completează de sus în jos
 //   extra: { adulti:[...], copii:[...] } — coloane specifice tab-ului (Partea IX)
 // ============================================================================
 (function () {
@@ -155,7 +157,7 @@
     },
     {
       key: "instruiri", nr: "IX", title: "Instruirea utilizatorilor",
-      period: "lista", categorie: true, dateField: "data", cumulative: true,
+      period: "lista", categorie: true, dateField: "data", cumulative: true, orderById: true,
       cols: [
         ["data", "Data", "date", { req: true }],
         ["format_online", "Online", "bool", { g: "Formatul instruirii", ct: true }],

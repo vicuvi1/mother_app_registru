@@ -221,7 +221,7 @@
       if (p.period === "luna") q = q.eq("an", state.an); // toate cele 12 luni
       else if (p.period !== "crud") q = q.eq("an", state.an).eq("luna", state.luna);
       if (p.categorie) q = q.eq("categorie_varsta", state.cat);
-      q = p.period === "luna" ? q.order("luna", { ascending: true }) : (p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true }));
+      q = p.orderById ? q.order("id", { ascending: true }) : (p.period === "luna" ? q.order("luna", { ascending: true }) : (p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true })));
       const { data, error } = await q;
       if (error) { toast("Eroare: " + error.message); return; }
       state.rows = data || [];
@@ -922,7 +922,7 @@
     const dataByPart = {};
     (await Promise.all(PARTS.map(async (p) => {
       let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
-      q = p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true });
+      q = (p.orderById || !p.dateField) ? q.order("id", { ascending: true }) : q.order(p.dateField, { ascending: true });
       const { data } = await q; return [p.key, data || []];
     }))).forEach(([k, v]) => (dataByPart[k] = v));
     setBusy(false);
