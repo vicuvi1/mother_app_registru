@@ -87,12 +87,13 @@
       period: "zi", categorie: true, dateField: "data", cumulative: true,
       cols: [
         ["data", "Data", "date", { req: true }],
-        // total_imprumuturi provine din Partea III; până la sincronizare = Σ CZU (read-only)
-        ["total_imprumuturi", "Total împrumuturi", "int", { ro: true, sum: ["czu_0_generalitati", "czu_1_filozofie", "czu_2_religie", "czu_3_stiinte_sociale", "czu_5_matematica", "czu_6_stiinte_aplicate", "czu_7_arte", "czu_8_limbi", "czu_9_geografie"] }],
+        // total_imprumuturi se preia implicit din Partea III (zilnic); editabil dacă lipsește Partea III
+        ["total_imprumuturi", "Total împrumuturi", "int"],
         ["czu_0_generalitati", "0 Generalități", "int", { g: GCZU }], ["czu_1_filozofie", "1 Filozofie", "int", { g: GCZU }],
         ["czu_2_religie", "2 Religie", "int", { g: GCZU }], ["czu_3_stiinte_sociale", "3 Șt. sociale", "int", { g: GCZU }],
         ["czu_5_matematica", "5 Matematică", "int", { g: GCZU }], ["czu_6_stiinte_aplicate", "6 Șt. aplicate", "int", { g: GCZU }],
-        ["czu_7_arte", "7 Arte", "int", { g: GCZU }], ["czu_8_limbi", "8 Limbi", "int", { g: GCZU }],
+        // „8 Limbi" (literatură) = Total − Σ(celelalte categorii CZU) — categoria-rest (calculat automat, read-only)
+        ["czu_7_arte", "7 Arte", "int", { g: GCZU }], ["czu_8_limbi", "8 Limbi", "int", { g: GCZU, ro: true }],
         ["czu_9_geografie", "9 Geografie/Istorie", "int", { g: GCZU }],
       ],
     },

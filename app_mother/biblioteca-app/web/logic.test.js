@@ -30,6 +30,12 @@ eq(L.docLangSplit(10, 1), { limba_romana: 9 }, "limbi: 10 cărți, 1 altă → 9
 eq(L.docLangSplit(0, 0), { limba_romana: 0 }, "limbi: 0 cărți → 0 română");
 eq(L.docLangSplit(3, 5), { limba_romana: 0 }, "limbi: alte > cărți → 0 română (fără negativ)");
 
+// czuRemainder (Partea IV): 8 Limbi = Total − Σ(celelalte CZU)
+eq(L.czuRemainder(10, [0, 0, 0, 0, 0, 0, 0, 0]), 10, "czu: total 10, fără altele → 10 la 8 Limbi");
+eq(L.czuRemainder(10, [2, 0, 0, 1, 0, 0, 0, 0]), 7, "czu: total 10 − (2+1) → 7 la 8 Limbi");
+eq(L.czuRemainder(10, [0, 0, 0, 12, 0, 0, 0, 0]), 0, "czu: altele > total → 0 (fără negativ)");
+eq(L.czuRemainder(0, [0, 0, 0, 0, 0, 0, 0, 0]), 0, "czu: total 0 → 0");
+
 // sumCols
 eq(L.sumCols([["a", "A", "int"], ["b", "B", "bool", { ct: true }], ["t", "T", "text"]],
   [{ a: 2, b: true, t: "x" }, { a: 3, b: false, t: "" }]), { a: 5, b: 1 }, "sumCols: int sumă, bool ct = nr bifate");

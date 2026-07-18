@@ -44,6 +44,15 @@
     return { limba_romana: Math.max(0, carti - alteLimbi) };
   }
 
+  // Categoria-rest CZU (Partea IV): „8 Limbi" (literatură) absoarbe restul, deci
+  // = Total împrumuturi − Σ(celelalte categorii CZU). Minim 0 dacă celelalte ar
+  // depăși totalul. `others` = valorile celorlalte categorii (fără czu_8_limbi).
+  function czuRemainder(total, others) {
+    total = Math.max(0, +total || 0);
+    const s = (others || []).reduce((a, v) => a + Math.max(0, +v || 0), 0);
+    return Math.max(0, total - s);
+  }
+
   // Sume pe coloane: int → sumă; bool cu ct → număr de bifate.
   function sumCols(cols, rows) {
     const acc = {};
@@ -51,7 +60,7 @@
     return acc;
   }
 
-  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, sumCols };
+  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, sumCols };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.RegistruLogic = api;
 })();

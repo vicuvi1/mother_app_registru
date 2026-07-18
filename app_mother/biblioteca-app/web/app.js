@@ -385,23 +385,21 @@
       if ((+row.limba_romana || 0) !== lr) { row.limba_romana = lr; affected.add("limba_romana"); }
     }
     if (part.key === "documente_continut_czu") {
+      // Totalul se preia din Partea III cât timp există date pentru zi (altfel rămâne cel editat manual)
       if (state.aux && state.aux.p3) { const p3 = state.aux.p3[row.data] || 0; if (p3 > 0 && (+row.total_imprumuturi || 0) !== p3) { row.total_imprumuturi = p3; affected.add("total_imprumuturi"); } }
-      const czuKeys = part.cols.filter((c) => c[0].indexOf("czu_") === 0).map((c) => c[0]);
-      const t = +row.total_imprumuturi || 0, s = czuKeys.reduce((a, k) => a + (+row[k] || 0), 0);
-      if (t > 0 && s > t) { rebalanceCZU(row, t, czuKeys); czuKeys.forEach((k) => affected.add(k)); toast("CZU rebalansat la totalul din Partea III"); }
+      // „8 Limbi" (literatură) = Total − Σ(celelalte categorii CZU) — categoria-rest (calculat automat, read-only)
+      const others = part.cols.filter((c) => c[0].indexOf("czu_") === 0 && c[0] !== "czu_8_limbi").map((c) => c[0]);
+      const czu8 = window.RegistruLogic.czuRemainder(row.total_imprumuturi, others.map((k) => row[k]));
+      if ((+row.czu_8_limbi || 0) !== czu8) { row.czu_8_limbi = czu8; affected.add("czu_8_limbi"); }
     }
     return affected;
-  }
-  function rebalanceCZU(row, total, keys) {
-    const out = window.RegistruLogic.rebalanceCZU(keys.map((k) => +row[k] || 0), total);
-    keys.forEach((k, i) => (row[k] = out[i]));
   }
   // Constrângeri între câmpuri (evidențiere roșie, ca în desktop)
   function validateRow(part, row) {
     const bad = new Set();
     if (part.key === "evidenta_utilizatori" && (+row.copii_pana_16 || 0) > 0 && (+row.prescolari || 0) > (+row.copii_pana_16 || 0)) bad.add("prescolari");
     if (part.split) { const t = +row[part.split.total] || 0, m = +row[part.split.m] || 0, f = +row[part.split.f] || 0; if (m + f > t) { bad.add(part.split.m); bad.add(part.split.f); } }
-    if (part.key === "documente_continut_czu") { const t = +row.total_imprumuturi || 0; if (t > 0) { const cz = part.cols.filter((c) => c[0].indexOf("czu_") === 0); if (cz.reduce((a, c) => a + (+row[c[0]] || 0), 0) > t) cz.forEach((c) => bad.add(c[0])); } }
+    if (part.key === "documente_continut_czu") { const t = +row.total_imprumuturi || 0; if (t > 0) { const others = part.cols.filter((c) => c[0].indexOf("czu_") === 0 && c[0] !== "czu_8_limbi"); if (others.reduce((a, c) => a + (+row[c[0]] || 0), 0) > t) others.forEach((c) => bad.add(c[0])); } }
     if ((part.key === "documente_inregistrate" || part.key === "documente_electronice") && (+row.alte_limbi || 0) > (+row.carti || 0)) bad.add("alte_limbi");
     return bad;
   }
@@ -631,9 +629,16 @@
       if (p.key === "documente_continut_czu") {
         const { data } = await sb.from("documente_inregistrate").select("*").eq("an", state.an).eq("luna", state.luna).eq("categorie_varsta", state.cat);
         const map = {}; (data || []).forEach((r) => { const t = (+r.total_imprumuturi || 0) || P3_DIN.reduce((a, k) => a + (+r[k] || 0), 0); if (r.data) map[r.data] = t; });
-        state.aux.p3 = map; const czuKeys = effCols().find((c) => c[0] === "total_imprumuturi")[3].sum;
+        state.aux.p3 = map;
+        const others = effCols().filter((c) => c[0].indexOf("czu_") === 0 && c[0] !== "czu_8_limbi").map((c) => c[0]);
         const ups = [];
-        for (const r of state.rows) { const czu = czuKeys.reduce((a, k) => a + (+r[k] || 0), 0); const total = (map[r.data] || 0) > 0 ? map[r.data] : czu; if ((+r.total_imprumuturi || 0) !== total) { r.total_imprumuturi = total; ups.push(sb.from(p.key).update({ total_imprumuturi: total }).eq("id", r.id)); } }
+        for (const r of state.rows) {
+          const upd = {}, p3t = map[r.data] || 0;
+          if (p3t > 0 && (+r.total_imprumuturi || 0) !== p3t) { r.total_imprumuturi = p3t; upd.total_imprumuturi = p3t; }
+          const czu8 = window.RegistruLogic.czuRemainder(r.total_imprumuturi, others.map((k) => r[k]));
+          if ((+r.czu_8_limbi || 0) !== czu8) { r.czu_8_limbi = czu8; upd.czu_8_limbi = czu8; }
+          if (Object.keys(upd).length) ups.push(sb.from(p.key).update(upd).eq("id", r.id));
+        }
         await Promise.all(ups);
       } else if (p.key === "evidenta_utilizatori_copii_adulti") {
         const q = (t) => sb.from(t).select("data,total_participanti").eq("an", state.an).eq("luna", state.luna).eq("categorie_varsta", state.cat);
