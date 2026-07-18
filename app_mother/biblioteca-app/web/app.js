@@ -375,8 +375,14 @@
     const oldTotal = part.key === "documente_inregistrate" ? (+row.total_imprumuturi || 0) : null;
     cols.forEach(([k, l, t, o]) => { if (o && o.sum) { const s = o.sum.reduce((a, x) => a + (+row[x] || 0), 0); if ((+row[k] || 0) !== s) { row[k] = s; affected.add(k); } } });
     if (part.key === "documente_inregistrate" && affected.has("total_imprumuturi")) {
-      const nt = +row.total_imprumuturi || 0;
-      ["carti", "limba_romana"].forEach((f) => { const cur = +row[f] || 0; if (cur === 0 || cur === oldTotal) { if (row[f] !== nt) { row[f] = nt; affected.add(f); } } });
+      // „Cărți" moștenește implicit totalul împrumuturilor cât timp e la valoarea implicită
+      const nt = +row.total_imprumuturi || 0, cur = +row.carti || 0;
+      if (cur === 0 || cur === oldTotal) { if (row.carti !== nt) { row.carti = nt; affected.add("carti"); } }
+    }
+    // Părțile III & VII — „Limba română" = „Cărți" − „Alte limbi" (calculat automat, read-only)
+    if (part.key === "documente_inregistrate" || part.key === "documente_electronice") {
+      const lr = window.RegistruLogic.docLangSplit(row.carti, row.alte_limbi).limba_romana;
+      if ((+row.limba_romana || 0) !== lr) { row.limba_romana = lr; affected.add("limba_romana"); }
     }
     if (part.key === "documente_continut_czu") {
       if (state.aux && state.aux.p3) { const p3 = state.aux.p3[row.data] || 0; if (p3 > 0 && (+row.total_imprumuturi || 0) !== p3) { row.total_imprumuturi = p3; affected.add("total_imprumuturi"); } }
@@ -396,6 +402,7 @@
     if (part.key === "evidenta_utilizatori" && (+row.copii_pana_16 || 0) > 0 && (+row.prescolari || 0) > (+row.copii_pana_16 || 0)) bad.add("prescolari");
     if (part.split) { const t = +row[part.split.total] || 0, m = +row[part.split.m] || 0, f = +row[part.split.f] || 0; if (m + f > t) { bad.add(part.split.m); bad.add(part.split.f); } }
     if (part.key === "documente_continut_czu") { const t = +row.total_imprumuturi || 0; if (t > 0) { const cz = part.cols.filter((c) => c[0].indexOf("czu_") === 0); if (cz.reduce((a, c) => a + (+row[c[0]] || 0), 0) > t) cz.forEach((c) => bad.add(c[0])); } }
+    if ((part.key === "documente_inregistrate" || part.key === "documente_electronice") && (+row.alte_limbi || 0) > (+row.carti || 0)) bad.add("alte_limbi");
     return bad;
   }
   function applyRowValidation(id) {

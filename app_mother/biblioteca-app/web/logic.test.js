@@ -24,6 +24,12 @@ eq(L.copiiSplit(2, 3, 0, "elevi"), { prescolari: 2, elevi: 3, copii_pana_16: 5 }
 eq(L.copiiSplit(2, 0, 5, "copii_pana_16"), { prescolari: 2, elevi: 3, copii_pana_16: 5 }, "copii: edit total → elevi");
 eq(L.copiiSplit(4, 3, 5, "prescolari"), { prescolari: 4, elevi: 1, copii_pana_16: 5 }, "copii: edit preșcolari cu total>0");
 
+// docLangSplit (Partea III): limba_romana = carti − alte_limbi
+eq(L.docLangSplit(10, 0), { limba_romana: 10 }, "limbi: 10 cărți, 0 alte → 10 română");
+eq(L.docLangSplit(10, 1), { limba_romana: 9 }, "limbi: 10 cărți, 1 altă → 9 română");
+eq(L.docLangSplit(0, 0), { limba_romana: 0 }, "limbi: 0 cărți → 0 română");
+eq(L.docLangSplit(3, 5), { limba_romana: 0 }, "limbi: alte > cărți → 0 română (fără negativ)");
+
 // sumCols
 eq(L.sumCols([["a", "A", "int"], ["b", "B", "bool", { ct: true }], ["t", "T", "text"]],
   [{ a: 2, b: true, t: "x" }, { a: 3, b: false, t: "" }]), { a: 5, b: 1 }, "sumCols: int sumă, bool ct = nr bifate");

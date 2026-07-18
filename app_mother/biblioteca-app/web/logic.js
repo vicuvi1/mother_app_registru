@@ -36,6 +36,14 @@
     return { prescolari: P, elevi: E, copii_pana_16: C };
   }
 
+  // Split pe limbi (Partea III): o carte e fie în limba română, fie în altă
+  // limbă, deci „Limba română" = „Cărți" − „Alte limbi" (implicit tot restul e
+  // în română; minim 0 dacă „Alte limbi" ar depăși „Cărți").
+  function docLangSplit(carti, alteLimbi) {
+    carti = Math.max(0, +carti || 0); alteLimbi = Math.max(0, +alteLimbi || 0);
+    return { limba_romana: Math.max(0, carti - alteLimbi) };
+  }
+
   // Sume pe coloane: int → sumă; bool cu ct → număr de bifate.
   function sumCols(cols, rows) {
     const acc = {};
@@ -43,7 +51,7 @@
     return acc;
   }
 
-  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, sumCols };
+  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, sumCols };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.RegistruLogic = api;
 })();

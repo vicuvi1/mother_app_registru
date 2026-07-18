@@ -78,7 +78,8 @@
         ["documente_audiovizuale", "Doc. audiovizuale", "int", { g: GDOC }],
         ["documente_electronice_cd_dvd", "Doc. CD/DVD", "int", { g: GDOC }],
         ["alte_documente", "Alte documente", "int", { g: GDOC }],
-        ["limba_romana", "Limba română", "int", { g: GLIMBI }], ["alte_limbi", "Alte limbi", "int", { g: GLIMBI }],
+        // „Limba română" = „Cărți" − „Alte limbi" (calculat automat, vezi deriveRow)
+        ["limba_romana", "Limba română", "int", { g: GLIMBI, ro: true }], ["alte_limbi", "Alte limbi", "int", { g: GLIMBI }],
       ],
     },
     {
@@ -147,7 +148,8 @@
         ["documente_audiovizuale", "Doc. audiovizuale", "int", { g: GDOC }],
         ["documente_electronice_cd_dvd", "Doc. CD/DVD", "int", { g: GDOC }],
         ["alte_documente", "Alte documente", "int", { g: GDOC }],
-        ["limba_romana", "Limba română", "int", { g: GLIMBI }], ["alte_limbi", "Alte limbi", "int", { g: GLIMBI }],
+        // „Limba română" = „Cărți" − „Alte limbi" (calculat automat, vezi deriveRow)
+        ["limba_romana", "Limba română", "int", { g: GLIMBI, ro: true }], ["alte_limbi", "Alte limbi", "int", { g: GLIMBI }],
       ],
     },
     {
