@@ -209,7 +209,8 @@
         ["participanti_masculin", "Masculin", "int", { g: "Număr participanți" }],
         ["participanti_feminin", "Feminin", "int", { g: "Număr participanți" }],
       ],
-      split: { total: "total_participanti", m: "participanti_masculin", f: "participanti_feminin" },
+      // Split pe sex bidirecțional (ca Partea IX): editezi Masculin/Feminin → celălalt = Total − acela
+      split: { total: "total_participanti", m: "participanti_masculin", f: "participanti_feminin", bidir: true },
     },
     {
       key: "activitati_online", nr: "XII", title: "Activități culturale online",
