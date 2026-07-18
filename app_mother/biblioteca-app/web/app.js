@@ -371,7 +371,19 @@
       const r2 = window.RegistruLogic.copiiSplit(row.prescolari, row.elevi, row.copii_pana_16, col);
       ["prescolari", "elevi", "copii_pana_16"].forEach((k) => { if ((+row[k] || 0) !== r2[k]) { row[k] = r2[k]; affected.add(k); } });
     }
-    if (part.split && col === part.split.total) { const t = +row[part.split.total] || 0; if (t > 0) { const g = window.RegistruLogic.genderSplit(t); row[part.split.f] = g.f; row[part.split.m] = g.m; affected.add(part.split.f); affected.add(part.split.m); } }
+    if (part.split) {
+      const sk = part.split, t = +row[sk.total] || 0;
+      if (sk.bidir) {
+        // Editezi un sex → celălalt = Total − acela (doar la editarea Fete/Băieți, nu a Totalului)
+        if (col === sk.f || col === sk.m) {
+          const r = window.RegistruLogic.pairSplit(t, +row[sk.f] || 0, +row[sk.m] || 0, col === sk.m ? "m" : "f");
+          if ((+row[sk.f] || 0) !== r.f) { row[sk.f] = r.f; affected.add(sk.f); }
+          if ((+row[sk.m] || 0) !== r.m) { row[sk.m] = r.m; affected.add(sk.m); }
+        }
+      } else if (col === sk.total && t > 0) {
+        const g = window.RegistruLogic.genderSplit(t); row[sk.f] = g.f; row[sk.m] = g.m; affected.add(sk.f); affected.add(sk.m);
+      }
+    }
     const oldTotal = part.key === "documente_inregistrate" ? (+row.total_imprumuturi || 0) : null;
     cols.forEach(([k, l, t, o]) => { if (o && o.sum) { const s = o.sum.reduce((a, x) => a + (+row[x] || 0), 0); if ((+row[k] || 0) !== s) { row[k] = s; affected.add(k); } } });
     if (part.key === "documente_inregistrate" && affected.has("total_imprumuturi")) {
@@ -392,6 +404,11 @@
       const czu8 = window.RegistruLogic.czuRemainder(row.total_imprumuturi, others.map((k) => row[k]));
       if ((+row.czu_8_limbi || 0) !== czu8) { row.czu_8_limbi = czu8; affected.add("czu_8_limbi"); }
     }
+    // Partea IX, tab Copii — „Elevi" = Total − Preșcolari (restul copiilor; calculat automat, read-only)
+    if (part.key === "instruiri" && row.categorie_varsta === "copii") {
+      const elevi = window.RegistruLogic.pairSplit(row.total_participanti, row.prescolari, row.elevi, "f").m;
+      if ((+row.elevi || 0) !== elevi) { row.elevi = elevi; affected.add("elevi"); }
+    }
     return affected;
   }
   // Constrângeri între câmpuri (evidențiere roșie, ca în desktop)
@@ -401,6 +418,7 @@
     if (part.split) { const t = +row[part.split.total] || 0, m = +row[part.split.m] || 0, f = +row[part.split.f] || 0; if (m + f > t) { bad.add(part.split.m); bad.add(part.split.f); } }
     if (part.key === "documente_continut_czu") { const t = +row.total_imprumuturi || 0; if (t > 0) { const others = part.cols.filter((c) => c[0].indexOf("czu_") === 0 && c[0] !== "czu_8_limbi"); if (others.reduce((a, c) => a + (+row[c[0]] || 0), 0) > t) others.forEach((c) => bad.add(c[0])); } }
     if ((part.key === "documente_inregistrate" || part.key === "documente_electronice") && (+row.alte_limbi || 0) > (+row.carti || 0)) bad.add("alte_limbi");
+    if (part.key === "instruiri" && row.categorie_varsta === "copii" && (+row.prescolari || 0) > (+row.total_participanti || 0)) bad.add("prescolari");
     return bad;
   }
   function applyRowValidation(id) {

@@ -53,6 +53,16 @@
     return Math.max(0, total - s);
   }
 
+  // Split în pereche dintr-un total (Partea IX: Fete/Băieți, Preșcolari/Elevi):
+  // membrul editat rămâne, celălalt = max(0, Total − editat). `changed`: "m"
+  // păstrează m și recalculează f; altfel păstrează f și recalculează m.
+  function pairSplit(total, f, m, changed) {
+    total = Math.max(0, +total || 0); f = Math.max(0, +f || 0); m = Math.max(0, +m || 0);
+    if (changed === "m") f = Math.max(0, total - m);
+    else m = Math.max(0, total - f);
+    return { f, m };
+  }
+
   // Sume pe coloane: int → sumă; bool cu ct → număr de bifate.
   function sumCols(cols, rows) {
     const acc = {};
@@ -60,7 +70,7 @@
     return acc;
   }
 
-  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, sumCols };
+  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, pairSplit, sumCols };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.RegistruLogic = api;
 })();

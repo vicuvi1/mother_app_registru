@@ -187,11 +187,14 @@
         copii: [
           ["total_participanti", "Total", "int", { g: "Total participanți", sg: "Participanți" }],
           ["prescolari", "Preșcolari", "int", { g: "Copii", sg: "Participanți" }],
-          ["elevi", "Elevi", "int", { g: "Copii", sg: "Participanți" }],
+          // Elevi = Total − Preșcolari (restul copiilor sunt elevi; calculat automat, read-only)
+          ["elevi", "Elevi", "int", { g: "Copii", sg: "Participanți", ro: true }],
           ["participanti_feminin", "Fete", "int", { g: "Copii ≤16 după sex", sg: "Participanți" }],
           ["participanti_masculin", "Băieți", "int", { g: "Copii ≤16 după sex", sg: "Participanți" }],
         ],
       },
+      // Split pe sex bidirecțional: editezi Fete/Băieți → celălalt = Total − acela (ambele tab-uri)
+      split: { total: "total_participanti", m: "participanti_masculin", f: "participanti_feminin", bidir: true },
     },
     {
       key: "activitati_culturale", nr: "XI", title: "Activități culturale și științifice",

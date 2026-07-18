@@ -36,6 +36,12 @@ eq(L.czuRemainder(10, [2, 0, 0, 1, 0, 0, 0, 0]), 7, "czu: total 10 − (2+1) →
 eq(L.czuRemainder(10, [0, 0, 0, 12, 0, 0, 0, 0]), 0, "czu: altele > total → 0 (fără negativ)");
 eq(L.czuRemainder(0, [0, 0, 0, 0, 0, 0, 0, 0]), 0, "czu: total 0 → 0");
 
+// pairSplit (Partea IX): complement dintr-un total
+eq(L.pairSplit(12, 5, 0, "f"), { f: 5, m: 7 }, "pair: 5 fete din 12 → 7 băieți");
+eq(L.pairSplit(12, 0, 5, "m"), { f: 7, m: 5 }, "pair: 5 băieți din 12 → 7 fete");
+eq(L.pairSplit(12, 2, 0, "f"), { f: 2, m: 10 }, "pair: 2 preșcolari din 12 → 10 elevi");
+eq(L.pairSplit(12, 15, 0, "f"), { f: 15, m: 0 }, "pair: membru > total → complement 0 (fără negativ)");
+
 // sumCols
 eq(L.sumCols([["a", "A", "int"], ["b", "B", "bool", { ct: true }], ["t", "T", "text"]],
   [{ a: 2, b: true, t: "x" }, { a: 3, b: false, t: "" }]), { a: 5, b: 1 }, "sumCols: int sumă, bool ct = nr bifate");
