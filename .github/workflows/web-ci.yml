@@ -1,9 +1,9 @@
 name: web-ci
 on:
   push:
-    paths: ["app_mother/biblioteca-app/web/**"]
+    paths: ["app_mother/biblioteca-app/web/**", ".github/workflows/web-ci.yml"]
   pull_request:
-    paths: ["app_mother/biblioteca-app/web/**"]
+    paths: ["app_mother/biblioteca-app/web/**", ".github/workflows/web-ci.yml"]
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -16,6 +16,37 @@ jobs:
         with:
           node-version: "20"
       - name: Syntax-check all JS
-        run: for f in *.js; do echo "check $f"; node --check "$f"; done
+        run: for f in *.js dev/*.js; do echo "check $f"; node --check "$f"; done
       - name: Run logic + save-queue tests
         run: node logic.test.js && node outbox.test.js
+
+  # The SQL schema + migrations, tested on a throwaway Postgres (never Supabase).
+  sql:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pg: ["15", "17"] # Supabase projects run 15 (older) or 17
+    services:
+      pg:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: test
+      PGDATABASE: postgres
+    defaults:
+      run:
+        working-directory: app_mother/biblioteca-app/web/supabase
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load schema + migrations, run tests
+        run: |
+          psql -qX -v ON_ERROR_STOP=1 -f tests/stubs.sql
+          psql -qX -v ON_ERROR_STOP=1 -f schema.sql > /dev/null
+          for m in migrations/*.sql; do echo "apply $m"; psql -qX -v ON_ERROR_STOP=1 -f "$m" > /dev/null; done
+          psql -X -v ON_ERROR_STOP=1 -f tests/migration_001.test.sql
