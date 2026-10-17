@@ -70,7 +70,33 @@
     return acc;
   }
 
-  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, pairSplit, sumCols };
+  // Ce copii de siguranță păstrăm (folder local + cloud). Numele: registru_AAAA-LL-ZZ_HHMMSS.json.
+  // Păstrează: ultimele `recent` copii + cea mai nouă din fiecare zi pe ultimele `zile` zile +
+  // cea mai nouă din fiecare lună (pentru totdeauna). Întoarce numele de ȘTERS.
+  // Numele care nu au forma de mai sus nu sunt atinse niciodată.
+  function backupsToDelete(names, now, recent, zile) {
+    recent = recent == null ? 24 : recent; zile = zile == null ? 31 : zile;
+    const re = /^registru_(\d{4})-(\d{2})-(\d{2})_\d{6}\.json$/;
+    const dated = names.filter((n) => re.test(n)).sort().reverse(); // cele mai noi primele
+    const keep = new Set(dated.slice(0, recent));
+    const seenDay = new Set(), seenMonth = new Set();
+    const cutoff = new Date(now.getTime() - zile * 864e5);
+    for (const n of dated) {
+      const [, y, m, d] = n.match(re), day = y + m + d, month = y + m;
+      if (!seenMonth.has(month)) { seenMonth.add(month); keep.add(n); }
+      if (!seenDay.has(day)) { seenDay.add(day); if (new Date(+y, +m - 1, +d) >= cutoff) keep.add(n); }
+    }
+    return dated.filter((n) => !keep.has(n));
+  }
+
+  // O copie nouă e suspectă dacă are mult mai puține rânduri decât precedenta (ex. citită
+  // fără login → tabele goale). Așa nu suprascriem copii bune cu una goală.
+  function snapshotLooksWrong(total, prevTotal) {
+    if (!prevTotal) return false;
+    return total === 0 || total < prevTotal * 0.5;
+  }
+
+  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, pairSplit, sumCols, backupsToDelete, snapshotLooksWrong };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.RegistruLogic = api;
 })();

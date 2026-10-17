@@ -2,7 +2,8 @@
 -- Registru Digital Bibliotecă — schema Supabase (PostgreSQL)
 -- ----------------------------------------------------------------------------
 -- Portare 1:1 a modelelor SQLAlchemy (app/database/models.py) în Postgres.
--- Rulați acest fișier în Supabase → SQL Editor (o singură dată la configurare).
+-- Rulați acest fișier în Supabase → SQL Editor (o singură dată la configurare),
+-- apoi, în ordine, fișierele din supabase/migrations/.
 --
 -- Multi-user: RLS este activat pe fiecare tabel; orice utilizator AUTENTIFICAT
 -- (login Supabase) poate citi și scrie. O singură bibliotecă / registru comun.
