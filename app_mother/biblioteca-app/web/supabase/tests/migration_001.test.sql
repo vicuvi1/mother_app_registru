@@ -44,8 +44,8 @@ insert into app_settings (cheie, valoare) values ('session_state', '{"part":"vol
 insert into app_settings (cheie, valoare) values ('excluded_days_2026', '{"10":["14.10"]}') on conflict (cheie) do update set valoare = excluded.valoare;
 do $$ begin
   assert (select count(*) from istoric) >= 3, 'mama can read the history';
-  assert (select count(*) from istoric where tabel = 'app_settings' and coalesce(nou ->> 'cheie', '') = 'session_state') = 0, 'navigation state is not history';
-  assert (select count(*) from istoric where tabel = 'app_settings' and nou ->> 'cheie' = 'excluded_days_2026') = 1, 'real settings are history';
+  assert (select count(*) from istoric where tabel = 'app_settings' and coalesce(ident ->> 'cheie', '') = 'session_state') = 0, 'navigation state is not history';
+  assert (select count(*) from istoric where tabel = 'app_settings' and ident ->> 'cheie' = 'excluded_days_2026') = 1, 'real settings are history';
 end $$;
 
 \echo '== stranger with a valid login: sees nothing, changes nothing'
@@ -90,7 +90,9 @@ begin
   select * into r from istoric where operatie = 'DELETE';
   assert r.vechi ->> 'data' = '02.10' and (r.vechi ->> 'adulti')::int = 7, 'DELETE keeps the whole row';
   select * into r from istoric where operatie = 'INSERT' and utilizator = 'mama@test.md';
-  assert r.nou = '{"an": 2026, "luna": 10, "data": "05.10"}'::jsonb, 'INSERT keeps identifying fields: ' || r.nou::text;
+  assert r.ident = '{"an": 2026, "luna": 10, "data": "05.10"}'::jsonb, 'INSERT keeps identifying fields: ' || r.ident::text;
+  select * into r from istoric where tabel = 'evidenta_utilizatori' and operatie = 'UPDATE';
+  assert r.ident ->> 'data' = '01.10', 'UPDATE says which row: ' || coalesce(r.ident::text, 'null');
 end $$;
 
 \echo '== a deleted row can be brought back from history with its id'

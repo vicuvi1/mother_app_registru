@@ -84,9 +84,11 @@ create table if not exists public.istoric (
   tabel      text not null,
   rand_id    bigint,
   operatie   text not null,  -- INSERT | UPDATE | DELETE | RESTORE
+  ident      jsonb,          -- ce rând: an, luna, data, categoria, nume… (pentru afișare)
   vechi      jsonb,          -- UPDATE: valorile de dinainte (doar câmpurile schimbate) · DELETE: tot rândul
-  nou        jsonb           -- UPDATE: valorile noi · INSERT: câmpurile de identificare
+  nou        jsonb           -- UPDATE: valorile noi
 );
+alter table public.istoric add column if not exists ident jsonb;
 create index if not exists istoric_la_idx on public.istoric (la desc);
 create index if not exists istoric_rand_idx on public.istoric (tabel, rand_id, id desc);
 alter table public.istoric enable row level security;
@@ -98,7 +100,7 @@ create or replace function public.istoric_log()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
   usr text := public.current_email();
-  o jsonb; n jsonb; vd jsonb := '{}'; nd jsonb := '{}'; k text; last_id bigint; rid bigint;
+  o jsonb; n jsonb; src jsonb; idn jsonb := '{}'; vd jsonb := '{}'; nd jsonb := '{}'; k text; last_id bigint; rid bigint;
   ignore_keys text[] := array['updated_at', 'created_at'];
   ident_keys text[] := array['an', 'luna', 'data', 'categorie_varsta', 'nume_prenume', 'partener', 'cheie', 'parte', 'camp', 'valoare'];
 begin
@@ -109,6 +111,10 @@ begin
     if (case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end) ->> 'cheie' in ('session_state', 'seeded_v1') then return null; end if;
   end if;
 
+  src := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
+  for k in select jsonb_object_keys(src) loop if k = any(ident_keys) then idn := idn || jsonb_build_object(k, src -> k); end if; end loop;
+  rid := (src ->> 'id')::bigint;
+
   if tg_op = 'UPDATE' then
     o := to_jsonb(old); n := to_jsonb(new);
     for k in select jsonb_object_keys(n) loop
@@ -116,27 +122,23 @@ begin
       if (o -> k) is distinct from (n -> k) then vd := vd || jsonb_build_object(k, o -> k); nd := nd || jsonb_build_object(k, n -> k); end if;
     end loop;
     if nd = '{}'::jsonb then return null; end if;
-    rid := (n ->> 'id')::bigint;
     -- Scrierea „din mers" (fiecare tastă) se adună într-o singură intrare: același
     -- utilizator, același rând, în ultimele 2 minute. „vechi" păstrează valoarea de la început.
     select id into last_id from public.istoric
-      where tabel = tg_table_name and rand_id = rid and operatie = 'UPDATE'
+      where tabel = tg_table_name and rand_id is not distinct from rid and ident is not distinct from idn and operatie = 'UPDATE'
         and utilizator is not distinct from usr and la > now() - interval '2 minutes'
       order by id desc limit 1;
     if last_id is not null then
       update public.istoric set nou = nou || nd, vechi = vd || vechi, la = now() where id = last_id;
     else
-      insert into public.istoric (utilizator, tabel, rand_id, operatie, vechi, nou) values (usr, tg_table_name, rid, 'UPDATE', vd, nd);
+      insert into public.istoric (utilizator, tabel, rand_id, operatie, ident, vechi, nou) values (usr, tg_table_name, rid, 'UPDATE', idn, vd, nd);
     end if;
     return null;
   elsif tg_op = 'INSERT' then
-    n := to_jsonb(new);
-    for k in select jsonb_object_keys(n) loop if k = any(ident_keys) then nd := nd || jsonb_build_object(k, n -> k); end if; end loop;
-    insert into public.istoric (utilizator, tabel, rand_id, operatie, nou) values (usr, tg_table_name, (n ->> 'id')::bigint, 'INSERT', nd);
+    insert into public.istoric (utilizator, tabel, rand_id, operatie, ident) values (usr, tg_table_name, rid, 'INSERT', idn);
     return null;
   else -- DELETE: tot rândul, ca să poată fi readus
-    o := to_jsonb(old);
-    insert into public.istoric (utilizator, tabel, rand_id, operatie, vechi) values (usr, tg_table_name, (o ->> 'id')::bigint, 'DELETE', o);
+    insert into public.istoric (utilizator, tabel, rand_id, operatie, ident, vechi) values (usr, tg_table_name, rid, 'DELETE', idn, src);
     return null;
   end if;
 end $$;
