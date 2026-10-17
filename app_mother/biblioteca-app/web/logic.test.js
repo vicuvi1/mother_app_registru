@@ -81,6 +81,16 @@ eq(L.normDate("29.02", 2026, 2).error, "ziua", "data: 29 februarie în an nebise
 eq(L.normDate("12.13", 2026, 1).error, "luna", "data: luna 13");
 eq(L.normDate("ieri", 2026, 1).error, "format", "data: text oarecare");
 
+// sortByDate — ordinea din Partea IX a mamei (iunie, copii), în ordinea adăugării
+{
+  const june = ["11.06", "15.06", "16.06", "17.06", "22.06", "09.06", "03.06", "04.06", "08.06", "02.06", "10.06"].map((d, i) => ({ id: i + 1, data: d }));
+  eq(L.sortByDate(june, "data").map((r) => r.data), ["02.06", "03.06", "04.06", "08.06", "09.06", "10.06", "11.06", "15.06", "16.06", "17.06", "22.06"], "ordine: datele iunie în ordine");
+  const sameDay = [{ id: 7, data: "08.07" }, { id: 3, data: "08.07" }, { id: 5, data: "01.07" }];
+  eq(L.sortByDate(sameDay, "data").map((r) => r.id), [5, 3, 7], "ordine: aceeași zi → ordinea adăugării");
+  eq(L.sortByDate([{ id: 1, data: "" }, { id: 2, data: "20.05" }, { id: 3, data: null }, { id: 4, data: "04.05" }], "data").map((r) => r.id), [4, 2, 1, 3], "ordine: fără dată la sfârșit");
+  eq(L.sortByDate([{ id: 1, data: "02.12" }, { id: 2, data: "30.11" }], "data").map((r) => r.id), [2, 1], "ordine: luna contează înaintea zilei");
+}
+
 // snapshotLooksWrong — gardă împotriva copiilor goale
 eq(L.snapshotLooksWrong(0, 5000), true, "copie goală după una plină = suspectă");
 eq(L.snapshotLooksWrong(2000, 5000), true, "copie la sub jumătate = suspectă");

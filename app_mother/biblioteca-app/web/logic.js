@@ -110,7 +110,14 @@
     return { value: pad2(d) + "." + pad2(mo), month: mo };
   }
 
-  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, pairSplit, sumCols, backupsToDelete, snapshotLooksWrong, normDate };
+  // Ordinea rândurilor din părțile cu evenimente: după dată („ZZ.LL"), iar în aceeași zi
+  // în ordinea adăugării (id). Rândurile fără dată la sfârșit.
+  function sortByDate(rows, field) {
+    const key = (r) => { const m = /^(\d{2})\.(\d{2})$/.exec(String(r[field] || "")); return m ? +m[2] * 100 + +m[1] : 99999; };
+    return rows.slice().sort((a, b) => key(a) - key(b) || (+a.id || 0) - (+b.id || 0));
+  }
+
+  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, pairSplit, sumCols, backupsToDelete, snapshotLooksWrong, normDate, sortByDate };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.RegistruLogic = api;
 })();

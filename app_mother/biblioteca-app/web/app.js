@@ -249,7 +249,7 @@
       if (p.period === "luna") q = q.eq("an", state.an); // toate cele 12 luni
       else if (p.period !== "crud") q = q.eq("an", state.an).eq("luna", state.luna);
       if (p.categorie) q = q.eq("categorie_varsta", state.cat);
-      q = p.orderById ? q.order("id", { ascending: true }) : (p.period === "luna" ? q.order("luna", { ascending: true }) : (p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true })));
+      q = p.period === "luna" ? q.order("luna", { ascending: true }) : (p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true }));
       const { data, error } = await q;
       if (stale()) return;
       if (error) {
@@ -259,6 +259,8 @@
       }
       // Peste datele serverului se pun modificările încă netrimise (ca să le vedeți, chiar și offline).
       state.rows = (data || []).map((r) => Object.assign(r, OB.pending(p.key, r.id) || {}));
+      // Evenimentele (V, VI, IX, XI, XII): mereu în ordinea datelor; în aceeași zi, în ordinea adăugării.
+      if (p.period === "lista" && p.dateField) state.rows = window.RegistruLogic.sortByDate(state.rows, p.dateField);
       // Auto-schelet (ca în desktop): la deschiderea unei luni goale, creează
       // automat zilele lucrătoare (părți zilnice) sau rândul lunii (parte lunară).
       if (!fromScaffold && !state.rows.length && (p.period === "zi" || p.period === "luna")) {
@@ -679,6 +681,7 @@
     if (type === "int") el.value = row[col] == null ? 0 : row[col];
     if (before === row[col]) return;
     focusOld.set(el, row[col]);
+    if (col === part.dateField && part.period === "lista") resortRows();
     pushUndo({ kind: "cell", key: part.key, id, col, type, old: before });
     // sincronizare inversă II → IX/XI
     const cdef = effCols().find((c) => c[0] === col);
@@ -687,6 +690,19 @@
       const arr = state.presets[col] || (state.presets[col] = []);
       if (!arr.includes(row[col])) { arr.push(row[col]); sb.from("text_presets").upsert({ parte: part.pid, camp: col, valoare: row[col] }, { onConflict: "parte,camp,valoare", ignoreDuplicates: true }).then(() => {}, () => {}); }
     }
+  }
+  // Reordonează rândurile după dată după ce s-a schimbat data unui eveniment. Așteptăm să se
+  // termine clicul/Tab-ul care a declanșat salvarea, apoi punem cursorul înapoi unde era.
+  function resortRows() {
+    const p = state.part, sorted = window.RegistruLogic.sortByDate(state.rows, p.dateField);
+    if (sorted.every((r, i) => r === state.rows[i])) return;
+    setTimeout(() => {
+      if (state.part !== p) return;
+      const a = document.activeElement, at = a && a.dataset && a.dataset.id ? [a.dataset.id, a.dataset.col] : null;
+      state.rows = window.RegistruLogic.sortByDate(state.rows, p.dateField);
+      renderGrid();
+      if (at) { const back = $("content").querySelector(`tbody input[data-id="${at[0]}"][data-col="${at[1]}"]`); if (back) { back.focus(); if (back.select && back.type !== "checkbox") back.select(); } }
+    }, 0);
   }
   // Salvează celula în care se află cursorul (înainte de schimbarea lunii/părții, închiderea filei…).
   function commitActive() {
@@ -752,7 +768,10 @@
       }
       if (state.rows.some((r) => r[p.dateField] === base[p.dateField])) { toast(`Ziua ${base[p.dateField]} există deja în tabel`, 5000); return; }
     }
-    else if (p.period === "lista" && p.dateField) { const t = todayStr(); base[p.dateField] = t.y === state.an && t.m === state.luna ? t.d : ddmm(1, state.luna); }
+    else if (p.period === "lista" && p.dateField) {
+      const t = todayStr(), dated = state.rows.filter((r) => /^\d{2}\.\d{2}$/.test(r[p.dateField] || ""));
+      base[p.dateField] = t.y === state.an && t.m === state.luna ? t.d : dated.length ? dated[dated.length - 1][p.dateField] : ddmm(1, state.luna);
+    }
     p.cols.forEach(([k, l, t, o]) => { if (o && o.req && (t === "text" || t === "txt") && base[k] === undefined) base[k] = ""; });
     const { data, error } = await sb.from(p.key).insert(base).select().maybeSingle(); if (error) { toast("Eroare: " + error.message); return; }
     if (data) pushUndo({ kind: "add", key: p.key, id: data.id });
@@ -1176,6 +1195,7 @@
       const p = PARTS.find((x) => x.key === pg.key), cols = partCols(p, pg.cat || "copii");
       let rows = dataByPart[p.key] || [];
       if (p.period !== "crud") rows = rows.filter((r) => (pg.month ? r.luna === pg.month : true) && (!p.categorie || r.categorie_varsta === pg.cat));
+      if (p.period === "lista" && p.dateField) rows = window.RegistruLogic.sortByDate(rows, p.dateField);
       const title = `Partea ${pg.nr}. ${p.title}${pg.cat ? " (" + pg.cat + ")" : ""}${pg.month ? " — " + LUNI[pg.month - 1] + " " + state.an : " — anul " + state.an}`;
       return { title, cols, rows };
     });
@@ -1203,7 +1223,7 @@
     (await Promise.all(PARTS.map(async (p) => {
       const build = () => {
         let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
-        q = (p.orderById || !p.dateField) ? q.order("id", { ascending: true }) : q.order(p.dateField, { ascending: true });
+        q = !p.dateField ? q.order("id", { ascending: true }) : q.order(p.dateField, { ascending: true });
         return q.order("id", { ascending: true });
       };
       try { return [p.key, await fetchRows(build)]; } catch (e) { failed.push(`Partea ${p.nr}`); return [p.key, []]; }
