@@ -121,12 +121,12 @@
   }
 
   // ---- Backup complet (ambele formate) --------------------------------------
-  async function runBackup(sb, ui) {
+  async function runBackup(sb, ui, tables) {
     ui = ui || {};
     const note = ui.note || (() => {});
     try {
       note("Se descarcă datele din Supabase…");
-      const data = await fetchAll(sb, (i, n, t) => note(`Descărcare ${i}/${n}: ${t}`));
+      const data = tables || await fetchAll(sb, (i, n, t) => note(`Descărcare ${i}/${n}: ${t}`));
 
       note("Se generează Excel…");
       downloadBytes(buildExcel(data), `registru_backup_${stamp()}.xlsx`,
@@ -155,18 +155,22 @@
   }
 
   // ---- Backup în cloud (Supabase Storage, off-device) -----------------------
-  async function cloudBackup(sb, note) {
-    note = note || (() => {});
+  // opts.snapshot: copie deja făcută (verificată de app.js) · opts.name: alt nume de fișier
+  async function cloudBackup(sb, note, opts) {
+    note = note || (() => {}); opts = opts || {};
     try {
       note("Backup cloud: se colectează datele…");
-      const data = await fetchAll(sb);
-      const json = JSON.stringify({ created: new Date().toISOString(), tables: data });
-      const name = `registru_${stamp()}.json`;
-      const { error } = await sb.storage.from("backups").upload(name, new Blob([json], { type: "application/json" }), { upsert: false });
+      const obj = opts.snapshot || await snapshot(sb);
+      const name = opts.name || `registru_${stamp()}.json`;
+      const { error } = await sb.storage.from("backups").upload(name, new Blob([JSON.stringify(obj)], { type: "application/json" }), { upsert: false });
       if (error) { note("Backup cloud eșuat: " + error.message); return { error }; }
       try { localStorage.setItem("lastCloudBackup", new Date().toISOString()); } catch (e) {}
-      // Păstrează cele mai noi 15 copii, șterge restul (nu umple Storage).
-      try { const all = await listCloudBackups(sb); if (all.length > 15) await sb.storage.from("backups").remove(all.slice(15).map((f) => f.name)); } catch (e) {}
+      // Retenție pe niveluri (ultimele 24 + una/zi pe o lună + una/lună), nu „ultimele 15".
+      try {
+        const all = (await listCloudBackups(sb)).map((f) => f.name);
+        const del = window.RegistruLogic.backupsToDelete(all, new Date());
+        if (del.length) await sb.storage.from("backups").remove(del);
+      } catch (e) {}
       note("Backup cloud salvat ✔ (" + name + ")");
       return { name };
     } catch (e) { note("Backup cloud eșuat: " + e.message); return { error: e }; }
@@ -175,14 +179,38 @@
     try { const last = localStorage.getItem("lastCloudBackup"); if (!last) return null; return (Date.now() - new Date(last).getTime()) / 3.6e6; } catch (e) { return null; }
   }
   async function listCloudBackups(sb) {
-    const { data } = await sb.storage.from("backups").list("", { limit: 100, sortBy: { column: "name", order: "desc" } });
+    const { data } = await sb.storage.from("backups").list("", { limit: 1000, sortBy: { column: "name", order: "desc" } });
     return (data || []).filter((f) => f.name.endsWith(".json"));
   }
+  // Ora ultimei copii cloud automate (din numele fișierului) — aceeași pe orice calculator.
+  const STAMP_RE = /^registru_(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})(\d{2})\.json$/;
+  function stampTime(name) { const m = STAMP_RE.exec(name); return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : null; }
+  async function lastCloudBackupTime(sb) {
+    const times = (await listCloudBackups(sb)).map((f) => stampTime(f.name)).filter(Boolean);
+    const t = times.length ? Math.max(...times) : null;
+    if (t) try { localStorage.setItem("lastCloudBackup", new Date(t).toISOString()); } catch (e) {}
+    return t;
+  }
+  // Nume de fișier → text pentru om („17.10.2026, 14:05" / „înainte de restaurare, …").
+  function describe(name) {
+    const m = /(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})/.exec(name);
+    const when = m ? `${m[3]}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : name;
+    return /inainte-de-restaurare/.test(name) ? `${when} — înainte de restaurare` : when;
+  }
+  // Gardă: o copie cu mult mai puține rânduri decât precedenta (ex. citită fără login)
+  // nu trebuie să suprascrie copiile bune.
+  const totalRows = (obj) => Object.keys((obj && obj.tables) || {}).reduce((a, t) => a + ((obj.tables[t] || []).length), 0);
+  function checkSnapshot(obj) {
+    const total = totalRows(obj);
+    let prev = null; try { prev = +localStorage.getItem("lastSnapshotRows") || null; } catch (e) {}
+    return { ok: !window.RegistruLogic.snapshotLooksWrong(total, prev), total, prev };
+  }
+  function markSnapshot(total) { try { if (total == null) localStorage.removeItem("lastSnapshotRows"); else localStorage.setItem("lastSnapshotRows", String(total)); } catch (e) {} }
   async function downloadCloud(sb, name) {
     const { data, error } = await sb.storage.from("backups").download(name);
     if (error) throw new Error(error.message);
     return JSON.parse(await data.text());
   }
 
-  window.RegistruBackup = { runBackup, hoursSinceBackup, cloudBackup, hoursSinceCloudBackup, listCloudBackups, downloadCloud, snapshot, stamp, ALL_TABLES };
+  window.RegistruBackup = { runBackup, hoursSinceBackup, cloudBackup, hoursSinceCloudBackup, lastCloudBackupTime, listCloudBackups, downloadCloud, describe, snapshot, checkSnapshot, markSnapshot, stamp, ALL_TABLES };
 })();

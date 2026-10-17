@@ -6,7 +6,7 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const PARTS = window.REGISTRU_PARTS, MAX5 = window.REGISTRU_MAX5, partCols = window.partCols;
-  const HOME = { key: "__home" }, STAFF = { key: "__staff" }, IMPORT = { key: "__import" }, FINAL = { key: "__final" };
+  const HOME = { key: "__home" }, STAFF = { key: "__staff" }, IMPORT = { key: "__import" }, FINAL = { key: "__final" }, HISTORY = { key: "__history" };
   function download(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
   const LUNI = ["Ianuarie","Februarie","Martie","Aprilie","Mai","Iunie","Iulie","August","Septembrie","Octombrie","Noiembrie","Decembrie"];
 
@@ -50,6 +50,14 @@
   }
   async function onLoggedIn() {
     const { data } = await sb.auth.getUser(); if (!data.user) return;
+    // Doar conturile aprobate (tabelul utilizatori_permisi). Înainte de migrarea 001 funcția
+    // nu există → eroare → nu blocăm pe nimeni.
+    const acc = await sb.rpc("is_allowed");
+    if (!acc.error && acc.data === false) {
+      loggingOut = true; await sb.auth.signOut(); loggingOut = false;
+      $("authErr").textContent = "Acest cont nu are acces la registru. Cereți administratorului să vă adauge.";
+      return;
+    }
     $("auth").classList.add("hidden"); $("app").classList.remove("hidden");
     $("who").textContent = data.user.email; $("who2").textContent = data.user.email;
     lastEmail = data.user.email; needLogin = false;
@@ -69,7 +77,7 @@
     for (let y = state.an - 3; y <= state.an + 1; y++) $("an").add(new Option(y, y, false, y === state.an));
     $("an").onchange = () => { state.an = +$("an").value; if (state.part === HOME) renderHome(); else if (state.part === FINAL) renderFinal(); else if (!special()) { loadData(); updateChrome(); } };
   }
-  const special = () => state.part === STAFF || state.part === IMPORT || state.part === HOME || state.part === FINAL;
+  const special = () => state.part === STAFF || state.part === IMPORT || state.part === HOME || state.part === FINAL || state.part === HISTORY;
 
   // ---- Setări ---------------------------------------------------------------
   function applyTheme(t) { document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light"); }
@@ -159,6 +167,7 @@
       `<div class="navsep"></div>` +
       PARTS.map((p) => `<button class="nav" data-key="${p.key}">${p.nr}. ${esc(p.title.split(" ").slice(0, 2).join(" "))}${badge(state.badges[p.key])}</button>`).join("") +
       `<div class="navsep"></div><button class="nav" data-key="__staff">👤 Personal</button>` +
+      `<button class="nav" data-key="__history">🕘 Istoric modificări</button>` +
       `<button class="nav" data-key="__import">⬆ Import / Migrare</button>`;
     $("nav").querySelectorAll("button.nav").forEach((b) => (b.onclick = () => selectPart(b.dataset.key)));
     markActive(state.part ? state.part.key : "__home");
@@ -174,6 +183,7 @@
     if (key === "__final") { state.part = FINAL; updateChrome(); renderFinal(); return; }
     if (key === "__staff") { state.part = STAFF; updateChrome(); renderStaff(); subscribe("personal"); return; }
     if (key === "__import") { state.part = IMPORT; updateChrome(); renderImport(); return; }
+    if (key === "__history") { state.part = HISTORY; state.hist = null; updateChrome(); renderHistory(false); return; }
     state.part = PARTS.find((p) => p.key === key);
     if (!state.part.categorie) state.cat = "copii";
     updateChrome(); loadData(); subscribe(state.part.key);
@@ -182,8 +192,8 @@
   function updateChrome() {
     const p = state.part, sp = special();
     markActive(p.key);
-    $("hbadge").textContent = p === HOME ? "🏠" : p === FINAL ? "📗" : p === STAFF ? "👤" : p === IMPORT ? "⬆" : p.nr;
-    $("title").textContent = p === HOME ? "Acasă" : p === FINAL ? "Registru final" : p === STAFF ? "Personal (responsabili)" : p === IMPORT ? "Import / Migrare date" : `Partea ${p.nr}. ${p.title}`;
+    $("hbadge").textContent = p === HOME ? "🏠" : p === FINAL ? "📗" : p === STAFF ? "👤" : p === IMPORT ? "⬆" : p === HISTORY ? "🕘" : p.nr;
+    $("title").textContent = p === HOME ? "Acasă" : p === FINAL ? "Registru final" : p === STAFF ? "Personal (responsabili)" : p === IMPORT ? "Import / Migrare date" : p === HISTORY ? "Istoric modificări" : `Partea ${p.nr}. ${p.title}`;
     $("subtitle").textContent = isPart() ? (p.period === "luna" ? `Anul ${state.an}` : (p.period !== "crud" ? `${LUNI[state.luna - 1]} ${state.an}` : "")) : "";
     $("anWrap").style.display = (p === HOME || p === FINAL || (isPart() && p.period !== "crud")) ? "" : "none";
     buildToolbar();
@@ -1027,7 +1037,7 @@
     $("homeBackup").onclick = doBackup; $("homeSettings").onclick = openSettings;
     $("homeCloudRestore").onclick = openCloudRestore;
     $("homeFolder").onclick = async () => { const F2 = window.RegistruLocalFolder; if (!F2 || !F2.supported) { toast("Necesită Chrome/Edge"); return; } if (!(await F2.hasFolder())) return openFolderSetup(); const ok = await saveLocalFolder((m) => toast(m), true); if (ok) renderHome(); };
-    $("homeFolderRestore").onclick = async () => { if (!confirm("Restaurați datele din folderul local registru mother? (se actualizează/adaugă)")) return; await restoreFromFolder(false, (m) => toast(m)); };
+    $("homeFolderRestore").onclick = restoreFromFolder;
     $("homeContinue").onclick = continueLastSession; $("homeYearEnd").onclick = openYearEnd;
     $("homeReport").onclick = openIncompleteReport; $("homeCover").onclick = openCover;
     $("content").querySelectorAll(".todo div[data-i]").forEach((d) => (d.onclick = () => { const s = state.incomplete[+d.dataset.i]; navigateTo(s.key, state.an, s.month, s.cat || "copii"); }));
@@ -1166,25 +1176,53 @@
     w.document.close();
   }
   function refreshBackupInfo() { const h = window.RegistruBackup.hoursSinceBackup(), info = $("backupInfo"); info.textContent = h === null ? "fără backup" : h > 24 ? `backup acum ${Math.floor(h / 24)}z` : "backup recent ✔"; }
-  // ---- Folder local de siguranță „registru mother" --------------------------
+  // ---- Copii de siguranță ---------------------------------------------------
   let localDirty = false;
   function markDirty() { localDirty = true; }
-  async function saveLocalFolder(note, request) {
+  // Copie completă, verificată: fără login sau cu mult mai puține rânduri decât data
+  // trecută (ex. tabele citite goale) NU o salvăm peste copiile bune.
+  async function takeSnapshot(force) {
+    const { data } = await sb.auth.getSession(); if (!data || !data.session) return { skip: true };
+    const obj = await window.RegistruBackup.snapshot(sb);
+    const chk = window.RegistruBackup.checkSnapshot(obj);
+    if (!chk.ok && !force) return { suspect: chk };
+    return { obj, total: chk.total };
+  }
+  let suspectWarned = false;
+  function warnSuspect(c) {
+    if (suspectWarned) return; suspectWarned = true;
+    toast(`⚠ Copia de acum are doar ${c.total} rânduri (data trecută: ${c.prev}). Nu am suprascris copiile bune. Dacă ați șters date intenționat, apăsați „Salvează copie”.`, 10000);
+  }
+  async function saveLocalFolder(note, request, snap) {
     try {
       const F = window.RegistruLocalFolder; if (!F || !F.supported) return false;
       const h = await F.getFolder(request); if (!h) return false;
-      const obj = await window.RegistruBackup.snapshot(sb);
-      await F.saveSnapshot(h, obj, window.RegistruBackup.stamp());
+      const s = snap || await takeSnapshot(false);
+      if (s.skip) return false;
+      if (s.suspect) { warnSuspect(s.suspect); return false; }
+      await F.saveSnapshot(h, s.obj, window.RegistruBackup.stamp());
+      window.RegistruBackup.markSnapshot(s.total);
       localDirty = false; try { localStorage.setItem("lastLocalFolder", new Date().toISOString()); } catch (e) {}
       if (note) note("Copie salvată în folderul local ✔");
       return true;
     } catch (e) { if (note) note("Folder local: " + e.message); return false; }
   }
-  async function restoreFromFolder(replace, put) {
+  async function restoreFromFolder() {
     const F = window.RegistruLocalFolder; if (!F || !F.supported) { toast("Necesită Chrome/Edge"); return; }
     const h = await F.getFolder(true); if (!h) { toast("Folderul local nu e configurat"); return; }
-    const obj = await F.readSnapshot(h);
-    await window.RegistruImport.restoreJson(sb, obj, put || toast, { replace });
+    const names = (await F.listNames(h)).filter((n) => n !== "registru_backup.json");
+    const rows = [`<div style="display:flex;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px"><b>Cea mai recentă copie</b></span><button class="ghost lf-rs" data-n="registru_backup.json">Alege…</button></div>`]
+      .concat(names.map((n) => `<div style="display:flex;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${esc(window.RegistruBackup.describe(n))}</span><button class="ghost lf-rs" data-n="${esc(n)}">Alege…</button></div>`)).join("");
+    $("settings").innerHTML = `<div class="box"><h3>📂 Copii din folderul local</h3>
+      <p class="status">Alegeți copia; în pasul următor alegeți ce părți se restaurează.</p>
+      <div style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 8px">${rows}</div>
+      <div class="actions"><button class="ghost" id="lf_close">Închide</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    $("lf_close").onclick = () => $("settings").classList.add("hidden");
+    $("settings").querySelectorAll(".lf-rs").forEach((b) => (b.onclick = async () => {
+      try { openRestoreDialog(await F.readSnapshot(h, b.dataset.n), "folderul local (" + (b.dataset.n === "registru_backup.json" ? "cea mai recentă" : window.RegistruBackup.describe(b.dataset.n)) + ")"); }
+      catch (e) { toast("Nu pot citi copia: " + e.message, 6000); }
+    }));
   }
   function openFolderSetup() {
     const F = window.RegistruLocalFolder;
@@ -1201,37 +1239,226 @@
     };
   }
   async function doBackup() {
-    await window.RegistruBackup.runBackup(sb, { note: (m) => ($("backupInfo").textContent = m) });
-    await window.RegistruBackup.cloudBackup(sb, (m) => ($("backupInfo").textContent = m));
-    await saveLocalFolder((m) => ($("backupInfo").textContent = m), true);
+    const note = (m) => ($("backupInfo").textContent = m);
+    note("Se pregătește copia…");
+    let s = await takeSnapshot(false);
+    if (s.skip) { toast("Reconectați-vă întâi", 4000); return; }
+    if (s.suspect) {
+      if (!confirm(`Copia de acum are ${s.suspect.total} rânduri, față de ${s.suspect.prev} data trecută.\n\nAți șters intenționat date? OK = salvează totuși · Anulare = nu salva`)) { note("Copie anulată"); return; }
+      s = await takeSnapshot(true);
+    }
+    await window.RegistruBackup.runBackup(sb, { note }, s.obj.tables);
+    await window.RegistruBackup.cloudBackup(sb, note, { snapshot: s.obj });
+    await saveLocalFolder(note, true, s);
+    window.RegistruBackup.markSnapshot(s.total);
     refreshBackupInfo(); if (state.part === HOME) renderHome();
   }
+  // La pornire și apoi la fiecare oră: copie în folderul local (dacă s-a modificat ceva)
+  // și în cloud (dacă a trecut intervalul din Setări). Ora ultimei copii cloud se citește
+  // din lista de copii, nu din acest browser — corect și pe alt calculator.
+  let autoBusy = false, autoFirst = true;
   async function maybeAutoBackup() {
-    await saveLocalFolder(null, false); // copie în folderul local (dacă permisiunea e deja acordată)
-    const days = toInt(state.settings.backup_days || "0"); if (!days) return;
-    const h = window.RegistruBackup.hoursSinceCloudBackup(); if (h !== null && h < days * 24) return;
-    await window.RegistruBackup.cloudBackup(sb, (m) => ($("backupInfo").textContent = m)); // off-device, silent
-    refreshBackupInfo();
+    if (autoBusy || needLogin || $("app").classList.contains("hidden")) return;
+    autoBusy = true;
+    try {
+      const days = toInt(state.settings.backup_days || "0");
+      let needCloud = false;
+      if (days) { const t = await window.RegistruBackup.lastCloudBackupTime(sb); needCloud = !t || Date.now() - t > days * 864e5; }
+      const F = window.RegistruLocalFolder;
+      const canLocal = (autoFirst || localDirty) && F && F.supported && !!(await F.getFolder(false));
+      autoFirst = false;
+      if (!needCloud && !canLocal) return;
+      const s = await takeSnapshot(false);
+      if (s.skip) return;
+      if (s.suspect) { warnSuspect(s.suspect); return; }
+      if (canLocal) await saveLocalFolder(null, false, s);
+      if (needCloud) await window.RegistruBackup.cloudBackup(sb, (m) => ($("backupInfo").textContent = m), { snapshot: s.obj });
+      window.RegistruBackup.markSnapshot(s.total);
+      refreshBackupInfo();
+    } catch (e) { /* încercăm din nou peste o oră */ } finally { autoBusy = false; }
   }
   async function openCloudRestore() {
-    $("settings").innerHTML = `<div class="box"><h3>☁ Backup cloud</h3><p class="status">Se încarcă lista…</p></div>`;
+    $("settings").innerHTML = `<div class="box"><h3>☁ Copii în cloud</h3><p class="status">Se încarcă lista…</p></div>`;
     $("settings").classList.remove("hidden");
     const list = await window.RegistruBackup.listCloudBackups(sb);
-    const rows = list.map((f) => `<div style="display:flex;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${esc(f.name)}</span><button class="ghost cr-dl" data-n="${esc(f.name)}" title="Descarcă pe PC">⬇</button><button class="ghost cr-rs" data-n="${esc(f.name)}">Restaurează</button></div>`).join("") || "<div class='pp-empty'>Nicio copie în cloud.</div>";
-    $("settings").innerHTML = `<div class="box"><h3>☁ Backup cloud</h3>
-      <label class="row" style="margin:6px 0"><input type="checkbox" id="cr_replace" style="width:auto;margin-right:8px"><b>Înlocuiește</b> datele la restaurare (curat)</label>
-      <div style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 8px">${rows}</div>
-      <pre id="restLog" style="margin-top:10px;background:#0f172a;color:#cbd5e1;padding:10px;border-radius:8px;max-height:160px;overflow:auto;font-size:12px;white-space:pre-wrap;display:none"></pre>
+    const rows = list.map((f) => `<div style="display:flex;gap:8px;align-items:center;padding:5px 4px;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${esc(window.RegistruBackup.describe(f.name))}</span><button class="ghost cr-dl" data-n="${esc(f.name)}" title="Descarcă pe PC">⬇</button><button class="ghost cr-rs" data-n="${esc(f.name)}">Alege…</button></div>`).join("") || "<div class='pp-empty'>Nicio copie în cloud.</div>";
+    $("settings").innerHTML = `<div class="box"><h3>☁ Copii în cloud</h3>
+      <p class="status">Alegeți copia; în pasul următor alegeți ce părți se restaurează.</p>
+      <div style="max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:4px 8px">${rows}</div>
+      <div style="margin-top:10px"><label class="status" style="display:inline">Sau dintr-un fișier .json de pe calculator: </label><input type="file" id="cr_file" accept=".json,application/json" style="width:auto"></div>
       <div class="actions"><button class="ghost" id="cr_close">Închide</button></div></div>`;
     $("cr_close").onclick = () => $("settings").classList.add("hidden");
+    $("cr_file").onchange = async () => { const f = $("cr_file").files[0]; if (!f) return; try { openRestoreDialog(JSON.parse(await f.text()), "fișierul " + f.name); } catch (e) { toast("Fișier invalid: " + e.message, 6000); } };
     $("settings").querySelectorAll(".cr-dl").forEach((b) => (b.onclick = async () => { try { const obj = await window.RegistruBackup.downloadCloud(sb, b.dataset.n); download(new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" }), b.dataset.n); } catch (e) { toast("Eroare: " + e.message); } }));
     $("settings").querySelectorAll(".cr-rs").forEach((b) => (b.onclick = async () => {
-      const replace = $("cr_replace").checked;
-      if (!confirm((replace ? "ÎNLOCUIEȘTE toate datele cu " : "Adaugă/actualizează din ") + "„" + b.dataset.n + "”?")) return;
-      const log = $("restLog"); log.style.display = "block"; log.textContent = "";
-      const put = (m) => { log.textContent += m + "\n"; log.scrollTop = log.scrollHeight; };
-      try { const obj = await window.RegistruBackup.downloadCloud(sb, b.dataset.n); await window.RegistruImport.restoreJson(sb, obj, put, { replace }); await loadSettings(); await loadStaff(); } catch (e) { put("✗ " + e.message); }
+      try { openRestoreDialog(await window.RegistruBackup.downloadCloud(sb, b.dataset.n), "cloud (" + window.RegistruBackup.describe(b.dataset.n) + ")"); } catch (e) { toast("Eroare: " + e.message, 6000); }
     }));
+  }
+
+  // ---- Restaurare sigură ----------------------------------------------------
+  // Părțile bifate sunt ÎNLOCUITE exact cu cele din copie, totul-sau-nimic (funcția
+  // restore_tables din baza de date). Înainte se face automat o copie a datelor de acum.
+  function restoreGroups() {
+    return PARTS.map((p) => ({ label: `Partea ${p.nr}. ${p.title}`, tables: [p.key], on: true })).concat([
+      { label: "Personal (responsabili)", tables: ["personal"], on: true },
+      { label: "Liste text, etichete coloane, range-uri", tables: ["text_presets", "etichete_custom", "range_config"], on: true },
+      { label: "Setări (nume bibliotecă, zile libere, copertă…)", tables: ["app_settings"], on: false },
+    ]);
+  }
+  function openRestoreDialog(obj, source) {
+    const T = (obj && obj.tables) || {};
+    if (!Object.keys(T).length) { toast("Copia nu conține date", 5000); return; }
+    const groups = restoreGroups(), cnt = (ts) => ts.reduce((a, t) => a + ((T[t] || []).length), 0);
+    const when = obj.created ? new Date(obj.created).toLocaleString("ro-RO") : "dată necunoscută";
+    const items = groups.map((g, i) => `<label class="row" style="margin:3px 0;font-size:13px"><input type="checkbox" data-g="${i}" ${g.on && cnt(g.tables) > 0 ? "checked" : ""} ${T[g.tables[0]] ? "" : "disabled"} style="width:auto;margin-right:8px">${esc(g.label)} <span class="status" style="margin-left:6px">(${T[g.tables[0]] ? cnt(g.tables) + " rânduri" : "lipsește din copie"})</span></label>`).join("");
+    $("settings").innerHTML = `<div class="box"><h3>↺ Restaurare din copie</h3>
+      <p style="font-size:13px">Copia din <b>${esc(when)}</b> · sursa: ${esc(source)}.</p>
+      <p class="status">Părțile bifate vor fi <b>înlocuite exact</b> cu cele din copie (totul sau nimic — dacă ceva nu merge, nu se schimbă nimic). Înainte, aplicația face automat o copie a datelor de acum.</p>
+      <div style="display:flex;gap:6px;margin:6px 0"><button class="ghost" id="rs_all">Bifează tot</button><button class="ghost" id="rs_none">Debifează tot</button></div>
+      <div style="max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${items}</div>
+      <pre id="rs_log" style="margin-top:10px;background:#0f172a;color:#cbd5e1;padding:10px;border-radius:8px;max-height:180px;overflow:auto;font-size:12px;white-space:pre-wrap;display:none"></pre>
+      <div class="actions"><button class="ghost" id="rs_cancel">Închide</button><button class="ok" id="rs_go">Restaurează părțile bifate</button></div></div>`;
+    $("settings").classList.remove("hidden");
+    const boxes = () => [...$("settings").querySelectorAll("input[data-g]")];
+    $("rs_all").onclick = () => boxes().forEach((b) => { if (!b.disabled) b.checked = true; });
+    $("rs_none").onclick = () => boxes().forEach((b) => (b.checked = false));
+    $("rs_cancel").onclick = () => $("settings").classList.add("hidden");
+    $("rs_go").onclick = async () => {
+      const chosen = boxes().filter((b) => b.checked).map((b) => groups[+b.dataset.g]);
+      if (!chosen.length) { toast("Bifați cel puțin o parte"); return; }
+      const emptied = chosen.filter((g) => !cnt(g.tables)).map((g) => g.label);
+      if (!confirm(`Înlocuiți ${chosen.length} părți cu datele din copia de ${when}?\n\nDatele de acum ale acestor părți vor fi înlocuite (se face întâi o copie de siguranță).` +
+        (emptied.length ? `\n\n⚠ Aceste părți sunt GOALE în copie și vor fi golite:\n• ${emptied.join("\n• ")}` : ""))) return;
+      $("rs_go").disabled = true;
+      try { await runRestore(obj, chosen.flatMap((g) => g.tables)); } finally { const b = $("rs_go"); if (b) b.disabled = false; }
+    };
+  }
+  async function runRestore(obj, tabele) {
+    const log = $("rs_log"); log.style.display = "block"; log.textContent = "";
+    const put = (m) => { log.textContent += m + "\n"; log.scrollTop = log.scrollHeight; };
+    commitActive(); await flushNow();
+    // 1. Copie de siguranță a datelor de ACUM (ca restaurarea să poată fi anulată)
+    put("1/3 Copie de siguranță a datelor de acum…");
+    const pre = await takeSnapshot(true);
+    if (pre.skip) { put("✗ Reconectați-vă întâi."); return; }
+    const preName = `registru_inainte-de-restaurare_${window.RegistruBackup.stamp()}.json`;
+    let saved = false;
+    const up = await window.RegistruBackup.cloudBackup(sb, () => {}, { snapshot: pre.obj, name: preName });
+    if (!up.error) { saved = true; put("   ✔ în cloud: " + preName); }
+    const F = window.RegistruLocalFolder;
+    try { const h = F && F.supported && (await F.getFolder(true)); if (h) { await F.saveNamed(h, preName, pre.obj); saved = true; put("   ✔ în folderul local"); } } catch (e) { /* încercăm descărcarea */ }
+    if (!saved) { download(new Blob([JSON.stringify(pre.obj)], { type: "application/json" }), preName); put("   ✔ descărcată pe calculator: " + preName); }
+    // 2. Restaurarea propriu-zisă
+    put("2/3 Restaurare…");
+    const payload = { created: obj.created || null, tables: {} };
+    tabele.forEach((t) => (payload.tables[t] = (obj.tables && obj.tables[t]) || []));
+    const { data, error } = await sb.rpc("restore_tables", { payload, tabele });
+    if (error && (error.code === "PGRST202" || /could not find the function/i.test(error.message || ""))) {
+      put("   (baza de date nu are încă migrarea 001 — folosesc metoda veche, tabel cu tabel)");
+      await window.RegistruImport.restoreJson(sb, payload, put, { replace: true });
+    } else if (error) {
+      put("✗ Restaurarea a eșuat: " + error.message + "\n   Nimic nu s-a schimbat în registru."); return;
+    } else {
+      Object.keys(data || {}).forEach((t) => put(`   ⟳ ${t}: ${data[t]} rânduri`));
+    }
+    // 3. Modificările netrimise ale acestor părți ar suprascrie datele restaurate → renunțăm la ele
+    OB.list().forEach((it) => { if (tabele.includes(it.table)) OB.remove(it.table, it.id); });
+    updateSaveState();
+    put("3/3 Gata ✔  (Dacă v-ați răzgândit: restaurați copia „înainte de restaurare”.)");
+    window.RegistruBackup.markSnapshot(null);
+    await loadSettings(); await loadStaff();
+    if (isPart()) loadData(); else if (state.part === HOME) renderHome();
+  }
+
+  // ---- Istoric modificări (tabelul „istoric", scris de baza de date) -------
+  // Fiecare adăugare / modificare / ștergere, cu cine și când; „↶ Revino" readuce valorile.
+  const HIST_PAGE = 100;
+  const SUPPORT_NAMES = { personal: "Personal", app_settings: "Setări", text_presets: "Liste text", etichete_custom: "Etichete coloane", range_config: "Range-uri", "*": "Tot registrul" };
+  function histTableName(t) { const p = PARTS.find((x) => x.key === t); return p ? `Partea ${p.nr}` : (SUPPORT_NAMES[t] || t); }
+  function histColLabel(t, k) {
+    const p = PARTS.find((x) => x.key === t); if (!p) return k;
+    const c = [...p.cols, ...((p.extra && p.extra.adulti) || []), ...((p.extra && p.extra.copii) || [])].find((x) => x[0] === k);
+    return c ? c[1] : k;
+  }
+  function histRowLabel(e) {
+    const i = e.ident || {}, bits = [];
+    if (i.data) bits.push(i.data); else if (i.luna) bits.push(LUNI[(+i.luna || 1) - 1]);
+    if (i.an && !i.data) bits.push(i.an);
+    if (i.categorie_varsta) bits.push(i.categorie_varsta === "adulti" ? "Adulți" : "Copii");
+    ["nume_prenume", "partener", "cheie"].forEach((k) => { if (i[k]) bits.push(i[k]); });
+    return bits.join(" · ");
+  }
+  const histVal = (v) => v === true ? "✓" : v === false ? "—" : v == null || v === "" ? "∅" : String(v);
+  function histWhat(e) {
+    if (e.operatie === "INSERT") return "rând adăugat";
+    if (e.operatie === "DELETE") return "rând șters";
+    if (e.operatie === "RESTORE") { const n = e.nou || {}; return `restaurare din copia ${n.copia_din ? new Date(n.copia_din).toLocaleString("ro-RO") : ""} (${(n.tabele || []).map(histTableName).join(", ")})`; }
+    const v = e.vechi || {}, n = e.nou || {};
+    return Object.keys(n).map((k) => `${esc(histColLabel(e.tabel, k))}: ${esc(histVal(v[k]))} → <b>${esc(histVal(n[k]))}</b>`).join("<br>");
+  }
+  async function renderHistory(more) {
+    if (!more || !state.hist) state.hist = { rows: [], filter: (state.hist && state.hist.filter) || "", done: false };
+    const h = state.hist;
+    if (!more) $("content").innerHTML = `<div class="status">Se încarcă…</div>`;
+    let q = sb.from("istoric").select("*").order("id", { ascending: false }).limit(HIST_PAGE);
+    if (h.rows.length) q = q.lt("id", h.rows[h.rows.length - 1].id);
+    if (h.filter) q = q.eq("tabel", h.filter);
+    const { data, error } = await q;
+    if (state.part !== HISTORY) return;
+    if (error) {
+      const missing = /istoric|PGRST205|42P01|does not exist|schema cache/i.test((error.code || "") + " " + error.message);
+      $("content").innerHTML = `<div class="card" style="max-width:640px"><h3>🕘 Istoric modificări</h3><p>${missing ? "Istoricul va fi disponibil după actualizarea bazei de date (migrarea <b>001</b> — vezi instrucțiunile)." : "Eroare: " + esc(error.message)}</p></div>`;
+      return;
+    }
+    h.rows = h.rows.concat(data || []); h.done = (data || []).length < HIST_PAGE;
+    const opts = [`<option value="">Toate părțile</option>`].concat(PARTS.map((p) => `<option value="${p.key}" ${h.filter === p.key ? "selected" : ""}>Partea ${p.nr}. ${esc(p.title)}</option>`),
+      Object.keys(SUPPORT_NAMES).filter((k) => k !== "*").map((k) => `<option value="${k}" ${h.filter === k ? "selected" : ""}>${esc(SUPPORT_NAMES[k])}</option>`)).join("");
+    // Rândurile create deodată (zilele unei luni noi, copierea lunii) → o singură linie.
+    const groupKey = (e) => e.operatie === "INSERT" ? [e.tabel, e.utilizator, (e.ident || {}).luna, (e.ident || {}).categorie_varsta].join("|") : null;
+    const lines = [];
+    h.rows.forEach((e, i) => {
+      const last = lines[lines.length - 1], gk = groupKey(e);
+      if (gk && last && last.gk === gk && Math.abs(Date.parse(last.e.la) - Date.parse(e.la)) < 60000) { last.n++; last.first = e; return; }
+      lines.push({ e, i, gk, n: 1, first: e });
+    });
+    const body = lines.map(({ e, i, n, first }) => {
+      if (n > 1) {
+        const d1 = (first.ident || {}).data, d2 = (e.ident || {}).data;
+        return `<tr><td style="padding:6px 8px;white-space:nowrap">${esc(new Date(e.la).toLocaleString("ro-RO"))}</td><td style="padding:6px 8px">${esc(e.utilizator || "")}</td><td style="padding:6px 8px;white-space:nowrap">${esc(histTableName(e.tabel))}</td><td style="padding:6px 8px">${esc(d1 && d2 ? d1 + " … " + d2 : histRowLabel(e))}</td><td style="padding:6px 8px;text-align:left">${n} rânduri adăugate deodată</td><td></td></tr>`;
+      }
+      const can = (e.operatie === "UPDATE" && e.vechi) || (e.operatie === "DELETE" && e.vechi) || (e.operatie === "INSERT" && e.rand_id != null);
+      const btn = can ? `<button class="ghost hs-undo" data-i="${i}" title="${e.operatie === "INSERT" ? "Șterge rândul adăugat" : e.operatie === "DELETE" ? "Readu rândul șters" : "Readu valorile de dinainte"}">↶ Revino</button>` : "";
+      return `<tr><td style="padding:6px 8px;white-space:nowrap">${esc(new Date(e.la).toLocaleString("ro-RO"))}</td><td style="padding:6px 8px">${esc(e.utilizator || "")}</td><td style="padding:6px 8px;white-space:nowrap">${esc(histTableName(e.tabel))}</td><td style="padding:6px 8px">${esc(histRowLabel(e))}</td><td style="padding:6px 8px;text-align:left;white-space:normal">${histWhat(e)}</td><td style="padding:4px">${btn}</td></tr>`;
+    }).join("") || `<tr><td colspan="6" style="padding:16px;color:var(--muted)">Nicio modificare înregistrată încă.</td></tr>`;
+    $("content").innerHTML = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><select id="hs_filter">${opts}</select><button class="ghost" id="hs_refresh">↻ Reîmprospătează</button><span class="status">Modificările făcute „din mers" (în ~2 minute) pe același rând apar într-o singură linie.</span></div>
+      <div class="tablebox"><table><thead><tr><th>Când</th><th>Cine</th><th>Partea</th><th>Rândul</th><th>Ce s-a schimbat</th><th></th></tr></thead><tbody>${body}</tbody></table></div>
+      ${h.done ? "" : `<div style="margin-top:10px"><button class="ghost" id="hs_more">Mai multe…</button></div>`}`;
+    $("hs_filter").onchange = () => { h.filter = $("hs_filter").value; renderHistory(false); };
+    $("hs_refresh").onclick = () => renderHistory(false);
+    if ($("hs_more")) $("hs_more").onclick = () => renderHistory(true);
+    $("content").querySelectorAll(".hs-undo").forEach((b) => (b.onclick = () => revertHistory(h.rows[+b.dataset.i])));
+  }
+  async function revertHistory(e) {
+    const where = `${histTableName(e.tabel)}${histRowLabel(e) ? " — " + histRowLabel(e) : ""}`;
+    if (e.operatie === "UPDATE") {
+      const what = Object.keys(e.vechi).map((k) => `${histColLabel(e.tabel, k)}: ${histVal((e.nou || {})[k])} → ${histVal(e.vechi[k])}`).join("\n");
+      if (!confirm(`Readuceți valorile de dinainte?\n${where}\n\n${what}`)) return;
+      if (e.rand_id != null) queueSave(e.tabel, e.rand_id, e.vechi);
+      else if (e.tabel === "app_settings" && e.ident && e.ident.cheie) { const { error } = await sb.from("app_settings").upsert(Object.assign({ cheie: e.ident.cheie }, e.vechi), { onConflict: "cheie" }); if (error) { toast("Eroare: " + error.message, 6000); return; } }
+      toast("Valorile de dinainte au fost readuse ✔", 3000);
+    } else if (e.operatie === "DELETE") {
+      if (!confirm(`Readuceți rândul șters?\n${where}`)) return;
+      const row = Object.assign({}, e.vechi); delete row.created_at; delete row.updated_at;
+      const { error } = e.tabel === "app_settings" ? await sb.from("app_settings").upsert(row, { onConflict: "cheie" }) : await sb.from(e.tabel).insert(row);
+      if (error) { toast(/duplicate|unique/i.test(error.message) ? "Există deja un rând pentru aceeași dată — nu l-am readus." : "Eroare: " + error.message, 7000); return; }
+      toast("Rândul a fost readus ✔", 3000);
+    } else if (e.operatie === "INSERT") {
+      if (!confirm(`Ștergeți rândul adăugat atunci?\n${where}\n\n(Dacă între timp a fost completat, se pierd și acele valori — dar rămân în istoric.)`)) return;
+      const { error } = await sb.from(e.tabel).delete().eq("id", e.rand_id);
+      if (error) { toast("Eroare: " + error.message, 6000); return; }
+      OB.remove(e.tabel, e.rand_id); toast("Rândul a fost șters ✔", 3000);
+    }
+    setTimeout(() => { if (state.part === HISTORY) renderHistory(false); }, 1200);
   }
 
   // ---- Etichete + realtime --------------------------------------------------
@@ -1355,6 +1582,7 @@
   document.addEventListener("paste", handlePaste);
   setInterval(() => { if (localDirty) saveLocalFolder(null, false); }, 5 * 60 * 1000);
   setInterval(() => { if (OB.size() && !needLogin) flushNow(); }, 15000);
+  setInterval(maybeAutoBackup, 60 * 60 * 1000);
   $("saveState").style.cursor = "pointer";
   $("saveState").onclick = () => { retryDelay = 0; commitActive(); flushNow(); };
   // Închiderea filei: celula curentă intră în coadă (sincron); dacă mai e ceva netrimis,

@@ -49,20 +49,26 @@
   async function writeText(folder, name, text) { const fh = await folder.getFileHandle(name, { create: true }); const w = await fh.createWritable(); await w.write(text); await w.close(); }
   async function readText(folder, name) { const fh = await folder.getFileHandle(name); const f = await fh.getFile(); return await f.text(); }
 
-  async function pruneDated(folder, keep) {
+  async function listNames(folder) {
     const names = [];
-    for await (const [name, h] of folder.entries()) { if (h.kind === "file" && /^registru_\d/.test(name)) names.push(name); }
-    names.sort();
-    if (names.length > keep) for (const n of names.slice(0, names.length - keep)) { try { await folder.removeEntry(n); } catch (e) {} }
+    for await (const [name, h] of folder.entries()) { if (h.kind === "file" && /^registru_.*\.json$/.test(name)) names.push(name); }
+    return names.sort().reverse();
+  }
+  // Retenție pe niveluri (ultimele 24 + una/zi pe o lună + una/lună pentru totdeauna) —
+  // înainte se păstrau doar ultimele 30 de salvări, adică ~2 ore la salvare din 5 în 5 minute.
+  async function pruneDated(folder) {
+    const del = window.RegistruLogic.backupsToDelete(await listNames(folder), new Date());
+    for (const n of del) { try { await folder.removeEntry(n); } catch (e) {} }
   }
 
-  // Scrie copia „vie" (registru_backup.json) + o copie datată; păstrează ultimele 30.
+  // Scrie copia „vie" (registru_backup.json) + o copie datată.
   async function saveSnapshot(folder, obj, stamp) {
     const json = JSON.stringify(obj);
     await writeText(folder, "registru_backup.json", json);
-    if (stamp) { try { await writeText(folder, `registru_${stamp}.json`, json); await pruneDated(folder, 30); } catch (e) {} }
+    if (stamp) { try { await writeText(folder, `registru_${stamp}.json`, json); await pruneDated(folder); } catch (e) {} }
   }
-  async function readSnapshot(folder) { return JSON.parse(await readText(folder, "registru_backup.json")); }
+  async function saveNamed(folder, name, obj) { await writeText(folder, name, JSON.stringify(obj)); }
+  async function readSnapshot(folder, name) { return JSON.parse(await readText(folder, name || "registru_backup.json")); }
 
-  window.RegistruLocalFolder = { supported, pickFolder, getFolder, hasFolder, forget, saveSnapshot, readSnapshot };
+  window.RegistruLocalFolder = { supported, pickFolder, getFolder, hasFolder, forget, saveSnapshot, saveNamed, readSnapshot, listNames };
 })();

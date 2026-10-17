@@ -129,7 +129,13 @@ begin
         and utilizator is not distinct from usr and la > now() - interval '2 minutes'
       order by id desc limit 1;
     if last_id is not null then
-      update public.istoric set nou = nou || nd, vechi = vd || vechi, la = now() where id = last_id;
+      update public.istoric set nou = nou || nd, vechi = vd || vechi, la = now() where id = last_id returning vechi, nou into o, n;
+      -- câmpurile care au ajuns înapoi la valoarea de la început nu mai sunt o modificare
+      for k in select jsonb_object_keys(n) loop
+        if (o -> k) is not distinct from (n -> k) then o := o - k; n := n - k; end if;
+      end loop;
+      if n = '{}'::jsonb then delete from public.istoric where id = last_id;
+      else update public.istoric set vechi = o, nou = n where id = last_id; end if;
     else
       insert into public.istoric (utilizator, tabel, rand_id, operatie, ident, vechi, nou) values (usr, tg_table_name, rid, 'UPDATE', idn, vd, nd);
     end if;

@@ -95,6 +95,24 @@ begin
   assert r.ident ->> 'data' = '01.10', 'UPDATE says which row: ' || coalesce(r.ident::text, 'null');
 end $$;
 
+\echo '== a value typed and put back within the burst leaves no history line'
+insert into evidenta_utilizatori (an, luna, data) values (2026, 10, '07.10');
+set role authenticated;
+select set_config('request.jwt.claims', '{"email":"mama@test.md","role":"authenticated"}', false);
+update evidenta_utilizatori set someri = 3, studenti = 1 where data = '07.10';
+update evidenta_utilizatori set someri = 0 where data = '07.10';
+reset role;
+do $$
+declare r record;
+begin
+  select * into r from istoric where operatie = 'UPDATE' and ident ->> 'data' = '07.10';
+  assert r.vechi = '{"studenti": 0}'::jsonb and r.nou = '{"studenti": 1}'::jsonb, 'only the field that really changed remains: ' || coalesce(r.nou::text, 'null');
+end $$;
+set role authenticated;
+update evidenta_utilizatori set studenti = 0 where data = '07.10';
+reset role;
+do $$ begin assert (select count(*) from istoric where operatie = 'UPDATE' and ident ->> 'data' = '07.10') = 0, 'fully reverted burst leaves nothing'; end $$;
+
 \echo '== a deleted row can be brought back from history with its id'
 insert into evidenta_utilizatori select * from jsonb_populate_record(null::evidenta_utilizatori, (select vechi from istoric where operatie = 'DELETE'));
 do $$ begin assert (select adulti from evidenta_utilizatori where data = '02.10') = 7, 'row back'; end $$;
@@ -143,7 +161,7 @@ end $$;
 reset role;
 do $$ begin
   assert (select adulti from evidenta_utilizatori where data = '01.10') = 1, 'first table untouched after the failed restore';
-  assert (select count(*) from evidenta_utilizatori) = 4, 'no rows lost after the failed restore';
+  assert (select count(*) from evidenta_utilizatori) = 5, 'no rows lost after the failed restore';
 end $$;
 
 \echo '== prune keeps recent history'

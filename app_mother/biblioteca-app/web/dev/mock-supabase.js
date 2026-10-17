@@ -13,10 +13,12 @@
 //   signOutEvent()      → sesiunea expiră cu eveniment SIGNED_OUT
 //   delay = 80          → latența fiecărei cereri (ms)
 //   rows(t) / reset()   → vezi tabelul t / golește baza
+//   notAllowed = true   → contul nu e în utilizatori_permisi (is_allowed = false)
+//   noMigration = true  → baza fără migrarea 001 (fără istoric / is_allowed / restore_tables)
 // ============================================================================
 (function () {
   const DBKEY = "mockdb_v1", SKEY = "mock_session";
-  const M = (window.__mock = { offline: false, loggedOut: false, expired: false, delay: 80, requests: 0 });
+  const M = (window.__mock = { offline: false, loggedOut: false, expired: false, notAllowed: false, noMigration: false, delay: 80, requests: 0 });
   const UNIQUE = {
     evidenta_utilizatori: ["an", "luna", "data"],
     evidenta_utilizatori_copii_adulti: ["an", "luna", "data", "categorie_varsta"],
@@ -58,6 +60,7 @@
     like(c, pat) { const re = new RegExp("^" + pat.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*") + "$"); this.f.push((r) => re.test(String(r[c] || ""))); return this; }
     order(c, o) { this.ord = [c, o && o.ascending === false ? -1 : 1]; return this; }
     range(a, b) { this.rng = [a, b]; return this; }
+    limit(n) { this.rng = [0, n - 1]; return this; }
     maybeSingle() { this.one = true; return this; }
     then(res, rej) { return this.exec().then(res, rej); }
     async exec() {
@@ -73,6 +76,8 @@
         if (this.rng) d = d.slice(this.rng[0], this.rng[1] + 1);
         return { data: this.one ? d[0] || null : d, error: null, status: status || 200 };
       };
+      if (this.t === "istoric" && M.noMigration) return { data: null, error: { message: "relation \"public.istoric\" does not exist", code: "42P01" }, status: 404 };
+      if (this.t !== "istoric" && M.notAllowed) { if (this.op === "select" || this.op === "update" || this.op === "delete") return out([]); return { data: null, error: { message: "new row violates row-level security policy", code: "42501" }, status: 403 }; }
       if (!authed) { // RLS „to authenticated": anonimul nu vede și nu modifică nimic — fără eroare
         if (this.op === "select" || this.op === "update" || this.op === "delete") return out([]);
         return { data: null, error: { message: "new row violates row-level security policy", code: "42501" }, status: 401 };
@@ -82,19 +87,68 @@
       if (this.op === "update") {
         const rows = match();
         for (const r of rows) { const nr = Object.assign({}, r, this.payload); if (conflict(this.t, nr, r.id)) return { data: null, error: { message: "duplicate key value violates unique constraint", code: "23505" }, status: 409 }; }
-        rows.forEach((r) => Object.assign(r, this.payload, { updated_at: now })); save(); return out(rows);
+        rows.forEach((r) => { const before = Object.assign({}, r); Object.assign(r, this.payload, { updated_at: now }); hist("UPDATE", this.t, before, r); }); save(); return out(rows);
       }
-      if (this.op === "delete") { const rows = match(), ids = new Set(rows.map((r) => r.id)); db.tables[this.t] = tbl(this.t).filter((r) => !ids.has(r.id)); save(); return out(rows); }
+      if (this.op === "delete") { const rows = match(), ids = new Set(rows.map((r) => r.id)); db.tables[this.t] = tbl(this.t).filter((r) => !ids.has(r.id)); rows.forEach((r) => hist("DELETE", this.t, r, null)); save(); return out(rows); }
       const list = Array.isArray(this.payload) ? this.payload : [this.payload], made = [];
       for (const p of list) {
         const row = Object.assign({ id: db.seq++, created_at: now, updated_at: now }, defaults(this.t), p);
         const dup = conflict(this.t, row);
-        if (dup && this.op === "upsert") { if (!this.opts.ignoreDuplicates) Object.assign(dup, p, { updated_at: now }); made.push(dup); continue; }
+        if (dup && this.op === "upsert") { if (!this.opts.ignoreDuplicates) { const before = Object.assign({}, dup); Object.assign(dup, p, { updated_at: now }); hist("UPDATE", this.t, before, dup); } made.push(dup); continue; }
         if (dup) return { data: null, error: { message: "duplicate key value violates unique constraint", code: "23505" }, status: 409 };
-        tbl(this.t).push(row); made.push(row);
+        tbl(this.t).push(row); made.push(row); hist("INSERT", this.t, null, row);
       }
       save(); return out(made, 201);
     }
+  }
+
+  // ---- istoric (imită triggerul din migrarea 001) ----
+  const IDENT = ["an", "luna", "data", "categorie_varsta", "nume_prenume", "partener", "cheie", "parte", "camp", "valoare"];
+  let restoring = false;
+  function hist(op, t, before, after) {
+    if (M.noMigration || restoring || t === "istoric") return;
+    const src = after || before;
+    if (t === "app_settings" && ["session_state", "seeded_v1"].includes(src.cheie)) return;
+    const ident = {}; IDENT.forEach((k) => { if (k in src) ident[k] = src[k]; });
+    const usr = (getSession() || { user: {} }).user.email || "postgres", la = new Date().toISOString();
+    const H = tbl("istoric");
+    if (op === "UPDATE") {
+      const vd = {}, nd = {};
+      Object.keys(after).forEach((k) => { if (k === "updated_at" || k === "created_at") return; if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) { vd[k] = before[k]; nd[k] = after[k]; } });
+      if (!Object.keys(nd).length) return;
+      const last = H.slice().reverse().find((e) => e.tabel === t && e.operatie === "UPDATE" && e.rand_id === (src.id ?? null) && JSON.stringify(e.ident) === JSON.stringify(ident) && e.utilizator === usr && Date.now() - Date.parse(e.la) < 120000);
+      if (last) {
+        last.nou = Object.assign(last.nou, nd); last.vechi = Object.assign(vd, last.vechi); last.la = la;
+        Object.keys(last.nou).forEach((k) => { if (JSON.stringify(last.nou[k]) === JSON.stringify(last.vechi[k])) { delete last.nou[k]; delete last.vechi[k]; } });
+        if (!Object.keys(last.nou).length) H.splice(H.indexOf(last), 1);
+        return;
+      }
+      H.push({ id: db.seq++, la, utilizator: usr, tabel: t, rand_id: src.id ?? null, operatie: "UPDATE", ident, vechi: vd, nou: nd });
+    } else H.push({ id: db.seq++, la, utilizator: usr, tabel: t, rand_id: src.id ?? null, operatie: op, ident, vechi: op === "DELETE" ? Object.assign({}, before) : null, nou: null });
+  }
+  async function rpc(name, args) {
+    await sleep(M.delay); M.requests++;
+    if (M.offline) return { data: null, error: { message: "TypeError: Failed to fetch", code: "" }, status: 0 };
+    if (M.noMigration) return { data: null, error: { message: `Could not find the function public.${name} in the schema cache`, code: "PGRST202" }, status: 404 };
+    if (name === "is_allowed") return { data: !!getSession() && !M.notAllowed, error: null, status: 200 };
+    if (name === "restore_tables") {
+      if (!getSession() || M.notAllowed) return { data: null, error: { message: "Acces interzis", code: "42501" }, status: 403 };
+      const res = {}, backup = JSON.stringify(db);
+      try {
+        restoring = true;
+        for (const t of args.tabele) {
+          const rows = (args.payload.tables || {})[t] || [];
+          rows.forEach((r) => { Object.keys(r).forEach((k) => { if (typeof r[k] === "string" && r[k] === "__FAIL__") throw Object.assign(new Error("invalid input syntax for type integer"), { code: "22P02" }); }); });
+          db.tables[t] = rows.map((r) => Object.assign(defaults(t), r));
+          const maxId = Math.max(0, ...db.tables[t].map((r) => +r.id || 0)); if (maxId >= db.seq) db.seq = maxId + 1;
+          res[t] = rows.length;
+        }
+        restoring = false;
+        tbl("istoric").push({ id: db.seq++, la: new Date().toISOString(), utilizator: getSession().user.email, tabel: "*", operatie: "RESTORE", nou: { tabele: args.tabele, randuri: res, copia_din: args.payload.created } });
+        save(); return { data: res, error: null, status: 200 };
+      } catch (e) { restoring = false; db = JSON.parse(backup); save(); return { data: null, error: { message: e.message, code: e.code || "P0001" }, status: 400 }; }
+    }
+    return { data: null, error: { message: "unknown rpc " + name, code: "PGRST202" }, status: 404 };
   }
 
   // ---- auth ----
@@ -127,7 +181,7 @@
   }; } };
 
   const client = {
-    from: (t) => new Query(t), auth, storage,
+    from: (t) => new Query(t), auth, storage, rpc,
     channel() { const ch = { on() { return ch; }, subscribe(cb) { if (cb) setTimeout(() => cb("SUBSCRIBED"), 0); return ch; } }; return ch; },
     removeChannel() {},
   };

@@ -46,5 +46,34 @@ eq(L.pairSplit(12, 15, 0, "f"), { f: 15, m: 0 }, "pair: membru > total → compl
 eq(L.sumCols([["a", "A", "int"], ["b", "B", "bool", { ct: true }], ["t", "T", "text"]],
   [{ a: 2, b: true, t: "x" }, { a: 3, b: false, t: "" }]), { a: 5, b: 1 }, "sumCols: int sumă, bool ct = nr bifate");
 
+// backupsToDelete — retenție pe niveluri
+{
+  const now = new Date(2026, 9, 17, 12, 0, 0); // 17 oct 2026
+  const pad = (n) => String(n).padStart(2, "0");
+  const name = (y, m, d, h) => `registru_${y}-${pad(m)}-${pad(d)}_${pad(h)}0000.json`;
+  const all = [];
+  for (let d = 1; d <= 17; d++) for (let h = 8; h <= 17; h++) all.push(name(2026, 10, d, h)); // 10/zi în octombrie
+  for (let d = 1; d <= 30; d++) all.push(name(2026, 9, d, 9), name(2026, 9, d, 15));          // 2/zi în septembrie
+  for (let m = 1; m <= 8; m++) for (let d = 1; d <= 3; d++) all.push(name(2026, m, d, 10));  // ian–aug
+  all.push("registru_backup.json", "registru_inainte-de-restaurare_2026-10-01_100000.json");
+  const del = new Set(L.backupsToDelete(all, now)), kept = all.filter((n) => !del.has(n));
+  // ultimele 24 = 17 oct (10) + 16 oct (10) + 15 oct orele 14–17 (4)
+  eq(kept.includes(name(2026, 10, 17, 17)) && kept.includes(name(2026, 10, 15, 14)) && !kept.includes(name(2026, 10, 15, 13)), true, "retenție: exact ultimele 24 copii păstrate");
+  eq(kept.includes(name(2026, 10, 3, 17)) && !kept.includes(name(2026, 10, 3, 9)), true, "retenție: din zilele mai vechi rămâne cea mai nouă copie a zilei");
+  eq(kept.includes(name(2026, 9, 20, 15)) && !kept.includes(name(2026, 9, 20, 9)), true, "retenție: o copie/zi în ultimele 31 de zile");
+  eq(kept.includes(name(2026, 9, 10, 15)), false, "retenție: zilele de peste 31 de zile nu se mai păstrează zilnic…");
+  eq(kept.includes(name(2026, 9, 30, 15)), true, "…dar ultima copie a lunii septembrie rămâne");
+  eq([1, 2, 3, 4, 5, 6, 7, 8].every((m) => kept.includes(name(2026, m, 3, 10))), true, "retenție: câte o copie pe lună, pentru totdeauna");
+  eq(kept.includes("registru_backup.json") && kept.includes("registru_inainte-de-restaurare_2026-10-01_100000.json"), true, "retenție: alte fișiere nu sunt șterse niciodată");
+  eq(kept.length < 90, true, "retenție: numărul de copii rămâne mic (" + kept.length + ")");
+}
+
+// snapshotLooksWrong — gardă împotriva copiilor goale
+eq(L.snapshotLooksWrong(0, 5000), true, "copie goală după una plină = suspectă");
+eq(L.snapshotLooksWrong(2000, 5000), true, "copie la sub jumătate = suspectă");
+eq(L.snapshotLooksWrong(4800, 5000), false, "câteva rânduri șterse = normal");
+eq(L.snapshotLooksWrong(0, 0), false, "registru nou, gol = normal");
+eq(L.snapshotLooksWrong(10, null), false, "prima copie = normal");
+
 if (fails) { console.error("\n" + fails + " test(e) eșuate"); process.exit(1); }
 console.log("\nTOATE TESTELE AU TRECUT");

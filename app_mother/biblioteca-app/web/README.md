@@ -104,6 +104,26 @@ Teste: `node outbox.test.js` (coada) și `node logic.test.js` (calcule).
 `index.html?mock=1`. Se încarcă `dev/mock-supabase.js`, o bază falsă păstrată în browser. Ea imită RLS, erorile
 de rețea și sesiunea expirată. Din consolă: `__mock.offline = true`, `__mock.loggedOut = true`, `__mock.rows("instruiri")`.
 
+## Migrări ale bazei de date (rulați o singură dată, în ordine)
+
+După `schema.sql`, rulați în **Supabase → SQL Editor** fiecare fișier din `supabase/migrations/`.
+Fișierele se pot rula de mai multe ori fără probleme.
+
+**`001_istoric_acces_restaurare.sql`** aduce:
+- **Acces doar pentru conturi aprobate** (tabelul `utilizatori_permisi`). La prima rulare sunt aprobate
+  conturile care există deja. Rezultatul afișat la final = cine are acces. Dacă vedeți un email necunoscut:
+  `delete from public.utilizatori_permisi where email = '...';`. Pentru un cont nou, creați-l întâi în
+  Authentication → Users, apoi: `insert into public.utilizatori_permisi (email) values ('nume@exemplu.com');`.
+  Recomandat și: **Authentication → Sign In / Providers → dezactivați „Allow new users to sign up”**.
+- **Istoric modificări** (pagina 🕘 din aplicație). Se înregistrează orice adăugare, modificare sau ștergere,
+  cu cine și când. „↶ Revino” readuce valorile sau rândul șters. Istoricul se păstrează 2 ani; jobul nocturn
+  din `registru-backups` îl curăță.
+- **Restaurare totul-sau-nimic** (`restore_tables`). Alegeți ce părți se restaurează. Dacă ceva eșuează,
+  nu se schimbă nimic. Înainte se face automat o copie „înainte de restaurare”.
+
+Aplicația funcționează și **înainte** de migrare: nu blochează pe nimeni, restaurează cu metoda veche,
+iar pagina Istoric arată un mesaj. Testele SQL (`supabase/tests/`) rulează în CI pe Postgres 15 și 17.
+
 ## Backup local („local + cloud")
 
 Supabase e copia vie, partajată. Butonul **⬇ Backup local** descarcă pe PC o copie
