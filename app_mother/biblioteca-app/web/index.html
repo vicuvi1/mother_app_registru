@@ -185,11 +185,12 @@
   <datalist id="staffList"></datalist>
   <div class="toast" id="toast"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.7/build/pdfmake.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.7/build/vfs_fonts.js"></script>
+  <!-- Biblioteci cu versiune fixă, incluse în aplicație (vezi vendor/README.md) -->
+  <script src="./vendor/supabase-js-2.117.2.js"></script>
+  <script src="./vendor/xlsx-0.18.5.full.min.js"></script>
+  <script src="./vendor/sql-wasm.js"></script>
+  <script src="./vendor/pdfmake-0.2.7.min.js"></script>
+  <script src="./vendor/pdfmake-0.2.7-vfs_fonts.js"></script>
   <!-- Doar pentru testare locală: ?mock=1 înlocuiește Supabase cu o bază falsă în browser (dev/mock-supabase.js). -->
   <script>if (/[?&]mock=1/.test(location.search)) document.write('<script src="./dev/mock-supabase.js"><\/script>');</script>
   <script src="./config.js"></script>

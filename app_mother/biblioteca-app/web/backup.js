@@ -29,7 +29,8 @@
     voluntariat: "Partea XIV",
   };
 
-  const SQLJS_CDN = "https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/";
+  // sql-wasm.wasm din vendor/; deschis de pe disc (file://) browserul nu-l poate încărca → CDN
+  const SQLJS_CDN = location.protocol === "file:" ? "https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/" : "./vendor/";
 
   function stamp() {
     const d = new Date();
@@ -195,7 +196,8 @@
   function describe(name) {
     const m = /(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})/.exec(name);
     const when = m ? `${m[3]}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : name;
-    return /inainte-de-restaurare/.test(name) ? `${when} — înainte de restaurare` : when;
+    const why = /inainte-de-(restaurare|import)/.exec(name);
+    return why ? `${when} — înainte de ${why[1]}` : when;
   }
   // Gardă: o copie cu mult mai puține rânduri decât precedenta (ex. citită fără login)
   // nu trebuie să suprascrie copiile bune.

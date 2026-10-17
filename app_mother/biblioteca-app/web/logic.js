@@ -96,7 +96,21 @@
     return total === 0 || total < prevTotal * 0.5;
   }
 
-  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, pairSplit, sumCols, backupsToDelete, snapshotLooksWrong };
+  // Data scrisă de om → "ZZ.LL". Acceptă „5", „5.10", „05/10", „5-10-2026" (anul se ignoră).
+  // Fără lună → `defMonth`. Întoarce { value } sau { error } ("" rămâne "" — câmp gol).
+  function normDate(text, year, defMonth) {
+    const s = String(text == null ? "" : text).trim();
+    if (!s) return { value: "" };
+    const m = /^(\d{1,2})(?:\s*[.\/\-]\s*(\d{1,2})(?:\s*[.\/\-]\s*\d{2,4})?)?\.?$/.exec(s);
+    if (!m) return { error: "format" };
+    const d = +m[1], mo = m[2] ? +m[2] : +defMonth;
+    if (!(mo >= 1 && mo <= 12)) return { error: "luna" };
+    const last = new Date(+year || 2000, mo, 0).getDate();
+    if (!(d >= 1 && d <= last)) return { error: "ziua" };
+    return { value: pad2(d) + "." + pad2(mo), month: mo };
+  }
+
+  const api = { weekdays, rebalanceCZU, genderSplit, copiiSplit, docLangSplit, czuRemainder, pairSplit, sumCols, backupsToDelete, snapshotLooksWrong, normDate };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof window !== "undefined") window.RegistruLogic = api;
 })();
