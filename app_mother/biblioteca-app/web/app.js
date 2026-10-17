@@ -141,7 +141,7 @@
     };
   }
   function openHelp() {
-    const rows = [["Ctrl+F", "Găsește în tabel"], ["Ctrl+Z", "Anulează ultima editare"], ["Ctrl+C / Ctrl+V", "Copiază / lipește (din Excel)"], ["Ctrl+D", "Duplică rândul (părți evenimente)"], ["Ctrl+Shift+M", "Copiază luna trecută"], ["Ctrl+← / Ctrl+→", "Luna anterioară / următoare"], ["Ctrl+S", "Salvare (automată oricum)"], ["Ctrl+E", "Export Excel"], ["Enter", "Celula de mai jos"], ["Tab", "Celula următoare"], ["F1", "Acest ajutor"]];
+    const rows = [["Ctrl+F", "Găsește în tabel"], ["Ctrl+Z", "Anulează ultima editare"], ["Ctrl+C / Ctrl+V", "Copiază / lipește (din Excel)"], ["Ctrl+D", "Duplică rândul (părți evenimente)"], ["Ctrl+Shift+M", "Copiază luna trecută"], ["Ctrl+← / Ctrl+→", "Luna anterioară / următoare"], ["↑ / ↓", "Rândul de sus / de jos (și alegere din listă)"], ["Ctrl+S", "Trimite acum modificările"], ["Ctrl+E", "Export Excel"], ["Enter", "Celula de mai jos"], ["Tab", "Celula următoare"], ["F1", "Acest ajutor"]];
     $("settings").innerHTML = `<div class="box"><h3>⌨ Scurtături tastatură</h3>
       <table style="width:100%;border-collapse:collapse">${rows.map(([k, d]) => `<tr><td style="padding:5px 8px;font-weight:600;white-space:nowrap">${k}</td><td style="padding:5px 8px;color:var(--muted)">${d}</td></tr>`).join("")}</table>
       <p class="status" style="margin-top:10px">Galben = ziua de azi · Bleu = calculat automat · Roșu = valoare invalidă</p>
@@ -232,7 +232,7 @@
     bind("exportDoc", () => window.RegistruExport.exportWord(p, state.rows, exCtx()));
     bind("printBtn", printCurrent);
   }
-  const exCtx = () => ({ an: state.an, luna: state.luna, cat: state.cat, cols: effCols(), orientation: state.settings.print_orientation || "landscape", toast });
+  const exCtx = () => ({ an: state.an, luna: state.luna, cat: state.cat, cols: effCols(), label, totals: totalsRows(), orientation: state.settings.print_orientation || "landscape", toast });
 
   // ---- Încărcare + meta -----------------------------------------------------
   // Fiecare încărcare primește un număr; un răspuns întârziat al unei încărcări
@@ -252,7 +252,11 @@
       q = p.orderById ? q.order("id", { ascending: true }) : (p.period === "luna" ? q.order("luna", { ascending: true }) : (p.dateField ? q.order(p.dateField, { ascending: true }) : q.order("id", { ascending: true })));
       const { data, error } = await q;
       if (stale()) return;
-      if (error) { toast("Eroare la încărcare: " + error.message, 6000); return; }
+      if (error) {
+        state.rows = [];
+        $("content").innerHTML = `<div class="card" style="max-width:560px"><h3>⚠ Datele nu s-au putut încărca</h3><p class="status">${esc(error.message)}</p><p style="font-size:13px">Verificați internetul. Modificările dvs. nesalvate rămân păstrate pe calculator.</p><button id="retryLoad">↻ Încearcă din nou</button></div>`;
+        $("retryLoad").onclick = () => loadData(); return;
+      }
       // Peste datele serverului se pun modificările încă netrimise (ca să le vedeți, chiar și offline).
       state.rows = (data || []).map((r) => Object.assign(r, OB.pending(p.key, r.id) || {}));
       // Auto-schelet (ca în desktop): la deschiderea unei luni goale, creează
@@ -261,7 +265,8 @@
         const scaffold = [];
         if (p.period === "luna") { for (let m = 1; m <= 12; m++) { const o = { an: state.an, luna: m }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); } }
         else { const excl = await getExcluded(state.an), exSet = new Set(excl[state.luna] || []); weekdays(state.an, state.luna).filter((d) => !exSet.has(d)).forEach((d) => { const o = { an: state.an, luna: state.luna, [p.dateField]: d }; if (p.categorie) o.categorie_varsta = state.cat; scaffold.push(o); }); }
-        if (scaffold.length) { const { error: e2 } = await sb.from(p.key).insert(scaffold); if (stale()) return; if (!e2) return loadData(true); }
+        // (dacă alt calculator a creat zilele în același timp, inserarea dă eroare — reîncărcăm oricum)
+        if (scaffold.length) { await sb.from(p.key).insert(scaffold); if (stale()) return; return loadData(true); }
       }
       await syncIn(p); await loadMeta(p);
       if (stale()) return;
@@ -311,7 +316,8 @@
     const v = r[k];
     if (t === "int") {
       const rg = colRange(p, k), oor = !o.ro && ((+v || 0) > rg.max || (+v || 0) < rg.min);
-      return `<input class="num${o.ro ? " calc" : ""}${oor ? " oor" : ""}" type="number" ${o.ro ? "readonly" : `data-min="${rg.min}" data-max="${rg.max}"`} value="${esc(v == null ? 0 : v)}" ${attr}>`;
+      // type="text" (nu "number"): la „number" săgețile ↑/↓ și rotița mouse-ului modifică valoarea pe ascuns
+      return `<input class="num${o.ro ? " calc" : ""}${oor ? " oor" : ""}" type="text" inputmode="numeric" autocomplete="off" ${o.ro ? "readonly" : `data-min="${rg.min}" data-max="${rg.max}"`} value="${esc(v == null ? 0 : v)}" ${attr}>`;
     }
     if (t === "monthlabel") return `<input class="txt calc" type="text" readonly value="${esc(LUNI[(+v || 1) - 1] || "")}" ${attr}>`;
     if (t === "bool") return `<input type="checkbox" ${v ? "checked" : ""} ${attr}>`;
@@ -337,6 +343,24 @@
     pop.querySelectorAll(".pp-item").forEach((d) => (d.onmousedown = (ev) => { ev.preventDefault(); inp.value = d.textContent; inp.dispatchEvent(new Event("change", { bubbles: true })); closePresetPopup(); }));
   }
   function closePresetPopup() { if (presetPop) presetPop.style.display = "none"; }
+  // ↑/↓ aleg din listă, Enter pune valoarea aleasă. Întoarce true dacă tasta a fost folosită.
+  function presetKey(inp, e) {
+    if (!presetPop || presetPop.style.display === "none") return false;
+    const items = [...presetPop.querySelectorAll(".pp-item")]; if (!items.length) return false;
+    let i = items.findIndex((x) => x.classList.contains("sel"));
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (i < 0 && e.key === "ArrowUp") { closePresetPopup(); return false; }
+      i = Math.max(0, Math.min(items.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)));
+      items.forEach((x, j) => x.classList.toggle("sel", j === i)); items[i].scrollIntoView({ block: "nearest" });
+      return true;
+    }
+    if (e.key === "Enter" && i >= 0) {
+      e.preventDefault(); inp.value = items[i].textContent; inp.dispatchEvent(new Event("change", { bubbles: true })); closePresetPopup(); moveDown(inp);
+      return true;
+    }
+    return false;
+  }
 
   function renderGrid() {
     const p = state.part, cols = effCols(), tk = todayStr(), showToday = p.period === "zi" && tk.y === state.an && tk.m === state.luna;
@@ -368,38 +392,60 @@
       if (t === "text" || t === "txt" || t === "staff") {
         inp.addEventListener("focus", () => openPresetPopup(inp));
         inp.addEventListener("input", () => { inp.classList.add("dirty"); if (live) commitCell(inp, false); openPresetPopup(inp); });
-        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); closePresetPopup(); moveDown(inp); } else if (e.key === "Escape") closePresetPopup(); });
+        inp.addEventListener("keydown", (e) => {
+          if (presetKey(inp, e)) return; // ↑/↓/Enter în lista deschisă
+          if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); closePresetPopup(); moveDown(inp); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); closePresetPopup(); moveUp(inp); }
+          else if (e.key === "Escape") closePresetPopup();
+        });
         inp.addEventListener("blur", () => setTimeout(closePresetPopup, 160));
       } else if (inp.type !== "checkbox" && !inp.readOnly) {
         inp.addEventListener("input", () => { inp.classList.add("dirty"); if (live) commitCell(inp, false); });
-        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); moveDown(inp); } });
+        inp.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); moveDown(inp); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); moveUp(inp); }
+        });
       }
     });
     $("content").querySelectorAll(".del").forEach((b) => (b.onclick = () => deleteRow(+b.dataset.id)));
     state.rows.forEach((r) => applyRowValidation(r.id));
     renderFooter();
   }
-  function moveDown(inp) {
+  function moveDown(inp) { moveRow(inp, 1); }
+  function moveUp(inp) { moveRow(inp, -1); }
+  function moveRow(inp, d) {
     const col = inp.dataset.col, all = [...$("content").querySelectorAll(`tbody input[data-col="${col}"]`)];
-    const i = all.indexOf(inp); if (i >= 0 && i < all.length - 1) all[i + 1].focus(); else inp.blur();
+    const i = all.indexOf(inp), next = all[i + d];
+    if (next) { next.focus(); if (next.select && next.type !== "checkbox") next.select(); }
+    else if (d > 0) inp.blur();
+  }
+  // Pune cursorul pe prima celulă editabilă a unui rând (după + Rând / Duplică).
+  function focusRow(id) {
+    const inp = [...$("content").querySelectorAll(`tbody input[data-id="${id}"]`)].find((x) => !x.readOnly && x.type !== "checkbox");
+    if (inp) { inp.scrollIntoView({ block: "center" }); inp.focus(); if (inp.select) inp.select(); }
   }
 
   const computeAcc = (cols, rows) => window.RegistruLogic.sumCols(cols, rows);
   function footerRow(label2, acc, cols, cls) {
     return "<tr>" + cols.map((c, i) => i === 0 ? `<td class="totlbl">${esc(label2)}</td>` : `<td class="${cls}">${acc[c[0]] == null ? "" : acc[c[0]]}</td>`).join("") + `<td class="${cls}"></td></tr>`;
   }
-  function renderFooter() {
-    const cols = effCols(), acc = computeAcc(cols, state.rows);
-    let html = footerRow("Total", acc, cols, "totalrow");
+  // Rândurile de total ale tabelului curent: [[eticheta, {coloană: valoare}], …] — pe ecran și în exporturi.
+  function totalsRows() {
+    const cols = effCols(), acc = computeAcc(cols, state.rows), out = [["Total", acc]];
     if (state.part.cumulative && state.prior) {
       const cum = {}; cols.forEach(([k, l, t, o]) => { if (t === "int" || (t === "bool" && o && o.ct)) cum[k] = (state.prior[k] || 0) + (acc[k] || 0); });
-      html += footerRow("Total de la început", cum, cols, "cumrow");
+      out.push(["Total de la început", cum]);
     }
+    return out;
+  }
+  function renderFooter() {
+    const cols = effCols(), html = totalsRows().map(([l, acc], i) => footerRow(l, acc, cols, i ? "cumrow" : "totalrow")).join("");
     const f = $("gridFoot"); if (f) f.innerHTML = html;
   }
 
   // ---- Reguli intra-rând ----------------------------------------------------
-  function deriveRow(part, row, col) {
+  // prev = valoarea câmpului înainte de modificare (doar la editarea unei celule).
+  function deriveRow(part, row, col, prev) {
     const cols = effCols(), affected = new Set([col]);
     if (part.key === "evidenta_utilizatori" && ["elevi", "copii_pana_16", "prescolari"].indexOf(col) >= 0) {
       const r2 = window.RegistruLogic.copiiSplit(row.prescolari, row.elevi, row.copii_pana_16, col);
@@ -415,7 +461,12 @@
           if ((+row[sk.m] || 0) !== r.m) { row[sk.m] = r.m; affected.add(sk.m); }
         }
       } else if (col === sk.total && t > 0) {
-        const g = window.RegistruLogic.genderSplit(t); row[sk.f] = g.f; row[sk.m] = g.m; affected.add(sk.f); affected.add(sk.m);
+        // Împărțirea automată (jumătate-jumătate) doar dacă Masculin/Feminin n-au fost scrise de mână:
+        // sunt goale sau sunt exact împărțirea automată a totalului de dinainte.
+        const f0 = +row[sk.f] || 0, m0 = +row[sk.m] || 0, g0 = window.RegistruLogic.genderSplit(+prev || 0);
+        if (prev === undefined || (f0 === 0 && m0 === 0) || (f0 === g0.f && m0 === g0.m)) {
+          const g = window.RegistruLogic.genderSplit(t); row[sk.f] = g.f; row[sk.m] = g.m; affected.add(sk.f); affected.add(sk.m);
+        }
       }
     }
     const oldTotal = part.key === "documente_inregistrate" ? (+row.total_imprumuturi || 0) : null;
@@ -606,7 +657,7 @@
     const prev = row[col], nv = readInput(el, type);
     if (nv !== prev) {
       row[col] = nv;
-      const affected = deriveRow(part, row, col);
+      const affected = deriveRow(part, row, col, prev);
       if (state.settings.strict_validation === "1") {
         const rg = type === "int" ? colRange(part, col) : null;
         const oor = rg && (nv > rg.max || nv < rg.min);
@@ -625,6 +676,7 @@
     }
     if (!final) return;
     el.classList.remove("dirty");
+    if (type === "int") el.value = row[col] == null ? 0 : row[col];
     if (before === row[col]) return;
     focusOld.set(el, row[col]);
     pushUndo({ kind: "cell", key: part.key, id, col, type, old: before });
@@ -700,11 +752,11 @@
       }
       if (state.rows.some((r) => r[p.dateField] === base[p.dateField])) { toast(`Ziua ${base[p.dateField]} există deja în tabel`, 5000); return; }
     }
-    else if (p.period === "lista" && p.dateField) base[p.dateField] = ddmm(1, state.luna);
+    else if (p.period === "lista" && p.dateField) { const t = todayStr(); base[p.dateField] = t.y === state.an && t.m === state.luna ? t.d : ddmm(1, state.luna); }
     p.cols.forEach(([k, l, t, o]) => { if (o && o.req && (t === "text" || t === "txt") && base[k] === undefined) base[k] = ""; });
     const { data, error } = await sb.from(p.key).insert(base).select().maybeSingle(); if (error) { toast("Eroare: " + error.message); return; }
     if (data) pushUndo({ kind: "add", key: p.key, id: data.id });
-    markDirty(); await loadData();
+    markDirty(); await loadData(); if (data) focusRow(data.id);
   }
   async function deleteRow(id) {
     if (!confirm("Ștergeți acest rând?")) return;
@@ -854,16 +906,22 @@
   }
 
   // Sincronizare inversă: editarea Părții II (instruiri/activități) → IX/XI.
-  // Pune întreaga sumă pe primul rând al datei, restul = 0; dacă nu există, inserează.
+  // Diferența față de suma din IX/XI se pune pe primul rând al zilei (o scădere se ia pe rând,
+  // de la primul); celelalte instruiri/activități ale zilei rămân neatinse. Fără rânduri → se adaugă unul.
   async function reverseSync(col, dateStr, value) {
     if (!dateStr) return;
     const table = col === "instruiri" ? "instruiri" : "activitati_culturale";
     const an = state.an, luna = state.luna, cat = state.cat, nr = table === "instruiri" ? "IX" : "XI";
-    const { data, error } = await sb.from(table).select("id").eq("an", an).eq("luna", luna).eq("categorie_varsta", cat).eq("data", dateStr).order("id", { ascending: true });
+    const { data, error } = await sb.from(table).select("id,total_participanti,prescolari,categorie_varsta").eq("an", an).eq("luna", luna).eq("categorie_varsta", cat).eq("data", dateStr).order("id", { ascending: true });
     if (error) { toast(`Sincronizarea cu Partea ${nr} a eșuat: ${error.message}`, 6000); return; }
     if (data && data.length) {
-      queueSave(table, data[0].id, { total_participanti: value });
-      for (let i = 1; i < data.length; i++) queueSave(table, data[i].id, { total_participanti: 0 });
+      const rows = data.map((r) => Object.assign({}, r, OB.pending(table, r.id) || {}));
+      let delta = value - rows.reduce((a, r) => a + (+r.total_participanti || 0), 0);
+      if (!delta) return;
+      const set = (r, t) => { const u = { total_participanti: t }; if (table === "instruiri" && r.categorie_varsta === "copii") u.elevi = Math.max(0, t - (+r.prescolari || 0)); queueSave(table, r.id, u); };
+      if (delta > 0) set(rows[0], (+rows[0].total_participanti || 0) + delta);
+      else for (const r of rows) { if (!delta) break; const cur = +r.total_participanti || 0, take = Math.min(cur, -delta); if (take) { set(r, cur - take); delta += take; } }
+      if (rows.length > 1) toast(`Partea ${nr}: ${dateStr} are ${rows.length} rânduri — diferența a fost pusă pe primul. Verificați acolo dacă e corect.`, 6000);
     } else if (value > 0) {
       const ins = { an, luna, categorie_varsta: cat, data: dateStr, total_participanti: value };
       if (table === "activitati_culturale") ins.total_activitati = 1;
@@ -1247,7 +1305,8 @@
   function printCurrent() {
     const p = state.part, cols = effCols(), ori = state.settings.print_orientation || "landscape";
     const head = `<tr>${cols.map((c) => `<th>${esc(label(c))}</th>`).join("")}</tr>`;
-    const body = state.rows.map((r) => `<tr>${cols.map(([k, l, t]) => `<td>${esc(cellText(r, k, t))}</td>`).join("")}</tr>`).join("");
+    const body = state.rows.map((r) => `<tr>${cols.map(([k, l, t]) => `<td>${esc(cellText(r, k, t))}</td>`).join("")}</tr>`).join("") +
+      totalsRows().map(([l2, acc]) => `<tr>${cols.map(([k], i) => `<td style="font-weight:700;background:#eef2f7">${i === 0 ? esc(l2) : acc[k] == null ? "" : acc[k]}</td>`).join("")}</tr>`).join("");
     const per = p.period === "luna" ? `Anul ${state.an}` : (p.period !== "crud" ? `${LUNI[state.luna - 1]} ${state.an}` : "");
     const w = window.open("", "_blank");
     w.document.write(`<html><head><meta charset="utf-8"><title>Partea ${p.nr}</title><style>@page{size:A4 ${ori}}body{font:11px Segoe UI,sans-serif}h3{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #555;padding:3px;text-align:center}th{background:#eef2f7}</style></head><body><h3>Partea ${p.nr}. ${esc(p.title)} — ${per}${p.categorie ? " (" + state.cat + ")" : ""}</h3><table>${head}${body}</table><script>window.onload=function(){window.print()}<\/script></body></html>`);
@@ -1603,8 +1662,9 @@
     if (!src) src = state.rows[state.rows.length - 1];
     if (!src) { toast("Niciun rând de duplicat"); return; }
     const o = {}; Object.keys(src).forEach((k) => { if (!["id", "created_at", "updated_at"].includes(k)) o[k] = src[k]; });
-    const { error } = await sb.from(state.part.key).insert(o); if (error) { toast("Eroare: " + error.message); return; }
-    toast("Rând duplicat"); await loadData();
+    const { data: made, error } = await sb.from(state.part.key).insert(o).select("id").maybeSingle(); if (error) { toast("Eroare: " + error.message, 6000); return; }
+    if (made) pushUndo({ kind: "add", key: state.part.key, id: made.id });
+    toast("Rând duplicat (Ctrl+Z anulează)", 3000); await loadData(); if (made) focusRow(made.id);
   }
 
   // ---- Găsește în tabel (Ctrl+F) --------------------------------------------
@@ -1649,12 +1709,13 @@
     else if (k === "c") { const el = document.activeElement; if (el && el.matches && el.matches("#content tbody input") && el.type !== "checkbox" && el.selectionStart === el.selectionEnd && navigator.clipboard) navigator.clipboard.writeText(el.value || "").catch(() => {}); }
     else if (k === "d") { if (isPart() && state.part.period === "lista") { e.preventDefault(); duplicateRow(); } }
     else if (e.shiftKey && k === "m") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista")) { e.preventDefault(); copyLastMonth(); } }
-    else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && document.activeElement && document.activeElement.matches && document.activeElement.matches("input[type=text], textarea")) { /* mutare pe cuvinte în text */ }
+    else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && document.activeElement && document.activeElement.matches && document.activeElement.matches("input[type=text], input[type=email], textarea") && !["int", "date"].includes(document.activeElement.dataset.type)) { /* mutare pe cuvinte în text */ }
     else if (e.key === "ArrowLeft") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista") && state.luna > 1) { e.preventDefault(); state.luna--; loadData(); updateChrome(); } }
     else if (e.key === "ArrowRight") { if (isPart() && (state.part.period === "zi" || state.part.period === "lista") && state.luna < 12) { e.preventDefault(); state.luna++; loadData(); updateChrome(); } }
   });
   $("loginBtn").onclick = login;
   $("password").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+  $("email").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if ($("password").value) login(); else $("password").focus(); } });
   $("settingsBtn").onclick = openSettings;
   $("menuBtn").onclick = () => { const a = document.querySelector("aside"); if (a) a.classList.toggle("open"); };
   document.addEventListener("paste", handlePaste);

@@ -11,7 +11,7 @@
 // ============================================================================
 (function () {
   function create(storage, key) {
-    let items = load();
+    let items = load(), stored = true;
     let flushing = null, queued = null;
 
     function load() {
@@ -19,24 +19,29 @@
       catch (e) { return {}; }
     }
     function persist() {
-      try { storage.setItem(key, JSON.stringify(items)); return true; } catch (e) { return false; }
+      try { storage.setItem(key, JSON.stringify(items)); stored = true; return true; } catch (e) { stored = false; return false; }
     }
+    // Aplicația poate fi deschisă în două file: coada stă în localStorage, comun tuturor.
+    // Recitim înainte de fiecare operație, ca o filă să nu șteargă modificările celeilalte.
+    // (Dacă scrierea a eșuat — spațiu plin — memoria e singura copie: nu o înlocuim.)
+    function sync() { if (stored) items = load(); }
     const k = (table, id) => table + ":" + id;
 
     // Adaugă/combină câmpurile unui rând. Valorile mai noi le înlocuiesc pe cele vechi.
     // Întoarce false dacă nu s-a putut scrie în localStorage (spațiu plin / blocat).
     function put(table, id, fields) {
+      sync();
       const it = items[k(table, id)] || (items[k(table, id)] = { table, id, fields: {}, v: 0 });
       Object.assign(it.fields, fields);
       it.v++; it.ts = Date.now();
       return persist();
     }
-    function pending(table, id) { const it = items[k(table, id)]; return it ? it.fields : null; }
-    function list() { return Object.keys(items).map((x) => items[x]); }
-    function size() { return Object.keys(items).length; }
+    function pending(table, id) { sync(); const it = items[k(table, id)]; return it ? it.fields : null; }
+    function list() { sync(); return Object.keys(items).map((x) => items[x]); }
+    function size() { sync(); return Object.keys(items).length; }
     function clear() { items = {}; persist(); }
     // Rândul a fost șters intenționat → nu mai are sens să-l trimitem.
-    function remove(table, id) { if (items[k(table, id)]) { delete items[k(table, id)]; persist(); } }
+    function remove(table, id) { sync(); if (items[k(table, id)]) { delete items[k(table, id)]; persist(); } }
 
     // Trimite tot ce e în coadă, pe rând. Se oprește la prima problemă de rețea
     // sau de autentificare (nu insistă inutil); erorile permanente (ex. valoare
@@ -47,6 +52,7 @@
         const key = k(it.table, it.id), v = it.v, fields = Object.assign({}, it.fields);
         let r;
         try { r = await send(it.table, it.id, fields); } catch (e) { r = "retry"; }
+        sync();
         const cur = items[key];
         if (r === "ok") {
           // Dacă între timp s-a mai editat rândul, rămâne în coadă (se retrimite).
