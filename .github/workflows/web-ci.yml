@@ -17,5 +17,5 @@ jobs:
           node-version: "20"
       - name: Syntax-check all JS
         run: for f in *.js; do echo "check $f"; node --check "$f"; done
-      - name: Run logic tests
-        run: node logic.test.js
+      - name: Run logic + save-queue tests
+        run: node logic.test.js && node outbox.test.js

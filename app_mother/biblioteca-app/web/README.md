@@ -83,6 +83,27 @@ Logica de business e independentă de interfață și se poate refolosi într-un
 `app/ui/export/`) și regulile de sincronizare/calcul (`app/core/`). POC-ul de acum vorbește
 însă direct cu Supabase din browser, fără backend.
 
+## Salvarea datelor (nimic nu se pierde)
+
+Fiecare modificare trece printr-o **coadă de salvare** (`outbox.js`):
+
+1. Se salvează **în timp ce scrieți**, nu doar la ieșirea din celulă. Data e excepția: ea se salvează la ieșire.
+2. Modificarea e scrisă întâi în `localStorage`, pe calculator, apoi trimisă la Supabase.
+3. Iese din coadă **doar** după ce serverul confirmă că rândul s-a modificat. Un răspuns cu „0 rânduri”,
+   adică sesiunea pierdută, **nu** mai trece drept „salvat”.
+4. Dacă fila se închide, internetul cade sau sesiunea expiră, coada rămâne. Se retrimite automat:
+   la revenirea internetului, după reconectare (apare o fereastră de login peste aplicație)
+   sau la următoarea pornire.
+5. Indicatorul din antet arată starea reală: **✔ Toate salvate** / **⏳ Se salvează** /
+   **⚠ N în așteptare — păstrate pe calculator** / **🔒 reconectați-vă**. Click pe el încearcă din nou.
+6. Lipirea din Excel, „Auto valori” și „Copiază luna trecută” trec tot prin coadă și se anulează cu un singur **Ctrl+Z**.
+
+Teste: `node outbox.test.js` (coada) și `node logic.test.js` (calcule).
+
+**Testare locală fără Supabase:** serviți folderul (ex. `npx http-server . -p 8095`) și deschideți
+`index.html?mock=1`. Se încarcă `dev/mock-supabase.js`, o bază falsă păstrată în browser. Ea imită RLS, erorile
+de rețea și sesiunea expirată. Din consolă: `__mock.offline = true`, `__mock.loggedOut = true`, `__mock.rows("instruiri")`.
+
 ## Backup local („local + cloud")
 
 Supabase e copia vie, partajată. Butonul **⬇ Backup local** descarcă pe PC o copie
