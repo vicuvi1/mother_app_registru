@@ -19,13 +19,14 @@
   function subtitle(part, ctx) {
     if (part.period === "crud") return "";
     let s = `Anul ${ctx.an}`;
-    if (part.period !== "crud") s += `, luna ${LUNI[ctx.luna - 1] || ctx.luna}`;
+    if (part.period !== "luna") s += `, luna ${LUNI[ctx.luna - 1] || ctx.luna}`; // Partea VII = tot anul
     if (part.categorie) s += `, categorie: ${ctx.cat === "adulti" ? "Adulți" : "Copii"}`;
     return s;
   }
   function baseName(part, ctx) {
     let n = `partea_${part.nr}`;
-    if (part.period !== "crud") n += `_${ctx.an}_${String(ctx.luna).padStart(2, "0")}`;
+    if (part.period === "luna") n += `_${ctx.an}`;
+    else if (part.period !== "crud") n += `_${ctx.an}_${String(ctx.luna).padStart(2, "0")}`;
     if (part.categorie) n += `_${ctx.cat}`;
     return n;
   }
@@ -37,15 +38,19 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
-  const headers = (cols) => cols.map((c) => c[1]);
+  // denumirile coloanelor ca pe ecran (inclusiv cele redenumite cu dublu-clic)
+  const headers = (cols, ctx) => cols.map((c) => (ctx && ctx.label ? ctx.label(c) : c[1]));
+  // rândurile Total / Total de la început, ca pe ecran
+  const totalRows = (cols, ctx) => ((ctx && ctx.totals) || []).map(([l, acc]) => cols.map(([k], i) => (i === 0 ? l : acc[k] == null ? "" : String(acc[k]))));
   const rowText = (cols, r) => cols.map(([k, l, t]) => fmt(r[k], t));
 
   // ---- PDF (pdfmake) --------------------------------------------------------
   function exportPDF(part, rows, ctx) {
     if (!window.pdfMake) { ctx.toast && ctx.toast("PDF indisponibil (rețea?)"); return; }
     const cols = (ctx && ctx.cols) || part.cols;
-    const body = [headers(cols).map((h) => ({ text: h, bold: true, fontSize: 6, fillColor: "#eef2f7" }))];
+    const body = [headers(cols, ctx).map((h) => ({ text: h, bold: true, fontSize: 6, fillColor: "#eef2f7" }))];
     rows.forEach((r) => body.push(rowText(cols, r).map((x) => ({ text: x, fontSize: 6 }))));
+    if (rows.length) totalRows(cols, ctx).forEach((t) => body.push(t.map((x) => ({ text: x, bold: true, fontSize: 6, fillColor: "#eef2f7" }))));
     if (!rows.length) body.push([{ text: "— fără date —", colSpan: cols.length, alignment: "center", fontSize: 8 }]);
     const dd = {
       pageOrientation: (ctx && ctx.orientation) || "landscape", pageSize: "A4", pageMargins: [16, 24, 16, 28],
@@ -63,9 +68,10 @@
   // ---- Word (.doc prin HTML) ------------------------------------------------
   function exportWord(part, rows, ctx) {
     const cols = (ctx && ctx.cols) || part.cols;
-    const th = headers(cols).map((h) => `<th>${esc(h)}</th>`).join("");
+    const th = headers(cols, ctx).map((h) => `<th>${esc(h)}</th>`).join("");
     const trs = rows.map((r) =>
-      `<tr>${rowText(cols, r).map((x) => `<td>${esc(x)}</td>`).join("")}</tr>`).join("");
+      `<tr>${rowText(cols, r).map((x) => `<td>${esc(x)}</td>`).join("")}</tr>`).join("") +
+      (rows.length ? totalRows(cols, ctx).map((t) => `<tr>${t.map((x) => `<th>${esc(x)}</th>`).join("")}</tr>`).join("") : "");
     const html =
       `<html xmlns:o='urn:schemas-microsoft-com:office:office' ` +
       `xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>` +

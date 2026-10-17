@@ -56,6 +56,20 @@ function memStorage() { const m = {}; return { getItem: (k) => (k in m ? m[k] : 
   await Promise.all([q.flush(slow), q.flush(slow), q.flush(slow)]);
   eq([maxInFlight, q.size()], [1, 0], "flush-uri suprapuse rulează pe rând");
 
+  // două file deschise (aceeași coadă în localStorage) → nu își șterg una alteia modificările
+  {
+    const shared = memStorage(), tabA = O.create(shared, "ob"), tabB = O.create(shared, "ob");
+    tabA.put("a", 1, { x: 1 });
+    tabB.put("a", 2, { y: 2 });          // B pornise înainte să existe modificarea lui A
+    tabA.put("a", 3, { z: 3 });
+    eq(O.create(shared, "ob").size(), 3, "două file: nicio modificare pierdută");
+    const sentIds = [];
+    await tabA.flush(async (t, id) => { sentIds.push(id); return id === 1 ? "ok" : "retry"; });
+    eq([sentIds, O.create(shared, "ob").list().map((i) => i.id)], [[1, 2], [2, 3]], "fila A trimite și ce a pus B; la eroare de rețea restul rămâne");
+    tabB.put("a", 2, { y: 5 });
+    eq(tabA.pending("a", 2), { y: 5 }, "fila A vede editarea nouă din B");
+  }
+
   // localStorage stricat → pornește gol, nu crapă
   const bad = memStorage(); bad.setItem("ob", "{nu e json");
   eq(O.create(bad, "ob").size(), 0, "date corupte în localStorage → coadă goală, fără crash");
