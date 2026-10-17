@@ -7,9 +7,10 @@ toți lucrează pe **același registru**, în timp real.
 > ### 🔒 IMPORTANT — ca datele să NU se piardă (plan gratuit)
 > Citește ghidul complet: **[docs/SIGURANTA-DATELOR.md](docs/SIGURANTA-DATELOR.md)**
 > Pe scurt: proiectul gratuit Supabase intră în pauză după 7 zile de inactivitate
-> și se șterge după 90 de zile în pauză. Aplicația are deja un **ping automat zilnic**
-> (GitHub Actions) + **folder local „registru mother"** + backup cloud. Pentru siguranță
-> maximă, configurează și un **ping extern** (5 min pe cron-job.org — vezi ghidul).
+> și se șterge după 90 de zile în pauză. **Backup-ul nocturn** din repo-ul privat
+> `vicuvi1/registru-backups` copiază toată baza în fiecare noapte, verifică restaurarea
+> și ține proiectul activ. În plus: salvare sigură în aplicație, istoric modificări,
+> folder local „registru mother" + copii în cloud.
 
 Aceasta este o **dovadă de concept (POC)**: autentificare + Partea I editabilă +
 sincronizare live între utilizatori. Restul părților și exporturile urmează (vezi roadmap).

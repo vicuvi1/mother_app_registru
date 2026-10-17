@@ -68,6 +68,19 @@ eq(L.sumCols([["a", "A", "int"], ["b", "B", "bool", { ct: true }], ["t", "T", "t
   eq(kept.length < 90, true, "retenție: numărul de copii rămâne mic (" + kept.length + ")");
 }
 
+// normDate — date scrise de om → ZZ.LL
+eq(L.normDate("5", 2026, 10), { value: "05.10", month: 10 }, "data: doar ziua → luna curentă");
+eq(L.normDate("5.3", 2026, 10), { value: "05.03", month: 3 }, "data: 5.3 → 05.03");
+eq(L.normDate("05/10", 2026, 1).value, "05.10", "data: slash");
+eq(L.normDate(" 7-11-2026 ", 2026, 1).value, "07.11", "data: cu an și spații");
+eq(L.normDate("01.10.", 2026, 1).value, "01.10", "data: punct final");
+eq(L.normDate("", 2026, 10), { value: "" }, "data: goală rămâne goală");
+eq(L.normDate("31.02", 2026, 2).error, "ziua", "data: 31 februarie e invalidă");
+eq(L.normDate("29.02", 2028, 2).value, "29.02", "data: 29 februarie în an bisect");
+eq(L.normDate("29.02", 2026, 2).error, "ziua", "data: 29 februarie în an nebisect");
+eq(L.normDate("12.13", 2026, 1).error, "luna", "data: luna 13");
+eq(L.normDate("ieri", 2026, 1).error, "format", "data: text oarecare");
+
 // snapshotLooksWrong — gardă împotriva copiilor goale
 eq(L.snapshotLooksWrong(0, 5000), true, "copie goală după una plină = suspectă");
 eq(L.snapshotLooksWrong(2000, 5000), true, "copie la sub jumătate = suspectă");

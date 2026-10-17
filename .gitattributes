@@ -1,0 +1,3 @@
+# Bundled third-party libraries: keep byte-for-byte as published (no line-ending conversion)
+app_mother/biblioteca-app/web/vendor/*.js -text
+app_mother/biblioteca-app/web/vendor/*.wasm binary

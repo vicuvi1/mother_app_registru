@@ -578,6 +578,16 @@
     keys.forEach((k) => { if (k === skipCol) return; const inp = $("content").querySelector(`tbody input[data-id="${id}"][data-col="${k}"]`); if (inp) { if (inp.type === "checkbox") inp.checked = !!row[k]; else inp.value = row[k] == null ? "" : row[k]; markOOR(inp); } });
     applyRowValidation(id); renderFooter();
   }
+  // Verifică o dată scrisă într-o celulă: format ZZ.LL, zi existentă și — pentru data rândului
+  // pe părțile zilnice / cu evenimente — luna afișată. Întoarce { value } sau { error: mesaj }.
+  function checkDate(part, col, text, required) {
+    const r = window.RegistruLogic.normDate(text, state.an, state.luna);
+    if (r.error) return { error: `Data „${text}" nu e validă — scrieți ziua și luna, ex. ${ddmm(5, state.luna)}` };
+    if (!r.value) return required ? { error: "Data este obligatorie" } : r;
+    if (col === part.dateField && (part.period === "zi" || part.period === "lista") && r.month !== state.luna)
+      return { error: `Data trebuie să fie în luna afișată (${LUNI[state.luna - 1]}). Pentru altă lună, alegeți tab-ul lunii.` };
+    return r;
+  }
   // final=false: la fiecare tastă (salvare din mers); final=true: la ieșirea din celulă.
   function commitCell(el, final) {
     if (!el.isConnected && !final) return;
@@ -585,6 +595,14 @@
     const row = state.rows.find((r) => r.id === id); if (!row || !isPart()) return;
     if (!focusOld.has(el)) focusOld.set(el, row[col]); // fără eveniment focus (ex. fereastră inactivă)
     const before = focusOld.get(el);
+    if (type === "date") { // datele se potrivesc între părți după textul exact „ZZ.LL"
+      const chk = checkDate(part, col, el.value, !!el.dataset.req);
+      if (chk.error) {
+        el.value = before == null ? "" : before; el.classList.remove("dirty");
+        toast(chk.error, 6000); return;
+      }
+      el.value = chk.value;
+    }
     const prev = row[col], nv = readInput(el, type);
     if (nv !== prev) {
       row[col] = nv;
@@ -648,7 +666,7 @@
     const startIdx = state.rows.findIndex((r) => r.id === +el.dataset.id);
     if (startCol < 0 || startIdx < 0) return;
     const lines = text.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
-    const changes = [];
+    const changes = []; let badDates = 0;
     for (let dr = 0; dr < lines.length; dr++) {
       const ri = startIdx + dr; if (ri >= state.rows.length) break;
       const row = state.rows[ri], work = Object.assign({}, row), cells = lines[dr].split("\t"), affected = new Set();
@@ -656,7 +674,8 @@
         const ci = startCol + dc; if (ci >= cols.length) break;
         const [k, l, t, o = {}] = cols[ci]; if (o.ro || t === "monthlabel") continue;
         const raw = cells[dc].trim();
-        if (t === "int") work[k] = Math.max(0, parseInt(raw.replace(/[^\d-]/g, ""), 10) || 0);
+        if (t === "date") { const chk = checkDate(state.part, k, raw, !!o.req); if (chk.error) { badDates++; continue; } work[k] = chk.value; }
+        else if (t === "int") work[k] = Math.max(0, parseInt(raw.replace(/[^\d-]/g, ""), 10) || 0);
         else if (t === "bool") work[k] = /^(1|true|da|x|✓|adevărat)$/i.test(raw);
         else work[k] = raw === "" ? (o.req ? "" : null) : raw;
         deriveRow(state.part, work, k).forEach((x) => affected.add(x)); affected.add(k);
@@ -664,14 +683,23 @@
       if (affected.size) { const fields = {}; affected.forEach((k) => (fields[k] = work[k])); changes.push({ row, fields }); }
     }
     batchUpdate("lipire din Excel", changes);
-    toast(`Lipit din Excel: ${changes.length} rânduri (Ctrl+Z anulează)`, 3000);
+    toast(`Lipit din Excel: ${changes.length} rânduri (Ctrl+Z anulează)` + (badDates ? ` · ${badDates} date nevalide sărite` : ""), badDates ? 6000 : 3000);
   }
 
   async function addRow() {
     const p = state.part, base = {};
     if (p.period !== "crud") { base.an = state.an; base.luna = state.luna; }
     if (p.categorie) base.categorie_varsta = state.cat;
-    if (p.period === "zi") { const d = prompt("Data (ZZ.LL):", ddmm(1, state.luna)); if (!d) return; base[p.dateField] = d; }
+    if (p.period === "zi") {
+      let d = ddmm(1, state.luna);
+      for (;;) {
+        d = prompt("Data zilei (ZZ.LL):", d); if (d == null) return;
+        const chk = checkDate(p, p.dateField, d, true);
+        if (!chk.error) { base[p.dateField] = chk.value; break; }
+        alert(chk.error);
+      }
+      if (state.rows.some((r) => r[p.dateField] === base[p.dateField])) { toast(`Ziua ${base[p.dateField]} există deja în tabel`, 5000); return; }
+    }
     else if (p.period === "lista" && p.dateField) base[p.dateField] = ddmm(1, state.luna);
     p.cols.forEach(([k, l, t, o]) => { if (o && o.req && (t === "text" || t === "txt") && base[k] === undefined) base[k] = ""; });
     const { data, error } = await sb.from(p.key).insert(base).select().maybeSingle(); if (error) { toast("Eroare: " + error.message); return; }
@@ -938,12 +966,24 @@
     };
   }
 
+  // Supabase întoarce cel mult 1000 de rânduri pe cerere → citim pe pagini. `build` = funcție
+  // care construiește interogarea (cu ordine stabilă), apelată pentru fiecare pagină.
+  async function fetchRows(build) {
+    let all = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await build().range(from, from + 999);
+      if (error) throw new Error(error.message);
+      all = all.concat(data || []);
+      if (!data || data.length < 1000) return all;
+    }
+  }
+
   // ---- Dashboard ------------------------------------------------------------
   async function computeBadges() {
     state.incomplete = [];
     const results = await Promise.all(PARTS.map(async (p) => {
-      let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
-      const { data } = await q; return { p, rows: data || [] };
+      const build = () => { let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an); return q.order("id", { ascending: true }); };
+      try { return { p, rows: await fetchRows(build) }; } catch (e) { return { p, rows: [] }; }
     }));
     for (const { p, rows } of results) {
       if (p.period === "crud") { state.badges[p.key] = rows.length ? "ok" : "empty"; continue; }
@@ -1101,13 +1141,17 @@
     const cover = $("fin_cover").checked, c = await getCover();
     c.an = c.an || String(state.an);
     $("fin_status").textContent = "Se generează…"; setBusy(true);
-    const dataByPart = {};
+    const dataByPart = {}, failed = [];
     (await Promise.all(PARTS.map(async (p) => {
-      let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
-      q = (p.orderById || !p.dateField) ? q.order("id", { ascending: true }) : q.order(p.dateField, { ascending: true });
-      const { data } = await q; return [p.key, data || []];
+      const build = () => {
+        let q = sb.from(p.key).select("*"); if (p.period !== "crud") q = q.eq("an", state.an);
+        q = (p.orderById || !p.dateField) ? q.order("id", { ascending: true }) : q.order(p.dateField, { ascending: true });
+        return q.order("id", { ascending: true });
+      };
+      try { return [p.key, await fetchRows(build)]; } catch (e) { failed.push(`Partea ${p.nr}`); return [p.key, []]; }
     }))).forEach(([k, v]) => (dataByPart[k] = v));
     setBusy(false);
+    if (failed.length) { $("fin_status").textContent = "Nu am putut citi: " + failed.join(", ") + ". Verificați conexiunea și încercați din nou."; return; }
     const secs = finalSections(dataByPart);
     if (!secs.length && !cover) { $("fin_status").textContent = "Nu ați selectat nicio pagină."; return; }
     if (format === "word") {
@@ -1157,15 +1201,49 @@
       <input type="file" id="xlsxFile" accept=".xlsx"><button id="doXlsx">Importă din Excel</button>
       <label class="row" style="margin:10px 0"><input type="checkbox" id="impReplace" style="width:auto;margin-right:8px"><b>Înlocuiește</b> datele existente (restaurare curată — șterge înainte de import)</label>
       <pre id="importLog" style="margin-top:8px;background:#0f172a;color:#cbd5e1;padding:12px;border-radius:8px;max-height:320px;overflow:auto;font-size:12px;white-space:pre-wrap"></pre>
-      <p class="status">Fără „Înlocuiește": importul e sigur (nu dublează datele zilnice — actualizează pe cheie). Cu „Înlocuiește": șterge tot și pune datele din fișier.</p></div>`;
+      <p class="status">Fără „Înlocuiește": importul e sigur și se poate repeta — zilele/lunile se actualizează, iar la celelalte părți se adaugă doar rândurile care lipsesc (nimic nu se dublează). Cu „Înlocuiește": părțile din fișier sunt înlocuite deodată (totul sau nimic). Înainte de orice import se face automat o copie a datelor de acum.</p></div>`;
     const logEl = $("importLog"), log = (m) => { logEl.textContent += m + "\n"; logEl.scrollTop = logEl.scrollHeight; };
-    const run = async (btnId, fileId, fn) => { const f = $(fileId).files[0]; if (!f) { toast("Alegeți un fișier"); return; } const replace = $("impReplace").checked; if (replace && !confirm("Mod înlocuire: datele curente vor fi ȘTERSE și înlocuite cu cele din fișier. Continuați?")) return; logEl.textContent = ""; $(btnId).disabled = true; try { await fn(sb, f, log, { replace }); await loadStaff(); } catch (e) { log("✗ " + e.message); } finally { $(btnId).disabled = false; } };
+    const run = async (btnId, fileId, fn) => {
+      const f = $(fileId).files[0]; if (!f) { toast("Alegeți un fișier"); return; }
+      const replace = $("impReplace").checked;
+      if (replace && !confirm("Mod înlocuire: părțile din fișier vor ÎNLOCUI datele de acum (se face întâi o copie de siguranță). Continuați?")) return;
+      logEl.textContent = ""; $(btnId).disabled = true;
+      try {
+        commitActive(); await flushNow();
+        log("Copie de siguranță a datelor de acum…");
+        const pre = await takeSnapshot(true);
+        if (pre.skip) { log("✗ Reconectați-vă întâi."); return; }
+        const name = `registru_inainte-de-import_${window.RegistruBackup.stamp()}.json`;
+        const up = await window.RegistruBackup.cloudBackup(sb, () => {}, { snapshot: pre.obj, name });
+        if (up.error) { download(new Blob([JSON.stringify(pre.obj)], { type: "application/json" }), name); log("  ✔ descărcată pe calculator: " + name); }
+        else log("  ✔ în cloud: " + name + " (se poate restaura din Acasă → Restaurează din cloud)");
+        await fn(sb, f, log, { replace });
+        window.RegistruBackup.markSnapshot(null);
+        await loadSettings(); await loadStaff();
+      } catch (e) { log("✗ " + e.message); } finally { $(btnId).disabled = false; }
+    };
     $("doSqlite").onclick = () => run("doSqlite", "sqliteFile", window.RegistruImport.migrateSqlite);
     $("doXlsx").onclick = () => run("doXlsx", "xlsxFile", window.RegistruImport.importExcel);
   }
 
   // ---- Export / print / backup ----------------------------------------------
-  function exportCurrent() { const p = state.part; if (!isPart() || !state.rows.length) { toast("Nimic de exportat"); return; } const ws = XLSX.utils.json_to_sheet(state.rows); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `Partea ${p.nr}`.slice(0, 31)); XLSX.writeFile(wb, `partea_${p.nr}_${state.an}_${pad2(state.luna)}.xlsx`); }
+  // Excel-ul tabelului de pe ecran: aceleași coloane și denumiri ca în aplicație + rândul Total.
+  // (Pentru backup complet / reimport există „Salvează copie"; foaia nu se numește exact
+  // „Partea N", ca importul să n-o confunde cu o foaie de backup.)
+  function exportCurrent() {
+    const p = state.part; if (!isPart() || !state.rows.length) { toast("Nimic de exportat"); return; }
+    const cols = effCols(), heads = cols.map(label);
+    const val = (r, [k, l, t]) => t === "int" ? (+r[k] || 0) : cellText(r, k, t);
+    const aoa = [heads].concat(state.rows.map((r) => cols.map((c) => val(r, c))));
+    const acc = computeAcc(cols, state.rows);
+    aoa.push(cols.map(([k], i) => (i === 0 ? "Total" : acc[k] == null ? "" : acc[k])));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = heads.map((h) => ({ wch: Math.max(8, Math.min(30, String(h).length + 2)) }));
+    const per = p.period === "luna" ? String(state.an) : p.period === "crud" ? "" : `${LUNI[state.luna - 1].slice(0, 3)} ${state.an}`;
+    const sheet = `Partea ${p.nr}${per ? " - " + per : ""}${p.categorie ? " " + (state.cat === "adulti" ? "Adulți" : "Copii") : ""}`.slice(0, 31);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheet);
+    XLSX.writeFile(wb, `partea_${p.nr}_${state.an}_${pad2(state.luna)}${p.categorie ? "_" + state.cat : ""}.xlsx`);
+  }
   function printCurrent() {
     const p = state.part, cols = effCols(), ori = state.settings.print_orientation || "landscape";
     const head = `<tr>${cols.map((c) => `<th>${esc(label(c))}</th>`).join("")}</tr>`;
