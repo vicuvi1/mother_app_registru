@@ -104,6 +104,10 @@ declare
 begin
   -- În timpul unei restaurări se scrie o singură intrare (RESTORE), nu mii.
   if current_setting('app.restoring', true) = 'on' then return null; end if;
+  -- „unde am rămas" se scrie la fiecare navigare — nu e o modificare a registrului
+  if tg_table_name = 'app_settings' then
+    if (case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end) ->> 'cheie' in ('session_state', 'seeded_v1') then return null; end if;
+  end if;
 
   if tg_op = 'UPDATE' then
     o := to_jsonb(old); n := to_jsonb(new);

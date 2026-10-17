@@ -38,7 +38,15 @@ update evidenta_utilizatori set adulti = 8 where data = '01.10';   -- no real ch
 update evidenta_utilizatori set pensionari = 2 where data = '01.10';
 insert into evidenta_utilizatori (an, luna, data) values (2026, 10, '05.10');
 delete from evidenta_utilizatori where data = '02.10';
-do $$ begin assert (select count(*) from istoric) >= 3, 'mama can read the history'; end $$;
+-- navigation state + a real setting
+insert into app_settings (cheie, valoare) values ('session_state', '{"part":"instruiri"}') on conflict (cheie) do update set valoare = excluded.valoare;
+insert into app_settings (cheie, valoare) values ('session_state', '{"part":"voluntariat"}') on conflict (cheie) do update set valoare = excluded.valoare;
+insert into app_settings (cheie, valoare) values ('excluded_days_2026', '{"10":["14.10"]}') on conflict (cheie) do update set valoare = excluded.valoare;
+do $$ begin
+  assert (select count(*) from istoric) >= 3, 'mama can read the history';
+  assert (select count(*) from istoric where tabel = 'app_settings' and coalesce(nou ->> 'cheie', '') = 'session_state') = 0, 'navigation state is not history';
+  assert (select count(*) from istoric where tabel = 'app_settings' and nou ->> 'cheie' = 'excluded_days_2026') = 1, 'real settings are history';
+end $$;
 
 \echo '== stranger with a valid login: sees nothing, changes nothing'
 select set_config('request.jwt.claims', '{"email":"strain@rau.com","role":"authenticated"}', false);
